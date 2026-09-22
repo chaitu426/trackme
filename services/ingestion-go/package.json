@@ -1,0 +1,13 @@
+{
+  "name": "@trackme/ingestion-go",
+  "version": "0.1.0",
+  "private": true,
+  "description": "High-throughput Go edge collector (primary production ingestion)",
+  "scripts": {
+    "dev": "go run ./cmd/server",
+    "build": "go build -o bin/ingestion-go ./cmd/server",
+    "start": "./bin/ingestion-go",
+    "typecheck": "go vet ./...",
+    "lint": "go vet ./..."
+  }
+}

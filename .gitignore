@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+infra/geoip/*.mmdb
+infra/geoip/*.mmdb.gz
+
+# Copied from packages/tracker/dist at build time (see apps/web/scripts/copy-tracker-assets.mjs)
+apps/web/public/tracker.js
+
+# Turborepo
+.turbo/
+
+# Environment files
+.env
+.env*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Database & local storage
+infra/docker/data/
+postgres_data/
+clickhouse_data/
+redis_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary / Scratch
+temp_docx/
+scratch/
+scratch_docx_text.txt
+spec.zip
+

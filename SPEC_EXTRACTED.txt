@@ -1,0 +1,383 @@
+
+Growth Intelligence Platform
+Production Build Specification for a Coding Agent
+Implementation target: Next.js + TypeScriptVersion 1.0 | 16 September 2026
+Purpose and directive
+Build a multi-tenant, privacy-first growth intelligence SaaS. It must let a customer install a small tracking snippet, view accurate website analytics in real time, define conversions, connect billing data, understand which acquisition sources generate revenue, receive proactive alerts, and export its data. The product must be production-ready in design, but delivery should be phased so the team validates demand before building enterprise complexity.
+This is not a request to clone any platform’s proprietary source code, visual identity, or wording. Use the named platforms only as public product and architectural references. Implement original UI, original workflows, and an independently designed data model.
+Reference products
+Platform
+What to learn from it
+What not to copy
+Sleek Analytics (getsleek.io)
+Simple founder-first dashboard; lightweight privacy-first web analytics; real-time activity; Core Web Vitals; revenue connections; public dashboards; AI data exploration.
+Branding, UI design, proprietary code, marketing copy, and any unverified internal implementation.
+Plausible
+Privacy-first, cookie-free web analytics product shape; clean, focused traffic reports; separate operational and analytical storage pattern.
+Exact UI, wording, schemas, or open-source license obligations without legal review.
+PostHog
+Event analytics maturity: durable event ingestion, product analytics, funnels, retention, feature usage, and scalable analytical architecture.
+Attempting to replicate its broad product scope in MVP; proprietary cloud implementation details.
+GA4
+Market expectations around source/medium, campaign/UTM reporting, conversions, and acquisition analysis.
+Complex report taxonomy and difficult user experience.
+Stripe Dashboard
+Billing truth: subscriptions, payments, refunds, MRR changes, and invoices.
+Treating billing data alone as attribution truth.
+Mixpanel/Amplitude
+Funnels, cohorts, retention and behavioral segmentation.
+Building enterprise-level query flexibility before core reliability.
+Core thesis
+The platform should win by combining the simplicity of a privacy-first website analytics product with a trusted growth decision layer: acquisition -> activation -> subscription revenue -> retention. Basic pageview dashboards are commoditized. The durable advantage is clear attribution, transparent measurement quality, actionable alerts, data ownership, and lightweight product analytics without enterprise complexity.
+Element
+Definition
+Target customer
+Indie hackers, founders, small and mid-sized SaaS teams, agencies, creator businesses, and privacy-sensitive organizations.
+Primary buyer
+Founder, growth lead, marketer, product lead, agency owner, or technical operator.
+Primary job
+Answer: “What changed, why did it change, and what should we do next?”
+Core promise
+Install quickly, collect minimal data, trust the numbers, and connect traffic to revenue.
+Monetization
+Usage-based subscription SaaS: event volume, sites/workspaces, revenue integrations, retention, team seats, and enterprise controls.
+Product principles
+Privacy by default: no cookies required for basic measurement; minimize IP handling; never capture form contents, passwords, payment data, email addresses, or arbitrary PII by default.
+Trust before cleverness: every chart must define its metric, date range, timezone, filters, data freshness, and attribution model.
+Fast time to value: customer should install the snippet and see verified traffic in under five minutes.
+Progressive complexity: simple overview first; advanced segmentation, attribution, exports, and product analytics are available only when useful.
+Data ownership: customers can export permitted data and use a stable API; do not create artificial lock-in through inaccessible data.
+Reliable AI: the AI interface may only answer from executed, validated analytics queries and must expose the applied query/filters.
+Scope and priorities
+Priority
+Included
+Excluded until later
+P0: MVP
+Accounts/workspaces/sites, script installation, pageviews, SPA routes, sessions, custom events, referrers/UTMs, device/geo, dashboards, date filters, basic realtime, billing/limits.
+Session replay, identity graph, full attribution modeling, data warehouse sync, AI chat, feature flags.
+P1: Paid differentiation
+Goals/conversions, Stripe connection, revenue metrics, public dashboards, scheduled alerts, bot controls, CSV export, API keys, first-party proxy.
+Full multi-touch modeling, automatic event capture, native mobile SDKs, SSO.
+P2: Defensible moat
+Activation funnels, retention cohorts, subscription MRR movement, source-to-LTV, Slack/email reporting, annotations, RBAC, warehouse exports.
+Enterprise audit/compliance suite and global multi-region deployment.
+P3: Expansion
+AI analyst, product analytics advanced queries, privacy-safe session diagnostics, agency white label, SSO/SAML, SCIM, custom data residency.
+Anything that compromises accuracy, privacy or operational focus.
+Must-have features
+Feature
+Acceptance criteria
+Implementation direction
+Multi-tenant workspace
+User creates workspace; workspace contains members and sites; all queries enforce workspace/site authorization.
+PostgreSQL tenancy model with workspace_id on all operational entities; server-side authorization only.
+Site setup
+User creates site, gets snippet and installation instructions, verifies incoming event.
+Public write-only site key; no privileged key in browser.
+JavaScript tracker
+Async, resilient, privacy-safe tracker; pageview on load and route transitions; custom event API.
+TypeScript package served via CDN; sendBeacon first, fetch keepalive fallback; event UUID for idempotency.
+Page analytics
+Overview, visitors, pageviews, sessions, pages, entry pages, exits, duration, referrers, UTM campaigns, country, device/browser.
+ClickHouse aggregate queries and rollups; filters stored in URL state.
+Custom events
+Track named events with safe JSON properties; event explorer; conversion designation.
+Schema validation; property allowlist/denylist; cardinality protection.
+SPA support
+Avoid missed/duplicate routes for Next.js/React/Vue/Svelte sites.
+History API instrumentation and framework adapter examples; test suite for route behavior.
+Realtime dashboard
+Show active visitors/pages over a documented recent window.
+Redis activity keys + SSE endpoint; server-authorized subscriptions.
+Privacy controls
+No cookie reliance by default; IP minimization; configurable retention; DNT/consent integration mode; deletion request process.
+Process IP transiently for country/bot checks then discard/truncate; legal review for jurisdictional claims.
+Bot protection
+Known bot filtering plus heuristic filtering; customers can inspect exclusions.
+UA rules, IP/rate signals, request fingerprints; separate raw/filtered counts internally.
+Core Web Vitals
+p75 LCP/CLS/INP/FCP/TTFB by page/device/time.
+web-vitals package or browser PerformanceObserver; sampled events and percentile aggregates.
+Billing limits
+Meter events per workspace/site; enforce plan allowances and usage warnings.
+Counter rollups, hard/soft quota policy, Stripe Billing integration for your own billing.
+Exports/API
+CSV export and documented read API for aggregates; scoped keys and rate limits.
+Async export jobs for large ranges; API tokens hashed at rest; audit access.
+Competitive differentiators
+Differentiator
+Customer problem solved
+Why it matters
+Measurement Health Center
+Customers distrust mismatched analytics counts.
+Shows tracker coverage, blocked requests, bot exclusions, processing delay, timezone and metric definitions.
+Revenue-quality attribution
+Traffic metrics do not show profitable growth.
+Shows first-touch, last non-direct and selectable attribution models; coverage/confidence is explicit.
+Acquisition-to-retention view
+Web analytics and product analytics are disconnected.
+Connects campaign/source to activation, trial conversion, paid conversion, MRR, churn and LTV where customer identity is consentedly supplied server-side.
+Actionable anomaly alerts
+Founders do not constantly watch dashboards.
+Explains abnormal movement and likely drivers: referrer, campaign, page, country, release, performance metric.
+Data portability
+Closed dashboards frustrate technical teams.
+Raw/aggregate exports, warehouse delivery, documented APIs, predictable retention and deletion.
+Founder-ready product analytics
+Full product analytics platforms can be overkill.
+Templates for signup funnel, activation, feature adoption and retention with minimal event setup.
+Agency operating mode
+Agencies need reporting across client sites.
+Client workspaces, branded report links, scheduled digests, permissions and annotations.
+Architecture references
+Use two reference patterns, then implement the optimized hybrid described below. Plausible’s documented/self-hosted pattern separates operational data in PostgreSQL from high-volume analytics events in ClickHouse. PostHog’s commonly documented production pattern adds a durable streaming layer (Kafka-compatible queue), uses ClickHouse for analytics, PostgreSQL for application data, and Redis for caching/realtime coordination. ClickHouse itself is an OLAP-oriented columnar database designed for high-performance analytical workloads. [web:17][web:18][web:19][web:22][web:23][web:24]
+Reference pattern
+Strength
+Use in our product
+Plausible-style: app + PostgreSQL + ClickHouse
+Operational simplicity and correct separation of transactional vs event workloads.
+Use for local development and early production when event volumes are modest.
+PostHog-style: ingestion + Kafka/Redpanda + ClickHouse + PostgreSQL + Redis
+Backpressure, replayability, decoupled transforms and scale.
+Adopt progressively as production volume/reliability needs grow; design interfaces so queue insertion can be enabled early.
+ClickHouse analytical core
+Fast scans, aggregations and event-oriented storage.
+Primary store for immutable events, rollups, funnels and dimensional reports.
+Final target architecture
+Implement a modular monolith for the control plane and dashboard, with an isolated ingestion pipeline. Do not begin with dozens of microservices. Use clean boundaries, queues, typed contracts and independently deployable workers so the system can evolve into a distributed architecture without a rewrite.
+Layer
+Technology recommendation
+Responsibilities
+Web application
+Next.js (App Router) + TypeScript + React + Tailwind CSS + shadcn/ui or equivalent original component system.
+Marketing pages, authenticated dashboard, setup wizard, account settings, server-rendered initial views.
+API / control plane
+Next.js route handlers for MVP; extract a TypeScript service when required.
+Auth, workspace/site management, billing, authorization, API keys, dashboard query orchestration, integration settings.
+Tracker SDK
+TypeScript package/bundled browser script; CDN/edge hosted.
+Pageviews, SPA routes, events, sessions, Web Vitals, consent/DNT mode, batching and transport.
+Ingestion edge
+Cloudflare Workers or regional Node/Fastify service behind CDN/WAF.
+Validate, rate limit, enrich minimally, redact unsafe fields, assign event IDs and enqueue.
+Event queue
+Start with managed queue; production scale: Kafka or Redpanda.
+Durable buffering, retry, replay, dead-letter handling and consumer isolation.
+Analytics warehouse
+ClickHouse Cloud or managed ClickHouse.
+Raw events, materialized views, aggregate tables, funnel/retention queries and export source.
+Transactional database
+PostgreSQL (managed).
+Users, organizations, memberships, sites, goals, tokens, plans, billing state, integration configuration, audit records.
+Realtime/cache
+Redis (managed).
+Active user windows, SSE fan-out metadata, rate counters, short-lived cache and job locks.
+Workers
+TypeScript worker services; queue consumers and scheduled jobs.
+Event normalization, ClickHouse writes, rollups, integration reconciliation, alerts, exports, retention/deletion jobs.
+Identity/auth
+Auth.js, Clerk, WorkOS, or equivalent with secure server-side session handling.
+Email/OAuth login, organization membership, roles; add SSO in enterprise phase.
+Billing
+Stripe Billing.
+Plans, subscriptions, invoice state, metered/limit enforcement and customer portal.
+Observability
+OpenTelemetry, Sentry, structured logs, metrics platform, status page.
+Trace ingestion, query latency, data freshness, errors, costs and SLA monitoring.
+Event pipeline
+Step
+Design
+Capture
+Tracker assigns anonymous session ID and rotating visitor pseudonym; captures only approved dimensions and event properties.
+Batch
+Buffer a small number of events or a brief interval; use navigator.sendBeacon on unload when available.
+Receive
+Ingestion endpoint verifies site key, origin policy, payload size, schema version, event UUID and rate limits.
+Sanitize
+Reject or redact suspected PII keys/values; normalize URL; remove query parameters by default except approved campaign keys.
+Enrich
+Derive country/region from IP at edge; parse user agent; normalize referrer/UTM; apply bot decision. Do not retain full IP unless a reviewed, explicit legal requirement exists.
+Queue
+Write accepted events to a durable stream. Respond quickly; do not synchronously execute expensive queries.
+Process
+Consumer batches inserts into ClickHouse; tracks failures; retries safely using event UUID/idempotency.
+Aggregate
+Materialized views and scheduled rollups generate hourly/daily metrics and Web Vital percentiles.
+Serve
+Dashboard/API reads aggregate tables for common views; raw events only for tightly bounded drill-down queries.
+Alert
+Scheduled/anomaly worker compares current data with historical baseline and sends actionable notifications.
+Data model
+Entity/table
+Store
+Key fields
+users
+PostgreSQL
+id, email, name, auth_provider, created_at
+workspaces
+PostgreSQL
+id, name, plan, timezone, data_region, created_at
+workspace_members
+PostgreSQL
+workspace_id, user_id, role, created_at
+sites
+PostgreSQL
+id, workspace_id, domain, display_name, public_key_hash, settings_json, created_at
+goals
+PostgreSQL
+id, site_id, event_name or URL rule, value_config, enabled
+api_keys
+PostgreSQL
+id, workspace_id, scope, key_hash, last_used_at, expires_at
+integrations
+PostgreSQL
+id, workspace_id, provider, encrypted_credentials, status, last_sync_at
+audit_logs
+PostgreSQL
+id, workspace_id, actor_id, action, target_type, target_id, metadata, created_at
+events_raw
+ClickHouse
+event_id, timestamp, workspace_id, site_id, event_name, session_id, visitor_pseudonym, path, referrer, UTM dimensions, device dimensions, geo, properties JSON, bot_status
+pageview_rollups_hourly/daily
+ClickHouse
+site_id, date/hour, dimensions, visitors, sessions, pageviews, conversions, duration aggregates
+event_rollups_daily
+ClickHouse
+site_id, date, event_name, dimension columns, count, unique sessions/visitors
+web_vitals
+ClickHouse
+site_id, timestamp, path, metric_name, value, rating, device/connection dimensions
+revenue_events
+ClickHouse or PostgreSQL + replicated analytics table
+site_id, provider, external_id, timestamp, amount, currency, type, customer_ref pseudonym, attribution fields
+active_session_state
+Redis
+site_id, session_id, path, last_seen_at, lightweight dimensions
+Privacy and security requirements
+Use HTTPS only. Configure CSP, secure headers, CSRF protection where applicable, input validation, rate limiting, and WAF/CDN protections.
+Hash API keys; display their plaintext only once. Encrypt third-party integration secrets using managed KMS/envelope encryption. Rotate and revoke keys.
+Use row/tenant isolation at the application layer. Every database query must receive workspace/site scope from the verified session/token, never solely from client parameters.
+Do not allow unrestricted event property names/values. Enforce maximum payload sizes, depth limits, allowlists for key categories, and PII detection/redaction.
+Provide retention controls, deletion jobs, export capability, DPA/subprocessor documentation, audit logs, and an incident-response runbook before scaling privacy claims.
+Never claim universal legal compliance solely because tracking is cookieless. Obtain professional legal review for GDPR, UK GDPR, CCPA/CPRA, PECR/ePrivacy and each target jurisdiction.
+Next.js implementation conventions
+Area
+Required convention
+Language
+TypeScript with strict mode enabled. Avoid any; share API/types through a package or lib module.
+Rendering
+Use Next.js App Router. Prefer React Server Components for initial dashboard data; client components only for interactive charts, filters, streaming realtime updates and forms.
+Routes
+Use route groups such as /(marketing), /(auth), /(app). Keep public dashboard routes isolated, e.g. /share/[slug].
+Data access
+Keep database access in server-only modules. Use a typed query/service layer; do not query databases from browser components.
+Validation
+Use Zod schemas at every API boundary, tracker payload boundary, form action and integration webhook boundary.
+Charts
+Use a production-quality React chart library. All charts require loading, empty, error, comparison, timezone and accessible text states.
+State
+Keep filters/shareable query state in URL search params. Use server actions/route handlers deliberately; do not hide business logic in UI components.
+Testing
+Unit test metric calculations and validation; integration-test API auth/tenant boundaries; end-to-end test tracker installation and dashboard flows.
+Styling
+Tailwind CSS with design tokens. Build an original clean B2B interface; do not duplicate competitor layouts.
+Errors
+Use error.tsx, loading.tsx, not-found.tsx, structured error codes and correlation IDs. Never surface secrets in client errors.
+Core routes and screens
+Route/screen
+Purpose
+/
+Original marketing page: positioning, use cases, pricing, privacy stance, product screenshots created by our team.
+/login, /signup
+Authentication and workspace provisioning.
+/onboarding
+Create workspace, create site, choose platform, install snippet, validate first event, select goals.
+/app/[workspace]/overview
+North-star view: traffic, conversions, net revenue, active visitors, changes versus prior period, insight cards.
+/app/[workspace]/sites/[site]/pages
+Top pages, landing/exit views, URL filters and trend.
+/app/[workspace]/sites/[site]/acquisition
+Referrers, channels, UTM campaigns, conversion/revenue attribution.
+/app/[workspace]/sites/[site]/events
+Event explorer, conversion goals, property constraints and funnels in later phase.
+/app/[workspace]/sites/[site]/performance
+Core Web Vitals with p75 and page/device breakdown.
+/app/[workspace]/sites/[site]/realtime
+Active visitors, paths, sources and short activity feed.
+/app/[workspace]/sites/[site]/settings
+Domains, script, privacy, filters, keys, integrations, retention and deletion controls.
+/app/[workspace]/alerts
+Anomaly rules, notification channels and alert history.
+/app/[workspace]/exports
+Export requests, API docs/keys and warehouse destinations in later phase.
+/share/[slug]
+Read-only public dashboard with strict, intentionally limited data exposure.
+Non-functional requirements
+Requirement
+Target
+Tracker payload
+Keep initial tracker very small; target < 2 KB gzip excluding optional Web Vitals module where possible.
+Ingestion response
+Fast acknowledge path; target p95 under 200 ms in primary region under normal load.
+Dashboard performance
+Common aggregate reports target p95 under 1.5 seconds; cache safe repeated queries.
+Freshness
+Realtime visible within seconds; non-realtime aggregates fresh within a documented short interval.
+Availability
+Design for graceful degradation: if realtime fails, historical analytics remains available; if queue is delayed, show freshness state.
+Accuracy
+Idempotent writes; explicit bot/filter rules; transparent metric definitions; automated synthetic event checks.
+Accessibility
+Keyboard navigable dashboard, semantic labels, sufficient contrast, text alternatives for charts.
+Cost controls
+Event quotas, payload restrictions, TTLs, rollups, query guardrails, per-tenant usage monitoring and export limits.
+Delivery plan
+Milestone
+Deliverables
+Exit criteria
+M0: Foundation
+Monorepo, Next.js app, CI/CD, auth, PostgreSQL migrations, ClickHouse instance, observability skeleton, design system.
+User can log in, create workspace/site; test environments deploy safely.
+M1: Tracking MVP
+Tracker, collector, schema validation, queue, ClickHouse writer, pageview reports, basic date/filter UI.
+A real test site sends pageviews; event counts reconcile within defined tolerance.
+M2: Usable paid beta
+Custom events/goals, realtime, billing/quotas, privacy controls, bot filter, onboarding/verification, support docs.
+10–20 design partners can self-install and return to dashboard weekly.
+M3: Revenue intelligence
+Stripe integration, payment/revenue normalization, attribution views, alerts, export/API, public dashboards.
+Customers can identify source/page contribution with transparent attribution limitations.
+M4: Differentiation
+Funnels, cohorts, MRR movements, collaboration, scheduled reporting, warehouse export.
+Retention and expansion demonstrate value beyond basic web analytics.
+M5: AI and enterprise
+Grounded AI analyst, SSO, richer RBAC, audit/compliance package, optional regional deployment.
+AI answers are traceable; enterprise controls satisfy validated buyer requirements.
+Definition of done
+Feature has written user story, acceptance criteria, privacy impact check, observability metrics, error states, loading/empty states, and tests.
+No cross-workspace data access is possible through UI, API, exports, cache keys, background jobs or public dashboard links.
+All tracker and API payloads are versioned and validated.
+All production secrets are stored in a managed secret store; no secrets are committed or sent to the browser.
+Dashboard values can be traced to documented query definitions and filtered data.
+Each release has migration/rollback guidance and a monitored deployment path.
+Open decisions for product owner
+Decision
+Recommended default
+Initial ICP
+B2B SaaS founders and indie hackers with Stripe; this gives a clear revenue-attribution wedge.
+First integrations
+Stripe first; then Paddle/Lemon Squeezy/Polar based on validated demand.
+Data region
+EU-first if privacy positioning is central; clearly disclose actual data locations and subprocessors.
+Billing metric
+Events per month with fair overage/upgrade path; avoid charging by seats initially for solo-founder adoption.
+Identity model
+Anonymous web analytics by default; optional consented server-side customer identifiers only for product/revenue linkage.
+Open-source posture
+Do not promise open source initially. Evaluate after product-market fit and license/security review.
+AI launch timing
+After stable metric definitions and semantic query layer are complete; do not place it in critical path for MVP.
+Source notes
+Architecture choices are informed by publicly described patterns in analytics systems: Plausible deployments separate PostgreSQL for users/sites/settings from ClickHouse for analytics events, while PostHog-oriented public architectural descriptions use a streaming pipeline with Kafka-compatible ingestion, ClickHouse analytics storage, PostgreSQL application data, and Redis caching/realtime coordination. ClickHouse documentation describes its analytical/OLAP role. [web:17][web:18][web:19][web:22][web:23][web:24]
+Product reference context: Sleek Analytics publicly positions itself as a lightweight privacy-first Google Analytics alternative with real-time visitor insights, a single-script setup model, and dashboard-oriented analytics. [web:1][web:8]
+This document contains recommended design choices and high-level architecture, not claims about proprietary internals of any reference product. Validate infrastructure decisions using load tests, security reviews, costs, legal advice, and interviews with target customers.

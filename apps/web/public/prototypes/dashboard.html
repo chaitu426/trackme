@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrackMe — Growth Intelligence UI/UX Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            solis: {
+              bg: '#08090d',
+              card: '#12141c',
+              border: '#1e2230',
+              accent: '#22c55e',
+              glow: '#16a34a',
+              orange: '#f97316',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Silk Dark Background with Subtle Fluid Gradients */
+    body.theme-dark {
+      background: radial-gradient(circle at 50% -10%, #151928 0%, #08090d 60%, #050608 100%);
+      color: #f1f5f9;
+      min-height: 100vh;
+    }
+
+    body.theme-light {
+      background: radial-gradient(circle at 10% 10%, #fdf2f8 0%, #f1f5f9 45%, #e2e8f0 100%);
+      color: #0f172a;
+      min-height: 100vh;
+    }
+
+    /* Glassmorphism Cards */
+    .glass-card {
+      background: rgba(18, 20, 28, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glass-card:hover {
+      border-color: rgba(34, 197, 94, 0.25);
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 0 24px rgba(34, 197, 94, 0.08);
+    }
+
+    .theme-light .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      box-shadow: 0 16px 36px -10px rgba(148, 163, 184, 0.2);
+    }
+    .theme-light .glass-card:hover {
+      border-color: rgba(99, 102, 241, 0.3);
+      box-shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.15);
+    }
+
+    /* Floating Pill Header */
+    .glass-pill {
+      background: rgba(22, 25, 36, 0.85);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+    .theme-light .glass-pill {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(203, 213, 225, 0.8);
+      box-shadow: 0 10px 25px rgba(100, 116, 139, 0.12);
+    }
+
+    /* Diagonal Hatch Pattern for Stacked Bars */
+    .hatch-pattern {
+      background-image: repeating-linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15),
+        rgba(255, 255, 255, 0.15) 3px,
+        transparent 3px,
+        transparent 6px
+      );
+    }
+
+    /* Glowing Orb Effect */
+    .orb-glow {
+      background: radial-gradient(circle at 35% 35%, #86efac 0%, #22c55e 40%, #15803d 85%, #052e16 100%);
+      box-shadow: 0 0 35px #22c55e, inset 0 0 15px rgba(255, 255, 255, 0.6);
+      animation: pulse-orb 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-orb {
+      0% { transform: scale(1); box-shadow: 0 0 28px rgba(34, 197, 94, 0.6); }
+      100% { transform: scale(1.04); box-shadow: 0 0 45px rgba(34, 197, 94, 0.9), 0 0 70px rgba(34, 197, 94, 0.3); }
+    }
+
+    /* Subtle custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+  </style>
+</head>
+<body class="theme-dark font-sans transition-colors duration-300 antialiased p-4 md:p-8">
+
+  <!-- TOP BAR / STYLE SELECTOR BANNER -->
+  <div class="max-w-7xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-4 px-2">
+    <div class="flex items-center space-x-3">
+      <div class="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping"></div>
+      <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        Live Product Prototype • Connected to Real TrackMe Architecture
+      </span>
+    </div>
+
+    <!-- Style Switcher: Solis Luxury Dark vs Modern Studio Light -->
+    <div class="flex items-center space-x-2 bg-[#12141c] border border-slate-800 rounded-full p-1 text-xs">
+      <button id="btn-style-dark" onclick="switchTheme('dark')" class="px-4 py-1.5 rounded-full font-semibold bg-emerald-500 text-black shadow-sm transition">
+        ✦ Style 1: Solis Dark Luxury
+      </button>
+      <button id="btn-style-light" onclick="switchTheme('light')" class="px-4 py-1.5 rounded-full font-semibold text-slate-400 hover:text-white transition">
+        ☀ Style 2: Studio Clean Light
+      </button>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- FLOATING PILL NAVIGATION (From Dribbble Solis Design) -->
+    <header class="glass-pill rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center space-x-6">
+        <!-- Logo -->
+        <div class="flex items-center space-x-2.5">
+          <div class="h-8 w-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-black text-base shadow-lg shadow-emerald-500/20">
+            T
+          </div>
+          <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+            TrackMe
+          </span>
+        </div>
+
+        <!-- Floating Nav Tabs -->
+        <nav class="hidden md:flex items-center space-x-1.5 text-xs font-medium text-slate-300">
+          <button class="px-4 py-2 rounded-xl bg-white text-slate-950 font-bold shadow-md transition">
+            Overview
+          </button>
+          <button class="px-3.5 py-2 rounded-xl hover:bg-slate-800/60 hover:text-white transition flex items-center space-x-1.5">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Realtime</span>
+            <span class="ml-1 px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded-md text-[10px] font-mono">18</span>
+          </button>
+          <button class="px-3.5 py-2 rounded-xl hover:bg-slate-800/60 hover:text-white transition">
+            Acquisition
+          </button>
+          <button class="px-3.5 py-2 rounded-xl hover:bg-slate-800/60 hover:text-white transition">
+            Events & Goals
+          </button>
+          <button class="px-3.5 py-2 rounded-xl hover:bg-slate-800/60 hover:text-white transition">
+            Web Vitals
+          </button>
+          <button class="px-3.5 py-2 rounded-xl hover:bg-slate-800/60 hover:text-white transition">
+            Settings
+          </button>
+        </nav>
+      </div>
+
+      <!-- Right Actions: Search, Notifications, Avatar -->
+      <div class="flex items-center space-x-3">
+        <!-- Site Switcher Pill -->
+        <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-[#090b10] border border-slate-800 text-xs font-mono text-slate-300">
+          <span class="text-emerald-400 font-bold">●</span>
+          <span>trackme.dev</span>
+        </div>
+
+        <!-- Search Icon -->
+        <button class="h-9 w-9 rounded-xl bg-slate-800/40 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-800 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </button>
+
+        <!-- Notification Bell -->
+        <button class="h-9 w-9 rounded-xl bg-slate-800/40 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-800 relative transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-400"></span>
+        </button>
+
+        <!-- User Avatar with Glow -->
+        <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-500 p-0.5 shadow-md">
+          <div class="h-full w-full rounded-[10px] bg-slate-900 flex items-center justify-center text-xs font-bold text-white">
+            CA
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ROW 1: DUAL HERO PANELS (Solis Chart + Total Profits/Visitors Card) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT: TRAFFIC VOLUME STACKED PILLAR CHART (8 cols) -->
+      <div class="lg:col-span-7 glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between relative overflow-hidden">
+        <!-- Card Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <div class="flex items-center space-x-3 mb-1">
+              <h2 class="text-xl font-bold tracking-tight text-white">Traffic & Ingestion Volume</h2>
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+                Cookieless
+              </span>
+            </div>
+            <div class="flex items-center space-x-4 text-xs text-slate-400">
+              <span class="flex items-center space-x-1.5">
+                <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                <span>Direct & Organic</span>
+              </span>
+              <span class="flex items-center space-x-1.5">
+                <span class="h-2.5 w-2.5 rounded-full bg-orange-400"></span>
+                <span>Referral & Campaigns</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex items-center space-x-2">
+            <select class="bg-[#181a24] border border-slate-800 text-xs font-semibold text-slate-300 rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500">
+              <option>Daily Breakdown</option>
+              <option>Hourly Rollup</option>
+              <option>Monthly Trend</option>
+            </select>
+            <button class="h-8 w-8 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-400 hover:text-white text-sm">
+              ⋮
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Solis-Style Dual Stacked Rounded Bars with Floating Active Tooltip -->
+        <div class="relative pt-12 pb-4">
+          <!-- Floating Interactive Tooltip over highlighted bar (July/Today) -->
+          <div class="absolute -top-2 left-[58%] -translate-x-1/2 z-20 bg-white text-slate-900 px-3 py-2 rounded-xl shadow-2xl text-xs font-semibold pointer-events-none animate-bounce">
+            <div class="text-[10px] text-slate-500 uppercase tracking-wider">Sept 20, 2026</div>
+            <div class="flex items-center space-x-1 text-emerald-600 font-bold">
+              <span>●</span> <span>34,210 uniques</span>
+            </div>
+            <div class="flex items-center space-x-1 text-orange-600 font-bold">
+              <span>●</span> <span>8,605 campaigns</span>
+            </div>
+            <div class="w-2.5 h-2.5 bg-white rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
+          </div>
+
+          <!-- The Bars Grid -->
+          <div class="h-56 flex items-end justify-between gap-2 sm:gap-3 px-2">
+            <!-- Jan -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-36">
+                <div class="w-full bg-emerald-500/80 h-24 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-12"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Jan</span>
+            </div>
+            <!-- Feb -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-44">
+                <div class="w-full bg-emerald-500/80 h-32 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-12"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Feb</span>
+            </div>
+            <!-- Mar -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-32">
+                <div class="w-full bg-emerald-500/80 h-20 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-12"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Mar</span>
+            </div>
+            <!-- Apr -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-48">
+                <div class="w-full bg-emerald-500/80 h-34 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-14"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Apr</span>
+            </div>
+            <!-- May -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-28">
+                <div class="w-full bg-emerald-500/80 h-16 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-12"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">May</span>
+            </div>
+            <!-- Jun -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-52">
+                <div class="w-full bg-emerald-400 h-36 rounded-t-2xl shadow-lg shadow-emerald-500/30"></div>
+                <div class="w-full bg-orange-400 hatch-pattern h-16"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Jun</span>
+            </div>
+            <!-- Jul (Active Highlight) -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer scale-105">
+              <div class="w-full max-w-[38px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-emerald-500/20 p-0.5 h-56 ring-2 ring-emerald-400 shadow-2xl shadow-emerald-500/40">
+                <div class="w-full bg-gradient-to-b from-emerald-300 to-emerald-500 h-38 rounded-t-xl"></div>
+                <div class="w-full bg-orange-500 hatch-pattern h-18 rounded-b-xl"></div>
+              </div>
+              <span class="text-[11px] font-bold text-emerald-400 font-mono bg-emerald-500/20 px-2 py-0.5 rounded-md">Today</span>
+            </div>
+            <!-- Aug -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-44">
+                <div class="w-full bg-emerald-500/80 h-30 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-14"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Aug</span>
+            </div>
+            <!-- Sep -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-50">
+                <div class="w-full bg-emerald-500/80 h-34 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-16"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Sep</span>
+            </div>
+            <!-- Oct -->
+            <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+              <div class="w-full max-w-[36px] flex flex-col items-center justify-end rounded-2xl overflow-hidden bg-slate-800/30 h-40">
+                <div class="w-full bg-emerald-500/80 h-28 rounded-t-2xl"></div>
+                <div class="w-full bg-orange-400/80 hatch-pattern h-12"></div>
+              </div>
+              <span class="text-[11px] text-slate-500 font-mono group-hover:text-white transition">Oct</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: TOTAL VISITORS & DOT-MATRIX RETENTION CARD (5 cols) -->
+      <div class="lg:col-span-5 glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Unique Visitors</span>
+            <button class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center space-x-1">
+              <span>View All</span>
+              <span>↗</span>
+            </button>
+          </div>
+
+          <!-- Hero Value -->
+          <div class="flex items-baseline space-x-3 mb-6">
+            <h3 class="text-4xl font-extrabold tracking-tight text-white">42,815</h3>
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-semibold text-xs flex items-center space-x-1">
+              <span>↗</span> <span>12.4%</span>
+            </span>
+          </div>
+
+          <!-- Dual Mini Metrics: Live Active vs Avg Duration -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="p-4 rounded-2xl bg-[#161822] border border-slate-800">
+              <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+                <span>Active Right Now</span>
+                <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              </div>
+              <div class="text-xl font-bold text-white">18</div>
+              <div class="text-[11px] text-emerald-400 font-mono mt-0.5">SSE Realtime Fanout</div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-[#161822] border border-slate-800">
+              <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+                <span>Avg Duration</span>
+                <span class="text-emerald-400 font-mono text-[10px]">↗ 8%</span>
+              </div>
+              <div class="text-xl font-bold text-white">2m 45s</div>
+              <div class="text-[11px] text-slate-400 font-mono mt-0.5">38.2% Bounce Rate</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dot Matrix Engagement Grid (Inspired by Dribbble bead/dot matrix) -->
+        <div class="p-4 rounded-2xl bg-[#151722] border border-slate-800/80">
+          <div class="flex items-center justify-between text-xs mb-3">
+            <span class="font-semibold text-slate-300">Session Frequency Matrix</span>
+            <span class="text-[11px] text-slate-400">Past 30 Days</span>
+          </div>
+          <!-- 6 x 10 Dot Grid representing visitor loyalty -->
+          <div class="grid grid-cols-10 gap-2">
+            <!-- Row of emerald/teal/orange dots representing traffic quality -->
+            <div class="h-3 w-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-600"></div>
+            <div class="h-3 w-3 rounded-full bg-orange-400 shadow-sm shadow-orange-400/50"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-400"></div>
+            <div class="h-3 w-3 rounded-full bg-teal-400"></div>
+            <div class="h-3 w-3 rounded-full bg-slate-700"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+            <div class="h-3 w-3 rounded-full bg-orange-400"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-400"></div>
+            <div class="h-3 w-3 rounded-full bg-teal-400"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></div>
+            <div class="h-3 w-3 rounded-full bg-slate-700"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-400"></div>
+            <div class="h-3 w-3 rounded-full bg-orange-400"></div>
+
+            <div class="h-3 w-3 rounded-full bg-teal-400"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-600"></div>
+            <div class="h-3 w-3 rounded-full bg-slate-700"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+            <div class="h-3 w-3 rounded-full bg-orange-400"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-400"></div>
+            <div class="h-3 w-3 rounded-full bg-teal-400"></div>
+            <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+          </div>
+          <div class="flex items-center justify-between text-[10px] text-slate-500 mt-3 pt-2 border-t border-slate-800">
+            <span class="flex items-center space-x-1">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>High Engagement (>3 pages)</span>
+            </span>
+            <span class="flex items-center space-x-1">
+              <span class="h-2 w-2 rounded-full bg-orange-400"></span>
+              <span>Single Bounce</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 2: 3 COLUMN WIDGETS (Glowing Orb CWV + Dotted Geo Map + Growth Wave Insight) -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+      <!-- WIDGET 1: 3D GLOWING ORB - CORE WEB VITALS (3 cols) -->
+      <div class="md:col-span-3 glass-card rounded-3xl p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
+
+        <!-- Glowing Sphere with Sparkles -->
+        <div class="relative my-4">
+          <div class="h-24 w-24 rounded-full orb-glow flex items-center justify-center text-white text-3xl font-black">
+            ✦
+          </div>
+        </div>
+
+        <div class="space-y-1.5 my-2">
+          <div class="text-emerald-400 font-extrabold text-lg">98.4% Passing</div>
+          <h3 class="text-sm font-bold text-white">Core Web Vitals p75</h3>
+          <p class="text-xs text-slate-400 max-w-[200px] leading-relaxed">
+            All 5 RUM metrics passing Google standards across real sessions.
+          </p>
+        </div>
+
+        <button class="mt-4 w-full py-2.5 px-4 rounded-xl bg-white text-slate-950 font-bold text-xs hover:bg-slate-200 transition shadow-lg shadow-white/10">
+          View Vitals Breakdown ↗
+        </button>
+      </div>
+
+      <!-- WIDGET 2: DOTTED GEOGRAPHIC COUNTRY BREAKDOWN (5 cols) -->
+      <div class="md:col-span-5 glass-card rounded-3xl p-6 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-white">Top Geographic Regions</h3>
+              <p class="text-[11px] text-slate-400">Edge MaxMind MMDB + CDN IP resolution</p>
+            </div>
+            <button class="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+              See more ↗
+            </button>
+          </div>
+
+          <!-- Country List with Mini Indicators -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#161822] border border-slate-800 text-xs">
+              <div class="flex items-center space-x-2.5">
+                <span class="text-base">🇺🇸</span>
+                <span class="font-semibold text-white">United States</span>
+              </div>
+              <div class="flex items-center space-x-3">
+                <span class="font-mono text-slate-300">18,420</span>
+                <span class="text-[10px] text-emerald-400 font-mono">43.0%</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#161822] border border-slate-800 text-xs">
+              <div class="flex items-center space-x-2.5">
+                <span class="text-base">🇬🇧</span>
+                <span class="font-semibold text-white">United Kingdom</span>
+              </div>
+              <div class="flex items-center space-x-3">
+                <span class="font-mono text-slate-300">8,210</span>
+                <span class="text-[10px] text-emerald-400 font-mono">19.1%</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#161822] border border-slate-800 text-xs">
+              <div class="flex items-center space-x-2.5">
+                <span class="text-base">🇩🇪</span>
+                <span class="font-semibold text-white">Germany</span>
+              </div>
+              <div class="flex items-center space-x-3">
+                <span class="font-mono text-slate-300">5,410</span>
+                <span class="text-[10px] text-emerald-400 font-mono">12.6%</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#161822] border border-slate-800 text-xs">
+              <div class="flex items-center space-x-2.5">
+                <span class="text-base">🇮🇳</span>
+                <span class="font-semibold text-white">India</span>
+              </div>
+              <div class="flex items-center space-x-3">
+                <span class="font-mono text-slate-300">4,150</span>
+                <span class="text-[10px] text-emerald-400 font-mono">9.6%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-[11px] text-slate-500 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+          <span>IP discarded instantly at edge</span>
+          <span class="text-emerald-400 font-mono">GDPR Compliant</span>
+        </div>
+      </div>
+
+      <!-- WIDGET 3: GROWTH HEADLINE + GLOWING WAVE CHART (4 cols) -->
+      <div class="md:col-span-4 glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Weekly Insight</span>
+          <h3 class="text-2xl font-black text-white tracking-tight leading-snug mt-2 mb-3">
+            Your visitor conversion is up by <span class="text-emerald-400 underline decoration-emerald-500/40">18.4%</span> this week.
+          </h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Traffic from GitHub and ProductHunt created 320 new demo triggers with high retention.
+          </p>
+        </div>
+
+        <!-- Glowing Neon Smooth SVG Area Wave -->
+        <div class="mt-6 relative">
+          <svg class="w-full h-24 overflow-visible" viewBox="0 0 300 100" fill="none">
+            <defs>
+              <linearGradient id="waveGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#22c55e" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Area Fill -->
+            <path d="M0,80 Q50,90 100,60 T200,30 T300,10 L300,100 L0,100 Z" fill="url(#waveGradient)"/>
+            <!-- Line Stroke -->
+            <path d="M0,80 Q50,90 100,60 T200,30 T300,10" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round"/>
+            <!-- Active Node -->
+            <circle cx="300" cy="10" r="5" fill="#ffffff" stroke="#22c55e" stroke-width="3"/>
+          </svg>
+
+          <!-- Floating Badge -->
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-2 font-mono">
+            <span>Sept 14</span>
+            <span class="text-emerald-400 font-bold">Today: Peak Conv.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ROW 3: CONVERSION GOALS & RECENT VERIFIED STREAM TAIL -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- CONVERSION GOALS MILESTONES (7 cols) -->
+      <div class="lg:col-span-7 glass-card rounded-3xl p-6 md:p-8">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h3 class="text-lg font-bold text-white">Active Conversion Goals</h3>
+            <p class="text-xs text-slate-400">ClickHouse on-the-fly conversion calculations</p>
+          </div>
+          <button class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition">
+            + New Goal
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <!-- Goal 1 -->
+          <div class="p-4 rounded-2xl bg-[#161822] border border-slate-800 flex items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-white text-sm">Demo Button Clicked</span>
+                <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-mono">custom_event</span>
+              </div>
+              <div class="text-[11px] text-slate-400 font-mono">Matching: demo_button_clicked</div>
+            </div>
+            <div class="flex items-center space-x-6 text-right">
+              <div>
+                <div class="text-base font-extrabold text-white">3,210</div>
+                <div class="text-[10px] text-slate-500 uppercase tracking-wider">Conversions</div>
+              </div>
+              <div>
+                <div class="text-base font-extrabold text-emerald-400">7.5%</div>
+                <div class="text-[10px] text-slate-500 uppercase tracking-wider">Conv. Rate</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Goal 2 -->
+          <div class="p-4 rounded-2xl bg-[#161822] border border-slate-800 flex items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-white text-sm">Pricing Page Visited</span>
+                <span class="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[10px] font-mono">pageview</span>
+              </div>
+              <div class="text-[11px] text-slate-400 font-mono">Matching: /pricing</div>
+            </div>
+            <div class="flex items-center space-x-6 text-right">
+              <div>
+                <div class="text-base font-extrabold text-white">8,940</div>
+                <div class="text-[10px] text-slate-500 uppercase tracking-wider">Conversions</div>
+              </div>
+              <div>
+                <div class="text-base font-extrabold text-emerald-400">20.8%</div>
+                <div class="text-[10px] text-slate-500 uppercase tracking-wider">Conv. Rate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STREAM TAIL VERIFIED EVENTS (5 cols) -->
+      <div class="lg:col-span-5 glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <h3 class="text-sm font-bold text-white">Live Event Stream Tail</h3>
+            </div>
+            <span class="text-xs font-mono text-slate-500">Redis Pub/Sub</span>
+          </div>
+
+          <div class="space-y-2 font-mono text-[11px]">
+            <div class="p-2.5 rounded-xl bg-[#161822] border border-slate-800/80 flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="text-slate-500">just now</span>
+                <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">custom</span>
+                <span class="text-slate-200">demo_button_clicked</span>
+              </div>
+              <span class="text-slate-400">US • Chrome</span>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-[#161822] border border-slate-800/80 flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="text-slate-500">2s ago</span>
+                <span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px]">pageview</span>
+                <span class="text-slate-200">/pricing</span>
+              </div>
+              <span class="text-slate-400">DE • Firefox</span>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-[#161822] border border-slate-800/80 flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="text-slate-500">4s ago</span>
+                <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">vital</span>
+                <span class="text-slate-200">LCP 1420ms (good)</span>
+              </div>
+              <span class="text-slate-400">GB • Safari</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span>Worker: Kafka acks=all</span>
+          <span class="text-emerald-400 font-semibold">Latency &lt; 85ms</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    function switchTheme(mode) {
+      const body = document.body;
+      const btnDark = document.getElementById('btn-style-dark');
+      const btnLight = document.getElementById('btn-style-light');
+
+      if (mode === 'light') {
+        body.classList.remove('theme-dark', 'dark');
+        body.classList.add('theme-light');
+        btnLight.className = "px-4 py-1.5 rounded-full font-semibold bg-indigo-600 text-white shadow-sm transition";
+        btnDark.className = "px-4 py-1.5 rounded-full font-semibold text-slate-500 hover:text-slate-900 transition";
+      } else {
+        body.classList.remove('theme-light');
+        body.classList.add('theme-dark', 'dark');
+        btnDark.className = "px-4 py-1.5 rounded-full font-semibold bg-emerald-500 text-black shadow-sm transition";
+        btnLight.className = "px-4 py-1.5 rounded-full font-semibold text-slate-400 hover:text-white transition";
+      }
+    }
+  </script>
+</body>
+</html>

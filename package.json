@@ -1,0 +1,38 @@
+{
+  "name": "trackme-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Production-grade, privacy-first, multi-tenant B2B SaaS growth intelligence & analytics platform",
+  "author": "Growth Intelligence Team",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.5.2",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rimraf node_modules",
+    "db:generate": "pnpm --filter @trackme/db db:generate",
+    "db:migrate": "pnpm --filter @trackme/db db:migrate",
+    "traffic:simulate": "tsx scripts/simulate-traffic.ts",
+    "seed:demo": "tsx scripts/seed-demo-site.ts",
+    "geoip:download": "bash scripts/download-geoip.sh",
+    "dev:ingest": "pnpm --filter @trackme/ingestion-go dev",
+    "dev:ingest-proxy": "cd services/ingest-proxy && go run .",
+    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.2",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.3",
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrackMe Demo Site</title>
+    <!-- Served from apps/web at http://localhost:3000/demo.html -->
+    <script
+      defer
+      src="http://localhost:3000/tracker.js"
+      data-site="site_pub_ueBSEXIWEdSjNQdRUu-opxZy"
+      data-endpoint="http://localhost:3001/v1/batch"
+      data-respect-dnt="false"
+    ></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        .status {
+            margin-top: 16px;
+            padding: 12px;
+            background: #f3f4f6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TrackMe Test Page</h1>
+    <p>Open this via <code>http://localhost:3000/demo.html</code> (not as a file:// URL) with web, ingestion, and event-worker running.</p>
+
+    <h2>Test Custom Events</h2>
+    <p>Click the button below to trigger a custom event called "demo_button_clicked".</p>
+
+    <button id="test-btn">Trigger Custom Event</button>
+    <div class="status" id="status">Waiting for tracker…</div>
+
+    <script>
+        function refreshStatus() {
+            const el = document.getElementById('status');
+            if (window.growth) {
+                el.textContent = 'Tracker loaded (window.growth). Pageview should flush within ~2s.';
+            } else {
+                el.textContent = 'Tracker not loaded yet — check that http://localhost:3000/tracker.js is reachable.';
+            }
+        }
+        refreshStatus();
+        setTimeout(refreshStatus, 500);
+        setTimeout(refreshStatus, 2000);
+
+        document.getElementById('test-btn').addEventListener('click', () => {
+            if (window.growth) {
+                window.growth.trackEvent('demo_button_clicked', {
+                    button_color: 'blue',
+                    page_section: 'demo_test'
+                });
+                document.getElementById('status').textContent = 'Sent custom event "demo_button_clicked".';
+            } else {
+                alert('Tracker not loaded yet!');
+            }
+        });
+    </script>
+</body>
+</html>
