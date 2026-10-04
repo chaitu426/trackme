@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { SessionMonitor } from "@/components/auth/session-monitor";
 
 export default async function AppLayout({
   children,
@@ -6,5 +7,10 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   await requireUser();
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <SessionMonitor />
+    </>
+  );
 }

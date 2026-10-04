@@ -2,16 +2,16 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
 import { AppError } from "@trackme/contracts";
-import { env } from "@trackme/config";
 import { db, users, eq } from "@trackme/db";
 import {
-  SESSION_COOKIE,
-  SESSION_TTL_SECONDS,
+  SESSION_SHORT_TTL_SECONDS,
+  SESSION_REMEMBER_TTL_SECONDS,
+  createRegisteredSession,
+  validateRegisteredSession,
+  revokeRegisteredSession,
   sessionCookieOptions,
-  signSessionToken,
-  verifySessionToken,
-  type SessionPayload,
-} from "./session";
+} from "./session-store";
+import { SESSION_COOKIE, type SessionPayload } from "./session";
 
 export type AuthenticatedUser = {
   id: string;
@@ -25,7 +25,7 @@ export async function getSessionFromCookie(
   if (!cookieValue) {
     return null;
   }
-  return verifySessionToken(cookieValue, env.NEXTAUTH_SECRET);
+  return validateRegisteredSession(cookieValue);
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
@@ -62,9 +62,10 @@ export async function requireUser(): Promise<AuthenticatedUser> {
 }
 
 export async function requireApiUser(request: NextRequest): Promise<AuthenticatedUser> {
-  const session = await getSessionFromCookie(request.cookies.get(SESSION_COOKIE)?.value);
+  const cookieVal = request.cookies.get(SESSION_COOKIE)?.value;
+  const session = await getSessionFromCookie(cookieVal);
   if (!session) {
-    throw new AppError(401, "UNAUTHENTICATED", "Authentication is required");
+    throw new AppError(401, "UNAUTHENTICATED", "Authentication is required or session has expired");
   }
 
   const rows = await db
@@ -79,24 +80,44 @@ export async function requireApiUser(request: NextRequest): Promise<Authenticate
 
   const user = rows[0];
   if (!user) {
-    throw new AppError(401, "UNAUTHENTICATED", "Authentication is required");
+    throw new AppError(401, "UNAUTHENTICATED", "User not found or account removed");
   }
   return user;
 }
 
-export async function createSessionCookie(user: { id: string; email: string }): Promise<string> {
-  return signSessionToken({ userId: user.id, email: user.email }, env.NEXTAUTH_SECRET);
-}
+export async function attachSessionCookie(
+  user: { id: string; email: string },
+  options?: {
+    rememberMe?: boolean | undefined;
+    userAgent?: string | undefined;
+    ipAddress?: string | undefined;
+  }
+): Promise<string> {
+  const { token, maxAgeSeconds } = await createRegisteredSession({
+    userId: user.id,
+    email: user.email,
+    rememberMe: options?.rememberMe,
+    userAgent: options?.userAgent,
+    ipAddress: options?.ipAddress,
+  });
 
-export async function attachSessionCookie(user: { id: string; email: string }): Promise<void> {
-  const token = await createSessionCookie(user);
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, sessionCookieOptions());
+  jar.set(SESSION_COOKIE, token, sessionCookieOptions(maxAgeSeconds));
+  return token;
 }
 
 export async function clearSessionCookie(): Promise<void> {
   const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (token) {
+    await revokeRegisteredSession(token);
+  }
   jar.set(SESSION_COOKIE, "", sessionCookieOptions(0));
 }
 
-export { SESSION_COOKIE, SESSION_TTL_SECONDS, sessionCookieOptions };
+export {
+  SESSION_COOKIE,
+  SESSION_SHORT_TTL_SECONDS,
+  SESSION_REMEMBER_TTL_SECONDS,
+  sessionCookieOptions,
+};

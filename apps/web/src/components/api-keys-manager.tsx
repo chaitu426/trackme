@@ -84,7 +84,7 @@ export function ApiKeysManager({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <KeyRound className="w-4 h-4 text-zinc-700" />
+            <KeyRound className="w-4 h-4 text-zinc-300" />
             <CardTitle>Programmatic API Tokens</CardTitle>
           </div>
           <Badge variant="outline">REST API</Badge>
@@ -97,18 +97,18 @@ export function ApiKeysManager({
       <div className="space-y-4">
         {/* Just Created Token Banner */}
         {justCreated && (
-          <div className="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs space-y-2 animate-in fade-in-0 duration-200">
+          <div className="p-4 rounded-xl bg-emerald-500/10/80 border border-emerald-200 text-xs space-y-2 animate-in fade-in-0 duration-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1.5 text-emerald-800 font-semibold">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 <span>API Key Generated — Copy it now</span>
               </div>
               <CopyButton text={justCreated} label="Copy Token" />
             </div>
-            <p className="text-[11px] text-emerald-700">
+            <p className="text-[11px] text-emerald-400">
               For security reasons, this token will never be displayed again.
             </p>
-            <div className="p-2.5 rounded-lg bg-white border border-emerald-200 font-mono text-[11px] text-zinc-900 break-all select-all">
+            <div className="p-2.5 rounded-lg bg-white/[0.02] border border-emerald-200 font-mono text-[11px] text-zinc-50 break-all select-all">
               {justCreated}
             </div>
           </div>
@@ -116,9 +116,9 @@ export function ApiKeysManager({
 
         {/* List of keys */}
         {keys.length === 0 ? (
-          <div className="text-center py-8 px-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50">
+          <div className="text-center py-8 px-4 rounded-xl border border-dashed border-white/10 bg-white/[0.03]/50">
             <KeyRound className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-zinc-700">No API keys created</p>
+            <p className="text-xs font-semibold text-zinc-300">No API keys created</p>
             <p className="text-[11px] text-zinc-400 mt-0.5">
               Generate a key to query ClickHouse analytics via the REST API.
             </p>
@@ -128,11 +128,11 @@ export function ApiKeysManager({
             {keys.map((key) => (
               <div
                 key={key.id}
-                className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200/80 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-zinc-50/80"
+                className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-white/[0.03]/80"
               >
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-zinc-900">{key.name}</span>
+                    <span className="font-semibold text-zinc-50">{key.name}</span>
                     <Badge variant="outline">{key.scopes.join(", ")}</Badge>
                   </div>
                   <div className="flex items-center space-x-2 text-zinc-500 font-mono text-[11px]">
@@ -171,7 +171,7 @@ export function ApiKeysManager({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-zinc-400 hover:text-rose-600 hover:bg-rose-50 text-xs h-7 px-2.5 transition shrink-0 self-start sm:self-center"
+                    className="text-zinc-400 hover:text-rose-600 hover:bg-rose-500/10 text-xs h-7 px-2.5 transition shrink-0 self-start sm:self-center"
                     disabled={pending}
                     onClick={() => setRevokingId(key.id)}
                   >
@@ -185,7 +185,7 @@ export function ApiKeysManager({
         )}
 
         {error && (
-          <div className="flex items-center space-x-1.5 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3">
+          <div className="flex items-center space-x-1.5 text-xs text-rose-400 bg-rose-500/10 border border-rose-200 rounded-xl p-3">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>

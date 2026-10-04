@@ -10,7 +10,7 @@ export function UsageQuotaCard({ usage }: { usage: WorkspaceUsage }) {
       ? "bg-rose-500"
       : status === "warning"
       ? "bg-amber-400"
-      : "bg-zinc-900";
+      : "bg-zinc-100";
 
   const badgeVariant =
     status === "exceeded" || status === "warning" ? "warning" : "success";
@@ -39,9 +39,9 @@ export function UsageQuotaCard({ usage }: { usage: WorkspaceUsage }) {
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs">
           <span className="text-zinc-500">
-            Plan: <span className="text-zinc-800 font-semibold capitalize">{plan}</span>
+            Plan: <span className="text-zinc-200 font-semibold capitalize">{plan}</span>
           </span>
-          <span className="font-mono font-semibold text-zinc-900">
+          <span className="font-mono font-semibold text-zinc-50">
             {currentUsage.toLocaleString()}{" "}
             <span className="text-zinc-400 font-normal">
               / {monthlyQuota.toLocaleString()} events ({percentageUsed}%)
@@ -50,7 +50,7 @@ export function UsageQuotaCard({ usage }: { usage: WorkspaceUsage }) {
         </div>
 
         {/* Progress Track */}
-        <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden border border-zinc-200/60">
+        <div className="h-2 w-full overflow-hidden rounded-full border border-white/10 bg-white/[0.06]">
           <div
             className={`h-full rounded-full transition-all duration-700 ${barColor}`}
             style={{ width: `${Math.min(percentageUsed, 100)}%` }}

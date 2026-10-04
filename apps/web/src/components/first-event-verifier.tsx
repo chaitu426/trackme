@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type FirstEventStatus = {
@@ -59,10 +60,19 @@ export function FirstEventVerifier({ siteId }: { siteId: string }) {
 
   if (status === "received") {
     return (
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-emerald-300">First event received!</div>
-          <div className="text-xs text-emerald-400/80">Your tracker is installed correctly.</div>
+      <div
+        className="rounded-xl p-4 flex items-center justify-between"
+        style={{
+          background: "rgba(16,185,129,0.08)",
+          border: "1px solid rgba(16,185,129,0.25)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <div>
+            <div className="text-sm font-semibold text-emerald-300">First event received!</div>
+            <div className="text-xs text-emerald-500 mt-0.5">Your tracker is installed correctly.</div>
+          </div>
         </div>
         <Badge variant="success">Verified</Badge>
       </div>
@@ -71,21 +81,36 @@ export function FirstEventVerifier({ siteId }: { siteId: string }) {
 
   if (status === "timeout") {
     return (
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-        <div className="text-sm font-semibold text-amber-300">Still waiting for your first event</div>
-        <div className="text-xs text-amber-400/80">
-          Double-check the snippet is installed, then visit your site — reopen this page to check again.
+      <div
+        className="rounded-xl p-4 flex items-start gap-3"
+        style={{
+          background: "rgba(234,179,8,0.06)",
+          border: "1px solid rgba(234,179,8,0.2)",
+        }}
+      >
+        <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+        <div>
+          <div className="text-sm font-semibold text-amber-300">Still waiting for your first event</div>
+          <div className="text-xs text-amber-500/80 mt-0.5">
+            Double-check the snippet is installed, then visit your site — reopen this page to check again.
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-[#141824] p-4 flex items-center space-x-3">
-      <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+    <div
+      className="rounded-xl p-4 flex items-center gap-3"
+      style={{
+        background: "rgba(59,130,246,0.05)",
+        border: "1px solid rgba(59,130,246,0.15)",
+      }}
+    >
+      <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
       <div>
-        <div className="text-sm font-semibold text-white">Waiting for your first event…</div>
-        <div className="text-xs text-slate-400">Visit your website after installing the snippet above.</div>
+        <div className="text-sm font-semibold text-zinc-200">Waiting for your first event…</div>
+        <div className="text-xs text-zinc-500 mt-0.5">Visit your website after installing the snippet above.</div>
       </div>
     </div>
   );

@@ -37,9 +37,9 @@ export function CopyButton({
   };
 
   const variantStyles = {
-    ghost: "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100",
-    secondary: "bg-zinc-100 hover:bg-zinc-200 text-zinc-700",
-    outline: "border border-zinc-200 hover:bg-zinc-50 text-zinc-700",
+    ghost: "text-zinc-400 hover:text-zinc-50 hover:bg-white/[0.04]",
+    secondary: "bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300",
+    outline: "border border-white/10 hover:bg-white/[0.03] text-zinc-300",
   };
 
   return (
@@ -56,8 +56,8 @@ export function CopyButton({
     >
       {copied ? (
         <>
-          <Check className="w-3.5 h-3.5 text-emerald-600 animate-in zoom-in-50 duration-150" />
-          <span className="text-emerald-700 text-[11px] font-semibold">Copied</span>
+          <Check className="w-3.5 h-3.5 text-emerald-400 animate-in zoom-in-50 duration-150" />
+          <span className="text-emerald-400 text-[11px] font-semibold">Copied</span>
         </>
       ) : (
         <>

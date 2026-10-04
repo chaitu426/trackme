@@ -57,7 +57,7 @@ export function Switch({
       <span
         aria-hidden="true"
         className={`
-          pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-xs
+          pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white/[0.02] 
           transform transition duration-200 ease-in-out
           ${checked ? "translate-x-[18px]" : "translate-x-1"}
         `}

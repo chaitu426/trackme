@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Target, Zap } from "lucide-react";
 import { db, goals, eq, desc } from "@trackme/db";
 import {
   getCustomEventsSummary,
@@ -65,25 +66,32 @@ export default async function SiteEventsAndGoalsPage({
   ]);
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="w-full space-y-5 text-left">
+      {/* ── Top Header: Strictly Left-Anchored ── */}
+      <div className="flex flex-col justify-between gap-4 border-b border-white/[0.06] pb-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Events & Conversion Goals</h1>
-          <p className="text-sm text-slate-400">
-            Track user behavior actions, custom event triggers, and funnel conversion rates for {site.domain}
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight text-zinc-50">Goals &amp; Events</h1>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-purple-400">
+              <Target className="h-3 w-3" />
+              Conversion Tracking
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-zinc-400">
+            Conversion milestones, custom actions, and SDK telemetry for{" "}
+            <span className="font-mono font-medium text-zinc-300">{site.domain}</span>
           </p>
         </div>
 
-        <div className="flex items-center space-x-1 bg-[#11131a] border border-slate-800 rounded-lg p-1 text-xs font-semibold">
+        <div className="flex items-center rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium text-zinc-400 gap-0.5">
           {RANGE_OPTIONS.map((option) => (
             <Link
               key={option.key}
               href={`?range=${option.key}`}
-              className={`px-3 py-1.5 rounded-md transition ${
+              className={`rounded-[5px] px-3 py-1.5 transition-colors font-medium ${
                 option.key === range
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                  : "hover:bg-white/[0.04] hover:text-zinc-300 text-zinc-500"
               }`}
             >
               {option.label}
@@ -92,41 +100,42 @@ export default async function SiteEventsAndGoalsPage({
         </div>
       </div>
 
-      {/* Conversion Goals Section */}
+      {/* ── Conversion Goals Section ── */}
       <GoalsManager siteId={site.id} initialGoals={goalMetrics} />
 
-      {/* Custom Events Explorer */}
+      {/* ── Custom Events Explorer ── */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
+        <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
+          <div>
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-400" />
               <CardTitle>Tracked Custom Events</CardTitle>
-              <CardDescription>
-                Custom business events emitted from your frontend application via the SDK.
-              </CardDescription>
             </div>
-            <Badge variant="outline">
-              {customEvents.length} {customEvents.length === 1 ? "Event Type" : "Event Types"}
-            </Badge>
+            <CardDescription className="mt-1">
+              Custom business events emitted from your frontend application via the SDK
+            </CardDescription>
           </div>
+          <Badge variant="outline" className="font-mono text-[10px]">
+            {customEvents.length} {customEvents.length === 1 ? "Event Type" : "Event Types"}
+          </Badge>
         </CardHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 pt-3 text-left">
           {customEvents.length === 0 ? (
-            <div className="p-6 rounded-xl bg-[#090a0f] border border-dashed border-slate-800 text-center space-y-2">
-              <p className="text-sm text-slate-300 font-medium">No custom events recorded yet</p>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
+            <div className="space-y-2 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+              <p className="text-sm font-medium text-zinc-300">No custom events recorded yet</p>
+              <p className="mx-auto max-w-md text-xs text-zinc-400">
                 Trigger events in your app using the tracker snippet. For example:
               </p>
-              <pre className="font-mono text-xs bg-[#141824] p-3 rounded-lg border border-slate-800 text-slate-300 max-w-md mx-auto text-left">
-                {`window.growth.trackEvent('button_clicked', { plan: 'pro' });`}
+              <pre className="mx-auto max-w-md rounded-lg border border-white/10 bg-black/50 p-3 text-left font-mono text-xs text-zinc-300">
+                {`window.trackme.trackEvent('button_clicked', { plan: 'pro' });`}
               </pre>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                  <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-zinc-400">
                     <th className="pb-3 font-semibold">Event Name</th>
                     <th className="pb-3 font-semibold text-right">Total Triggers</th>
                     <th className="pb-3 font-semibold text-right">Unique Sessions</th>
@@ -134,23 +143,25 @@ export default async function SiteEventsAndGoalsPage({
                     <th className="pb-3 font-semibold text-right">Last Triggered</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
+                <tbody className="divide-y divide-white/[0.06] font-mono">
                   {customEvents.map((evt: CustomEventSummary) => (
-                    <tr key={evt.eventName} className="hover:bg-slate-800/30 transition">
-                      <td className="py-3 font-bold text-white flex items-center space-x-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        <span>{evt.eventName}</span>
+                    <tr key={evt.eventName} className="transition hover:bg-white/[0.03]">
+                      <td className="py-3 font-bold text-zinc-200">
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                          <span>{evt.eventName}</span>
+                        </div>
                       </td>
-                      <td className="py-3 text-right text-slate-200">
+                      <td className="py-3 text-right text-zinc-300">
                         {evt.count.toLocaleString()}
                       </td>
-                      <td className="py-3 text-right text-slate-400">
+                      <td className="py-3 text-right text-zinc-400">
                         {evt.uniqueSessions.toLocaleString()}
                       </td>
-                      <td className="py-3 text-right text-slate-400">
+                      <td className="py-3 text-right text-zinc-400">
                         {evt.uniqueVisitors.toLocaleString()}
                       </td>
-                      <td className="py-3 text-right text-slate-500 font-sans text-[11px]">
+                      <td className="py-3 text-right font-sans text-[11px] text-zinc-400">
                         {formatRelativeTime(evt.lastSeen)}
                       </td>
                     </tr>
@@ -160,13 +171,13 @@ export default async function SiteEventsAndGoalsPage({
             </div>
           )}
 
-          {/* Quick SDK helper */}
-          <div className="p-3 rounded-lg bg-[#0c0e15] border border-slate-800/60 text-xs text-slate-400 flex items-center justify-between">
+          {/* Quick SDK Helper snippet */}
+          <div className="flex flex-col gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-xs text-zinc-400 sm:flex-row sm:items-center sm:justify-between text-left">
             <span>
               Emit custom events anytime in client JavaScript:
             </span>
-            <code className="text-slate-300 font-mono text-[11px] bg-[#141824] px-2 py-1 rounded border border-slate-800">
-              window.growth.trackEvent(&apos;event_name&apos;, &#123; prop: &apos;val&apos; &#125;)
+            <code className="rounded border border-white/10 bg-black/40 px-2 py-1 font-mono text-[11px] text-zinc-300">
+              window.trackme.trackEvent(&apos;event_name&apos;, &#123; prop: &apos;val&apos; &#125;)
             </code>
           </div>
         </div>

@@ -127,16 +127,35 @@ async function authenticateApiKey(
   return ctx;
 }
 
+export async function authenticateRequest(
+  request: NextRequest,
+  workspaceId: string,
+  requiredScopeOrPermission: ApiKeyScope | Permission | "read:analytics" | "admin:workspace" = "analytics:read"
+): Promise<TenantContext> {
+  const apiKeyContext = await authenticateApiKey(request, workspaceId);
+  const ctx =
+    apiKeyContext ??
+    (await loadMembershipContext((await requireApiUser(request)).id, workspaceId));
+
+  assertWorkspaceMatch(ctx, workspaceId);
+
+  const permission: Permission =
+    requiredScopeOrPermission === "admin:workspace"
+      ? "workspace:manage"
+      : requiredScopeOrPermission === "read:analytics"
+      ? "analytics:read"
+      : (requiredScopeOrPermission as Permission);
+
+  assertPermission(ctx, permission);
+  return ctx;
+}
+
 export async function requireMetricsAccess(
   request: NextRequest,
   workspaceId: string,
   siteId: string
 ): Promise<TenantContext> {
-  const apiKeyContext = await authenticateApiKey(request, workspaceId);
-  const ctx = apiKeyContext ?? (await loadMembershipContext((await requireApiUser(request)).id, workspaceId));
-
-  assertWorkspaceMatch(ctx, workspaceId);
-  assertPermission(ctx, "analytics:read");
+  const ctx = await authenticateRequest(request, workspaceId, "read:analytics");
 
   const siteRows = await db
     .select({
@@ -193,6 +212,7 @@ export async function listWorkspaceSites(workspaceId: string) {
       id: sites.id,
       domain: sites.domain,
       displayName: sites.displayName,
+      publicKey: sites.publicKey,
     })
     .from(sites)
     .where(eq(sites.workspaceId, workspaceId));

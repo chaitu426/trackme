@@ -8,6 +8,13 @@
       "when": 1789669056612,
       "tag": "0000_hard_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791113440113,
+      "tag": "0001_goofy_wind_dancer",
+      "breakpoints": true
     }
   ]
 }

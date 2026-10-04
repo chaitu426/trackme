@@ -2,48 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Google Fonts ─────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @layer base {
   :root {
-    /* Canvas */
-    --background: #f8f9fa;
-    --foreground: #09090b;
+    /* Linear / Vercel premium dark */
+    --background: #09090b;
+    --foreground: #ededed;
 
-    /* Cards & surfaces */
-    --card: #ffffff;
-    --card-foreground: #09090b;
+    --card: #0c0c0e;
+    --card-foreground: #fafafa;
 
-    /* Hairline borders */
-    --border: #eaedf0;
-    --border-subtle: #f0f1f3;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.05);
 
-    /* Brand – zinc dark */
-    --primary: #18181b;
-    --primary-foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #09090b;
 
-    /* Muted text & surfaces */
-    --muted: #f4f5f7;
-    --muted-foreground: #71717a;
+    --muted: #18181b;
+    --muted-foreground: #a1a1aa;
 
-    /* Accent – soft indigo */
-    --accent: #6366f1;
-    --accent-foreground: #ffffff;
+    --accent: #3b82f6;
+    --accent-foreground: #eff6ff;
 
-    /* Functional colours */
-    --success: #10b981;
-    --warning: #f59e0b;
+    --success: #22c55e;
+    --warning: #eab308;
     --danger: #ef4444;
 
-    /* Typography */
-    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    --chart: #3b82f6;
+    --chart-muted: #3f3f46;
+    --sparkline: #22c55e;
 
-    /* Radius */
-    --radius: 16px;
-    --radius-sm: 10px;
-    --radius-lg: 20px;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+    --radius: 8px;
+    --radius-sm: 6px;
+    --radius-lg: 12px;
   }
 }
 
@@ -56,77 +49,134 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.011em;
+    color-scheme: dark;
   }
 
   body {
-    background-color: var(--background);
+    background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    color-scheme: dark;
   }
 
   ::selection {
-    background-color: #18181b;
+    background-color: rgba(59, 130, 246, 0.35);
     color: #fafafa;
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 9999px; }
-  ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
 
-  /* Focus visible */
   :focus-visible {
-    outline: 2px solid var(--primary);
+    outline: 2px solid rgba(59, 130, 246, 0.7);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
 }
 
 @layer utilities {
-  /* Linear micro dot-grid chart backdrop */
-  .dot-grid {
-    background-image: radial-gradient(#e4e7eb 1px, transparent 1px);
-    background-size: 24px 24px;
+  .surface-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
   }
 
-  /* Hairline glass for navigation */
-  .glass-nav {
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(229,231,235,0.9);
+  .surface-inset {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-subtle);
   }
 
-  /* Linear card utility */
   .linear-card {
-    background: #ffffff;
-    border: 1px solid #eaedf0;
-    border-radius: var(--radius);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 4px 12px -2px rgba(0,0,0,0.04);
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .linear-card:hover {
-    border-color: #d4d8dd;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.04), 0 8px 24px -4px rgba(0,0,0,0.06);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: border-color 0.15s ease;
   }
 
-  /* Pulse live dot */
+  .linear-card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .metric-card:hover {
+    border-color: rgba(255, 255, 255, 0.11);
+  }
+
   .pulse-live {
-    animation: livePulse 2s cubic-bezier(0.4,0,0.6,1) infinite;
+    animation: livePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   @keyframes livePulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.45; transform: scale(0.9); }
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.9);
+    }
   }
 
-  /* Fade-in slide-up animation utility */
   @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
   .animate-fade-in-up {
-    animation: fadeInUp 0.25s ease both;
+    animation: fadeInUp 0.22s ease both;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.18s ease both;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.15s ease both;
+  }
+
+  /* Premium glow on stat card hover */
+  .metric-card-glow:hover {
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15), 0 8px 24px -8px rgba(0, 0, 0, 0.4);
   }
 }

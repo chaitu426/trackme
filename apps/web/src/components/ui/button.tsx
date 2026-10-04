@@ -1,4 +1,4 @@
-import React from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export function Button({
   variant = "primary",
@@ -6,19 +6,20 @@ export function Button({
   children,
   className = "",
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
+  children: ReactNode;
 }) {
   const base =
-    "inline-flex items-center justify-center font-semibold rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:pointer-events-none disabled:opacity-50";
 
   const variants: Record<string, string> = {
-    primary:   "bg-zinc-900 hover:bg-zinc-800 text-white shadow-xs",
-    secondary: "bg-zinc-100 hover:bg-zinc-200 text-zinc-800",
-    outline:   "border border-zinc-200 hover:border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700",
-    ghost:     "hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900",
-    danger:    "text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200",
+    primary: "bg-zinc-100 hover:bg-white text-zinc-950",
+    secondary: "bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200",
+    outline: "border border-white/10 hover:border-white/20 bg-transparent hover:bg-white/[0.04] text-zinc-300",
+    ghost: "hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100",
+    danger: "text-rose-400 hover:bg-rose-500/10 border border-transparent",
   };
 
   const sizes: Record<string, string> = {

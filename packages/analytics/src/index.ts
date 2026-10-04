@@ -6,4 +6,7 @@ export * from "./queries/recent-events.js";
 export * from "./queries/verification.js";
 export * from "./queries/campaigns.js";
 export * from "./queries/events.js";
-
+export * from "./queries/time-series.js";
+export * from "./queries/journeys.js";
+export * from "./queries/user-timeline.js";
+export * from "./queries/funnel-analysis.js";

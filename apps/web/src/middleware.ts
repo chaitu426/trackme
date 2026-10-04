@@ -18,6 +18,9 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/legal/")) {
     return true;
   }
+  if (pathname.startsWith("/invite")) {
+    return true;
+  }
   if (pathname.startsWith("/api/auth/login") || pathname.startsWith("/api/auth/signup")) {
     return true;
   }

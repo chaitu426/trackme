@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getRecentEvents } from "@trackme/analytics";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RealtimeLive } from "@/components/realtime-live";
 import { requireUser } from "@/lib/auth";
@@ -30,44 +30,41 @@ export default async function SiteRealtimeReport({
   ]);
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-center space-x-3">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Live Visitor Stream</h1>
-        <Badge variant="live">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-          <span>live</span>
-        </Badge>
-      </div>
-
-      {/* ── Live active count component ── */}
+    <div className="w-full space-y-4">
       <RealtimeLive siteId={site.id} initial={snapshot} />
 
-      {/* ── Recent Events Table ── */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Recent Events (Stream Tail · last 20)</CardTitle>
+        <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
+          <div>
+            <CardTitle>Event Stream Log</CardTitle>
+            <CardDescription>Live event stream tail · last 20 ingested events</CardDescription>
+          </div>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+            Telemetry Feed
+          </span>
         </CardHeader>
-        <div className="space-y-1.5 font-mono text-[11px]">
+        <div className="space-y-1 pt-2 font-mono text-[11px]">
           {recentEvents.length === 0 ? (
-            <p className="text-xs text-zinc-400 font-sans py-4 text-center">No events received yet.</p>
+            <p className="py-8 text-center font-sans text-xs text-zinc-500">No events received yet.</p>
           ) : (
             recentEvents.map((e) => (
               <div
                 key={e.eventId}
-                className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200/80 hover:bg-zinc-100/60 transition"
+                className="flex items-center justify-between rounded-lg px-3 py-2 transition hover:bg-white/[0.04]"
               >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <span className="text-zinc-400 shrink-0">{formatRelativeTime(e.occurredAt)}</span>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="shrink-0 text-zinc-500">{formatRelativeTime(e.occurredAt)}</span>
                   <Badge variant={e.type === "custom" ? "warning" : "default"} className="shrink-0 text-[10px]">
                     {e.type === "custom" ? `custom:${e.eventName}` : e.type}
                   </Badge>
-                  <span className="text-zinc-700 truncate max-w-[200px]">{e.path}</span>
+                  <span className="max-w-[280px] truncate text-zinc-200">{e.path}</span>
                 </div>
-                <div className="flex items-center space-x-2.5 text-zinc-400 text-[10px] shrink-0">
-                  <span>{e.country || "??"}</span>
-                  <span className="text-zinc-300">·</span>
-                  <span>{[e.browser, e.os].filter(Boolean).join("/") || "Unknown"}</span>
+                <div className="flex shrink-0 items-center gap-2 text-[10px] text-zinc-500">
+                  <span className="rounded bg-white/[0.04] px-1.5 py-0.5 font-semibold text-zinc-400">
+                    {e.country || "??"}
+                  </span>
+                  <span>·</span>
+                  <span>{[e.browser, e.os].filter(Boolean).join(" / ") || "Unknown"}</span>
                 </div>
               </div>
             ))

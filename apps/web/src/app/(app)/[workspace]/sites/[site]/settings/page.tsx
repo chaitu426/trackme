@@ -49,12 +49,10 @@ export default async function SiteSettingsPage({
     <div className="space-y-8 max-w-4xl">
       {/* ── Page Header ── */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-          Site Settings & Security
-        </h1>
-        <p className="text-xs text-zinc-500 mt-1">
-          Manage ingestion telemetry, privacy compliance, API access keys, quotas, and security audit logs for{" "}
-          <span className="font-mono font-semibold text-zinc-800">{site.domain}</span>
+        <h1 className="text-lg font-semibold tracking-[-0.02em] text-zinc-50">Settings</h1>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Snippet, privacy, API keys, and audit logs for{" "}
+          <span className="font-mono text-zinc-400">{site.domain}</span>
         </p>
       </div>
 
@@ -65,28 +63,28 @@ export default async function SiteSettingsPage({
 
       {/* ── Tracking Snippet ── */}
       <section id="snippet" className="linear-card p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
           <div>
             <div className="flex items-center space-x-2">
-              <Code2 className="w-4 h-4 text-zinc-800" />
-              <h3 className="text-sm font-bold text-zinc-900">Tracking Snippet</h3>
+              <Code2 className="w-4 h-4 text-zinc-200" />
+              <h3 className="text-sm font-bold text-zinc-50">Tracking Snippet</h3>
             </div>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Embed inside <code className="font-mono text-zinc-700 bg-zinc-100 px-1 py-0.5 rounded">&lt;head&gt;</code>{" "}
+              Embed inside <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-zinc-300">&lt;head&gt;</code>{" "}
               of your site. Lightweight (&lt;2 KB) and asynchronously executed.
             </p>
           </div>
           <CopyButton text={snippet} label="Copy Snippet" />
         </div>
 
-        <div className="relative bg-zinc-900 rounded-xl p-4 font-mono text-xs text-zinc-300 overflow-x-auto border border-zinc-800">
-          <pre className="whitespace-pre-wrap text-[11px] font-mono leading-relaxed">{snippet}</pre>
+        <div className="relative overflow-x-auto rounded-lg border border-white/10 bg-black/40 p-4 font-mono text-xs text-zinc-300">
+          <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{snippet}</pre>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-zinc-500 pt-1">
+        <div className="flex flex-col gap-2 pt-1 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-2">
             <span>Public Write Key:</span>
-            <code className="text-zinc-800 font-mono font-semibold bg-zinc-100 px-2 py-0.5 rounded">
+            <code className="rounded bg-white/[0.06] px-2 py-0.5 font-mono font-semibold text-zinc-200">
               {site.publicKey}
             </code>
             <CopyButton text={site.publicKey} variant="ghost" />

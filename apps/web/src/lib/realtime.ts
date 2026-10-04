@@ -114,13 +114,18 @@ async function scanActiveKeys(siteId: string): Promise<string[]> {
 }
 
 export async function getActiveVisitorCount(siteId: string): Promise<number> {
-  const redis = getRedis();
-  const indexKey = `rt:active:${siteId}`;
-  const now = Math.floor(Date.now() / 1000);
-  await redis.zremrangebyscore(indexKey, "-inf", now);
-  const count = await redis.zcount(indexKey, now, "+inf");
-  if (count > 0) return count;
+  try {
+    const redis = getRedis();
+    const indexKey = `rt:active:${siteId}`;
+    const now = Math.floor(Date.now() / 1000);
+    await redis.zremrangebyscore(indexKey, "-inf", now);
+    const count = await redis.zcount(indexKey, now, "+inf");
+    if (count > 0) return count;
 
-  const keys = await scanActiveKeys(siteId);
-  return keys.length;
+    const keys = await scanActiveKeys(siteId);
+    return keys.length;
+  } catch (err) {
+    console.warn(`[Realtime:getActiveVisitorCount] Failed to query Redis for site ${siteId}:`, err);
+    return 0;
+  }
 }

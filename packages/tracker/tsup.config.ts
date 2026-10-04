@@ -17,6 +17,7 @@ export default defineConfig([
   {
     entry: {
       index: "src/index.ts",
+      adapters: "src/adapters.ts",
     },
     format: ["esm", "cjs"],
     outDir: "dist",
@@ -24,4 +25,3 @@ export default defineConfig([
     clean: false,
   },
 ]);
-

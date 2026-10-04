@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { listWorkspaceSites, requireWorkspaceBySlug } from "@/lib/tenancy";
+import { listUserWorkspaces, listWorkspaceSites, requireWorkspaceBySlug } from "@/lib/tenancy";
 import { DashboardShell } from "@/components/dashboard-shell";
 
 export default async function WorkspaceLayout({
@@ -20,7 +20,10 @@ export default async function WorkspaceLayout({
     notFound();
   }
 
-  const siteList = await listWorkspaceSites(workspace.id);
+  const [siteList, userWorkspaces] = await Promise.all([
+    listWorkspaceSites(workspace.id),
+    listUserWorkspaces(user.id),
+  ]);
   const primarySite = siteList[0];
   const primarySiteDomain = primarySite?.domain ?? "";
 
@@ -31,6 +34,8 @@ export default async function WorkspaceLayout({
         name: workspace.name,
         slug: workspace.slug,
       }}
+      workspaces={userWorkspaces}
+      sites={siteList}
       primarySiteDomain={primarySiteDomain}
       user={{
         id: user.id,

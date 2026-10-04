@@ -1,11 +1,14 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FileText } from "lucide-react";
 import { getBreakdown } from "@trackme/analytics";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { RankingList } from "@/components/ui/ranking-list";
 import { requireUser } from "@/lib/auth";
 import { requireDashboardSite } from "@/lib/tenancy";
 import { buildMetricRequest } from "@/lib/metrics";
-import { parseRangeKey, resolveDateRange } from "@/lib/date-range";
-import { formatNumber, formatPercent } from "@/lib/format";
+import { parseRangeKey, resolveDateRange, RANGE_OPTIONS } from "@/lib/date-range";
+import { formatNumber } from "@/lib/format";
 
 export default async function SitePagesReport({
   params,
@@ -32,55 +35,59 @@ export default async function SitePagesReport({
   const breakdown = await getBreakdown(request, "path");
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Pages & Content Report</h1>
-        <p className="text-sm text-slate-400">
-          Pageview distribution and period-unique visitors by path for {site.domain}.
-          Visitor counts use <code className="text-xs">uniqExact</code> over the selected range
-          (not summed daily uniques).
-        </p>
+    <div className="w-full space-y-5 text-left">
+      {/* Top Header: Strictly Left-Anchored */}
+      <div className="flex flex-col justify-between gap-4 border-b border-white/[0.06] pb-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-50">Page Performance</h1>
+          <p className="mt-1 text-xs text-zinc-400">
+            Pageview volume and engagement metrics for{" "}
+            <span className="font-mono font-medium text-zinc-300">{site.domain}</span>
+          </p>
+        </div>
+
+        {/* Range switcher pills */}
+        <div className="flex items-center rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium text-zinc-400 gap-0.5">
+          {RANGE_OPTIONS.map((option) => (
+            <Link
+              key={option.key}
+              href={`?range=${option.key}`}
+              className={`rounded-[5px] px-3 py-1.5 transition-colors font-medium ${
+                option.key === range
+                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                  : "hover:bg-white/[0.04] hover:text-zinc-300 text-zinc-500"
+              }`}
+            >
+              {option.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Visited Pages</CardTitle>
+        <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
+          <div>
+            <CardTitle>All Visited Routes</CardTitle>
+            <CardDescription>
+              Ranked distribution of pageview volume and audience share ({breakdown.items.length} routes recorded)
+            </CardDescription>
+          </div>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+            Pageviews · % Share
+          </span>
         </CardHeader>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-800 text-xs uppercase text-slate-400">
-              <tr>
-                <th className="py-3 px-4">Page Path</th>
-                <th className="py-3 px-4 text-right">Pageviews</th>
-                <th className="py-3 px-4 text-right">Unique Visitors</th>
-                <th className="py-3 px-4 text-right">Share</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
-              {breakdown.items.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-6 px-4 text-center text-slate-500 font-sans">
-                    No pageviews recorded in this range yet.
-                  </td>
-                </tr>
-              ) : (
-                breakdown.items.map((row) => (
-                  <tr key={row.name} className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 px-4 text-slate-200">{row.name}</td>
-                    <td className="py-3 px-4 text-right font-sans text-slate-200">
-                      {formatNumber(row.pageviews)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-sans text-slate-400">
-                      {formatNumber(row.visitors)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-sans text-emerald-400">
-                      {formatPercent(row.percentage)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="pt-2">
+          <RankingList
+            items={breakdown.items.map((row) => ({
+              name: row.name,
+              value: row.pageviews,
+              percentage: row.percentage,
+              meta: `${formatNumber(row.visitors)} unique visitors`,
+              icon: <FileText className="h-3.5 w-3.5 text-blue-400" />,
+            }))}
+            empty="No pageviews recorded in this date range yet."
+            valueFormatter={formatNumber}
+          />
         </div>
       </Card>
     </div>

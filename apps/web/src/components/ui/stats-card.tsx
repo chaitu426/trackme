@@ -1,5 +1,6 @@
-import React from "react";
-import { Card } from "./card.js";
+import { Sparkline } from "./sparkline";
+import { Card } from "./card";
+import { cn } from "@/lib/utils";
 
 export interface StatsCardProps {
   title: string;
@@ -8,6 +9,10 @@ export interface StatsCardProps {
   isPositive?: boolean;
   subtitle?: string;
   badge?: string;
+  sparkline?: number[];
+  sparklineColor?: string;
+  sparklineVariant?: "bar" | "line";
+  className?: string;
 }
 
 export function StatsCard({
@@ -17,40 +22,69 @@ export function StatsCard({
   isPositive,
   subtitle,
   badge,
+  sparkline,
+  sparklineColor,
+  sparklineVariant = "bar",
+  className,
 }: StatsCardProps) {
   return (
-    <Card className="flex flex-col justify-between min-h-[120px]">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-zinc-500">{title}</span>
-        {badge && (
-          <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
-            {badge}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-baseline space-x-2.5">
-        <span className="text-2xl font-bold tracking-tight text-zinc-900 font-mono">
-          {value}
+    <Card
+      className={cn(
+        "group relative flex min-h-[142px] flex-col justify-between gap-3 p-4 sm:p-4.5 transition-all duration-200 hover:border-white/[0.16] hover:bg-[#0e0f16]/95 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]",
+        className
+      )}
+    >
+      {/* Top row: Left-anchored title & Right-anchored badge/delta */}
+      <div className="flex items-start justify-between gap-2 w-full text-left">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 select-none font-sans">
+          {title}
         </span>
-        {change && (
-          <span
-            className={`inline-flex items-center space-x-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-md border ${
-              isPositive
-                ? "text-emerald-600 bg-emerald-50 border-emerald-200/60"
-                : "text-rose-600 bg-rose-50 border-rose-200/60"
-            }`}
-          >
-            <span>{isPositive ? "↑" : "↓"}</span>
-            <span>{change}</span>
-          </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {badge && (
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+              {badge}
+            </span>
+          )}
+          {change && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums border",
+                isPositive
+                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+                  : "border-rose-500/25 bg-rose-500/10 text-rose-400"
+              )}
+            >
+              <span>{isPositive ? "↑" : "↓"}</span>
+              <span>{change.replace(/^[+-]/, "")}</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Main Metric Value */}
+      <div className="min-w-0 text-left">
+        <p className="text-[26px] sm:text-[28px] font-bold leading-none tracking-[-0.03em] text-zinc-50 tabular-nums">
+          {value}
+        </p>
+        {subtitle && (
+          <p className="mt-1.5 text-[11px] text-zinc-400 font-normal leading-normal">
+            {subtitle}
+          </p>
         )}
       </div>
 
-      {subtitle && (
-        <p className="text-[11px] text-zinc-400 mt-2 pt-2 border-t border-zinc-100">
-          {subtitle}
-        </p>
+      {/* Bottom Sparkline visualization */}
+      {sparkline && sparkline.length > 1 ? (
+        <div className="mt-auto pt-1">
+          <Sparkline
+            values={sparkline}
+            color={sparklineColor ?? "var(--sparkline)"}
+            className="w-full"
+            variant={sparklineVariant}
+          />
+        </div>
+      ) : (
+        <div className="h-7" />
       )}
     </Card>
   );

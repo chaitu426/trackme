@@ -10,8 +10,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        mono: ['"JetBrains Mono"', "Fira Code", "Consolas", "monospace"],
+        sans: ["var(--font-sans)", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        mono: ["var(--font-mono)", "SF Mono", "Consolas", "monospace"],
       },
       colors: {
         background: "var(--background)",
@@ -33,20 +33,24 @@ const config: Config = {
           DEFAULT: "var(--accent)",
           foreground: "var(--accent-foreground)",
         },
+        success: "var(--success)",
+        warning: "var(--warning)",
+        danger: "var(--danger)",
+        chart: "var(--chart)",
       },
       borderRadius: {
         DEFAULT: "var(--radius)",
         sm: "var(--radius-sm)",
         lg: "var(--radius-lg)",
-        xl: "16px",
-        "2xl": "20px",
+        xl: "12px",
+        "2xl": "16px",
       },
       boxShadow: {
-        "card":     "0 1px 2px rgba(0,0,0,0.02), 0 4px 16px -2px rgba(0,0,0,0.03)",
-        "card-hover": "0 2px 6px rgba(0,0,0,0.03), 0 10px 28px -4px rgba(0,0,0,0.05)",
-        "float":    "0 12px 40px -8px rgba(0,0,0,0.08), 0 4px 12px -2px rgba(0,0,0,0.03)",
-        "nav":      "0 2px 8px rgba(0,0,0,0.03)",
-        "xs":       "0 1px 2px rgba(0,0,0,0.03)",
+        card: "none",
+        "card-hover": "none",
+        float: "0 16px 40px -12px rgba(0,0,0,0.55)",
+        nav: "none",
+        xs: "0 1px 2px rgba(0,0,0,0.2)",
       },
     },
   },

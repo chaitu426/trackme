@@ -52,7 +52,49 @@ export default function RootLayout({ children }) {
       </section>
 
       <section style={{ marginBottom: 40 }}>
-        <h2>4. Public Ingestion API Reference</h2>
+        <h2>4. Framework SDKs and client-side routing</h2>
+        <p style={{ color: "#94a3b8" }}>
+          Nothing framework-specific is required. After <code>tracker.init()</code>, TrackMe
+          automatically observes client-side navigation from React, Next.js App Router, Next.js
+          Pages Router, Remix, SvelteKit, Vue Router, Angular Router, and any router that uses
+          the browser History API. It waits for the route render frame, deduplicates internal
+          router updates, handles browser back/forward, and records bfcache restores.
+        </p>
+        <pre style={{ background: "#11131a", border: "1px solid #1e2230", padding: 16, borderRadius: 8, overflowX: "auto" }}>
+          <code>{`import { GrowthTracker } from "@trackme/tracker";
+
+const tracker = new GrowthTracker({
+  siteKey: "YOUR_SITE_KEY",
+  endpoint: "https://ingest.example.com/v1/batch",
+});
+
+tracker.init(); // Initial page, SPA routes, Web Vitals, retry, and lifecycle handling are automatic.`}</code>
+        </pre>
+        <h3>Nonstandard routers only</h3>
+        <p style={{ color: "#94a3b8" }}>
+          The optional adapters are reserved for in-memory, embedded, or custom routers that do
+          not update the browser URL. Standard browser applications should not use them.
+        </p>
+        <h3>Example: custom in-memory route</h3>
+        <pre style={{ background: "#11131a", border: "1px solid #1e2230", padding: 16, borderRadius: 8, overflowX: "auto" }}>
+          <code>{`import { trackRoute } from "@trackme/tracker/adapters";
+
+myInMemoryRouter.onChange((route) => trackRoute(tracker, route.url));`}</code>
+        </pre>
+      </section>
+
+      <section style={{ marginBottom: 40 }}>
+        <h2>5. Goals and funnels</h2>
+        <p style={{ color: "#94a3b8" }}>Use semantic helpers for conversion analysis without attaching a person-level identifier:</p>
+        <pre style={{ background: "#11131a", border: "1px solid #1e2230", padding: 16, borderRadius: 8, overflowX: "auto" }}>
+          <code>{`tracker.trackGoal("signup_completed", { plan: "pro" });
+tracker.trackFunnelStep("signup", "pricing_viewed");
+tracker.trackFunnelStep("signup", "account_created");`}</code>
+        </pre>
+      </section>
+
+      <section style={{ marginBottom: 40 }}>
+        <h2>6. Public Ingestion API Reference</h2>
         <p style={{ color: "#94a3b8" }}>You can also send events directly from your backend servers:</p>
         <pre style={{ background: "#11131a", border: "1px solid #1e2230", padding: 16, borderRadius: 8, overflowX: "auto" }}>
           <code>{`POST https://ingest.growthintelligence.io/v1/e
@@ -74,4 +116,3 @@ Content-Type: application/json
     </div>
   );
 }
-
