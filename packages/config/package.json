@@ -16,7 +16,8 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "test": "node --import tsx --test src/env.test.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
@@ -26,4 +27,3 @@
     "typescript": "^5.7.3"
   }
 }
-

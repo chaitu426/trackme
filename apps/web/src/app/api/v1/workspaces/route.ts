@@ -13,6 +13,7 @@ import {
 } from "@trackme/db";
 import { requireApiUser } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
+import { invalidateIngestSiteCache } from "@/lib/ingest-cache";
 
 const CreateWorkspaceSchema = z.object({
   name: z.string().trim().min(2).max(64),
@@ -104,6 +105,9 @@ export async function POST(request: NextRequest) {
 
       return { workspace, site };
     });
+
+    // The edge remembers unknown keys for a few seconds; tell it this one now exists.
+    await invalidateIngestSiteCache(publicKeyHash);
 
     return NextResponse.json({
       workspace: created.workspace,

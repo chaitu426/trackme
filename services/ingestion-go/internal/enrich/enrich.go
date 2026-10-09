@@ -19,6 +19,8 @@ type TrackerEvent struct {
 	Path             string                 `json:"path"`
 	Title            string                 `json:"title,omitempty"`
 	Referrer         string                 `json:"referrer,omitempty"`
+	UserID           string                 `json:"userId,omitempty"`
+	UserTraits       map[string]interface{} `json:"userTraits,omitempty"`
 	Properties       map[string]interface{} `json:"properties,omitempty"`
 	Campaign         map[string]string      `json:"campaign,omitempty"`
 	WebVital         map[string]interface{} `json:"webVital,omitempty"`

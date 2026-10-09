@@ -117,7 +117,8 @@ export class GrowthTracker {
     this.transport = new Transport({
       endpoint: this.config.endpoint,
       ...(this.config.signingSecret ? { signingSecret: this.config.signingSecret } : {}),
-      consent: this.consent === "granted" ? "granted" : null,
+      consent: this.consent,
+      requireConsent: this.config.requireConsent === true,
     });
   }
 
