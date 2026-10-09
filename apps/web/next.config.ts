@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
     "@trackme/authz",
     "@trackme/db",
     "@trackme/analytics",
+    "@trackme/landing",
   ],
   experimental: {
     serverActions: {

@@ -1,13 +1,9 @@
 import type { Config } from "tailwindcss";
 
+// Same design tokens as apps/web so the docs read as part of the product.
 const config: Config = {
   darkMode: ["class"],
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-    "../../packages/landing/src/**/*.{ts,tsx}",
-  ],
+  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}", "../../packages/landing/src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       fontFamily: {
@@ -37,7 +33,6 @@ const config: Config = {
         success: "var(--success)",
         warning: "var(--warning)",
         danger: "var(--danger)",
-        chart: "var(--chart)",
       },
       borderRadius: {
         DEFAULT: "var(--radius)",
@@ -47,10 +42,7 @@ const config: Config = {
         "2xl": "16px",
       },
       boxShadow: {
-        card: "none",
-        "card-hover": "none",
         float: "0 16px 40px -12px rgba(0,0,0,0.55)",
-        nav: "none",
         xs: "0 1px 2px rgba(0,0,0,0.2)",
       },
     },
