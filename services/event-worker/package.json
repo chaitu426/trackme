@@ -9,7 +9,8 @@
     "build": "tsc",
     "start": "node dist/worker.js",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "test": "node --import tsx --test src/contract.test.ts src/isolate.test.ts src/writers/clickhouse.test.ts"
   },
   "dependencies": {
     "@trackme/analytics": "workspace:*",
@@ -24,4 +25,3 @@
     "typescript": "^5.7.3"
   }
 }
-

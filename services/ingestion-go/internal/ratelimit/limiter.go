@@ -25,16 +25,28 @@ func New(rdb *redis.Client, max, windowMs int) *Limiter {
 	return &Limiter{rdb: rdb, max: max, windowMs: windowMs}
 }
 
+// Counting and expiry happen in one script, in one round trip. Done as two
+// calls, a process dying between INCR and PEXPIRE would leave a counter that
+// never expires and blocks that key for good. The PTTL check also repairs any
+// counter already in that state.
+var hitScript = redis.NewScript(`
+local n = redis.call('INCR', KEYS[1])
+if n == 1 or redis.call('PTTL', KEYS[1]) < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+return n
+`)
+
+// Allow records one hit for key and reports whether it is within the limit.
+// The error is Redis being unreachable; callers decide whether that means
+// "allow" or "refuse".
 func (l *Limiter) Allow(ctx context.Context, key string) (bool, error) {
 	bucket := time.Now().UnixMilli() / int64(l.windowMs)
 	redisKey := fmt.Sprintf("rl:ingest:%s:%d", key, bucket)
 
-	n, err := l.rdb.Incr(ctx, redisKey).Result()
+	n, err := hitScript.Run(ctx, l.rdb, []string{redisKey}, l.windowMs).Int64()
 	if err != nil {
 		return false, err
-	}
-	if n == 1 {
-		_ = l.rdb.PExpire(ctx, redisKey, time.Duration(l.windowMs)*time.Millisecond).Err()
 	}
 	return n <= int64(l.max), nil
 }

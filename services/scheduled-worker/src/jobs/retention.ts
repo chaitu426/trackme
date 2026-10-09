@@ -27,6 +27,7 @@ export async function runRetentionCleanup(): Promise<void> {
     "pageview_rollups_daily",
     "event_rollups_daily",
     "session_engagement_daily",
+    "daily_uniques",
   ];
 
   for (const table of tables) {

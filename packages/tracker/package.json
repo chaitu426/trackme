@@ -21,7 +21,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "test": "node --import tsx --test src/transport.test.ts"
   },
   "dependencies": {
     "@trackme/contracts": "workspace:*"

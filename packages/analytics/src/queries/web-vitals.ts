@@ -26,7 +26,7 @@ export async function getWebVitalsSummary(
       countIf(rating = 'needs-improvement') AS needs_improvement_count,
       countIf(rating = 'poor') AS poor_count,
       count(*) AS total_samples
-    FROM web_vitals
+    FROM web_vitals FINAL
     WHERE workspace_id = {workspaceId:UUID}
       AND site_id = {siteId:UUID}
       AND timestamp >= {from:DateTime64}

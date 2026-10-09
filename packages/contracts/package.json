@@ -2,21 +2,22 @@
   "name": "@trackme/contracts",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.js"
-      
     }
   },
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "test": "node --import tsx --test src/fixtures.test.ts"
   },
   "dependencies": {
     "zod": "^3.24.2"
@@ -24,5 +25,4 @@
   "devDependencies": {
     "typescript": "^5.7.3"
   }
-} 
-
+}

@@ -19,22 +19,24 @@ async function getProducer() {
   return producerPromise;
 }
 
+/**
+ * Publish a rejected message to the dead-letter topic.
+ *
+ * Throws if the publish fails. The caller has not resolved the offset yet, so
+ * the batch is redelivered instead of the message being lost.
+ */
 export async function sendToDLQ(failedPayload: string, errorMessage: string): Promise<void> {
-  try {
-    const producer = await getProducer();
-    await producer.send({
-      topic: env.KAFKA_DLQ_TOPIC,
-      messages: [
-        {
-          value: JSON.stringify({
-            payload: failedPayload,
-            error: errorMessage,
-            failedAt: new Date().toISOString(),
-          }),
-        },
-      ],
-    });
-  } catch (err) {
-    console.error("Critical: Failed to publish to Kafka DLQ", err);
-  }
+  const producer = await getProducer();
+  await producer.send({
+    topic: env.KAFKA_DLQ_TOPIC,
+    messages: [
+      {
+        value: JSON.stringify({
+          payload: failedPayload,
+          error: errorMessage,
+          failedAt: new Date().toISOString(),
+        }),
+      },
+    ],
+  });
 }

@@ -9,7 +9,9 @@
     "build": "tsc",
     "start": "node dist/scheduler.js",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "test": "node --import tsx --test src/jobs/window.test.ts src/jobs/daily-rollups.test.ts",
+    "test:integration": "node --import tsx --test src/jobs/rollups.integration.test.ts"
   },
   "dependencies": {
     "@trackme/analytics": "workspace:*",
@@ -25,4 +27,3 @@
     "typescript": "^5.7.3"
   }
 }
-

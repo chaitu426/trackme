@@ -23,6 +23,12 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if problems := cfg.ProductionProblems(os.Getenv("NODE_ENV")); len(problems) > 0 {
+		for _, p := range problems {
+			log.Printf("unsafe production configuration: %s", p)
+		}
+		log.Fatal("refusing to start; fix the settings above")
+	}
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
@@ -57,9 +63,19 @@ func main() {
 		Sites:     sitesResolver,
 		Publisher: publisher,
 		Limiter:   ratelimit.New(rdb, cfg.RateLimitMax, cfg.RateLimitWindowMs),
+		SiteLimiter: ratelimit.New(rdb, cfg.SiteRateLimitMax, cfg.RateLimitWindowMs),
 		Quota:     quota.New(rdb),
 		Geo:       geoResolver,
 		MaxBody:   cfg.MaxBodyBytes,
+
+		TrustedProxyHops: cfg.TrustedProxyHops,
+		QuotaFailOpen:    cfg.QuotaFailOpen,
+	}
+
+	if cfg.TrustedProxyHops <= 0 {
+		log.Printf("client IP: TRUSTED_PROXY_HOPS=0, using the TCP peer address (correct only when nothing sits in front of this service)")
+	} else {
+		log.Printf("client IP: trusting %d proxy hop(s) in X-Forwarded-For (set TRUSTED_PROXY_HOPS=0 if this service is exposed directly)", cfg.TrustedProxyHops)
 	}
 
 	httpServer := &http.Server{

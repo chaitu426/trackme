@@ -16,7 +16,8 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "test": "node --import tsx --test src/queries/range-split.test.ts src/queries/overview.test.ts"
   },
   "dependencies": {
     "@clickhouse/client": "^1.11.0",
@@ -28,4 +29,3 @@
     "typescript": "^5.7.3"
   }
 }
-

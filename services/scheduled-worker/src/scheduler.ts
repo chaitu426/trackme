@@ -30,15 +30,16 @@ cron.schedule("5 * * * *", async () => {
   }
 });
 
-// 2. Daily Rollups: 00:15 UTC every day
-cron.schedule("15 0 * * *", async () => {
+// 2. Daily rollups: every 15 minutes. Each run resumes from where the rollup
+// tables end, so this keeps today's numbers fresh and repairs any downtime.
+cron.schedule("2,17,32,47 * * * *", async () => {
   try {
     await withDistributedLock(
       redis,
       "lock:scheduled:daily_rollups",
-      1800,
+      900,
       "Daily Rollups",
-      runDailyRollups
+      () => runDailyRollups().then(() => undefined)
     );
   } catch (err) {
     console.error("Failed running daily rollups:", err);

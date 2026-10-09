@@ -17,6 +17,17 @@ apps/web/public/tracker.js
 # Turborepo
 .turbo/
 
+# Compiled output that must never sit next to sources
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+services/ingestion-go/bin/
+
+# Local session cookies from curl -c and similar
+cookie.txt
+*.cookies
+
 # Environment files
 .env
 .env*.local

@@ -1,0 +1,369 @@
+{
+  "_comment": "Shared by the Go edge validator (services/ingestion-go/internal/validate) and the Zod TrackerEventSchema (packages/contracts). Only cases both must agree on belong here.",
+  "cases": [
+    {
+      "name": "valid pageview",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "valid custom with scalar properties",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "custom",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "properties": {
+          "plan": "pro",
+          "seats": 5,
+          "trial": true
+        }
+      }
+    },
+    {
+      "name": "valid identify with traits",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "identify",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "userId": "user-42",
+        "userTraits": {
+          "plan": "pro"
+        }
+      }
+    },
+    {
+      "name": "valid web vital",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "web_vital",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "webVital": {
+          "name": "LCP",
+          "value": 1800,
+          "rating": "good",
+          "navigationType": "navigate"
+        }
+      }
+    },
+    {
+      "name": "valid campaign",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "campaign": {
+          "source": "newsletter",
+          "medium": "email"
+        }
+      }
+    },
+    {
+      "name": "event id is not a uuid",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "not-a-uuid",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "timestamp is not a date",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "yesterday",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "site key too short",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "short",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "session id too short",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "abc",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "visitor id too long",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "unknown event type",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "click",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "schema version 2",
+      "valid": false,
+      "event": {
+        "schemaVersion": 2,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "nested property",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "properties": {
+          "a": {
+            "b": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "property key with a space",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "properties": {
+          "has space": "x"
+        }
+      }
+    },
+    {
+      "name": "property value too long",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "properties": {
+          "a": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        }
+      }
+    },
+    {
+      "name": "web vital with unknown metric",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "web_vital",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "webVital": {
+          "name": "XYZ",
+          "value": 1,
+          "rating": "good"
+        }
+      }
+    },
+    {
+      "name": "web vital with bad rating",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "web_vital",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "webVital": {
+          "name": "LCP",
+          "value": 1,
+          "rating": "meh"
+        }
+      }
+    },
+    {
+      "name": "web vital with negative value",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "web_vital",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "webVital": {
+          "name": "LCP",
+          "value": -5,
+          "rating": "good"
+        }
+      }
+    },
+    {
+      "name": "path longer than 512",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "user id longer than 256",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "userId": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+      }
+    },
+    {
+      "name": "campaign value longer than 128",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "campaign": {
+          "source": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      }
+    }
+  ]
+}

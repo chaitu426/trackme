@@ -1,33 +1,85 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/trackme/ingestion-go/internal/clientip"
 	"github.com/trackme/ingestion-go/internal/enrich"
 	"github.com/trackme/ingestion-go/internal/geo"
 	"github.com/trackme/ingestion-go/internal/origin"
-	"github.com/trackme/ingestion-go/internal/queue"
-	"github.com/trackme/ingestion-go/internal/quota"
-	"github.com/trackme/ingestion-go/internal/ratelimit"
 	"github.com/trackme/ingestion-go/internal/sign"
 	"github.com/trackme/ingestion-go/internal/site"
+	"github.com/trackme/ingestion-go/internal/validate"
 )
 
+// The dependencies the handler needs, as interfaces so each failure mode (Redis
+// down, Postgres slow, Kafka refusing) can be exercised in tests.
+type SiteResolver interface {
+	Resolve(ctx context.Context, publicKey string) (*site.ResolvedSite, error)
+}
+
+type RateLimiter interface {
+	Allow(ctx context.Context, key string) (bool, error)
+}
+
+type QuotaGate interface {
+	TryReserve(ctx context.Context, workspaceID string, quota, delta int) (bool, error)
+	Release(ctx context.Context, reserved map[string]int) error
+}
+
+type EventPublisher interface {
+	Publish(ctx context.Context, events []enrich.EnrichedEvent) error
+}
+
 type Server struct {
-	Sites     *site.Resolver
-	Publisher *queue.Publisher
-	Limiter   *ratelimit.Limiter
-	Quota     *quota.Checker
-	Geo       *geo.Resolver
-	MaxBody   int64
+	Sites     SiteResolver
+	Publisher EventPublisher
+	Limiter   RateLimiter // per client IP
+	// SiteLimiter limits per site. A busy site legitimately sends far more than
+	// one visitor's IP, so it needs its own, larger budget. Falls back to Limiter.
+	SiteLimiter RateLimiter
+	Quota       QuotaGate
+	Geo         *geo.Resolver
+	MaxBody     int64
+
+	// TrustedProxyHops is how many reverse proxies sit in front of this server;
+	// see internal/clientip. Zero means no proxy and X-Forwarded-For is ignored.
+	TrustedProxyHops int
+
+	// QuotaFailOpen accepts events when the quota counter in Redis cannot be
+	// reached, instead of rejecting them. Usage metering later reconciles the
+	// real count from ClickHouse, so the cost is briefly looser enforcement.
+	QuotaFailOpen bool
+
+	warnMu   sync.Mutex
+	warnLast map[string]time.Time
+}
+
+// warn logs at most once per interval per kind, so a Redis outage under load
+// produces a few lines instead of one per request.
+func (s *Server) warn(kind, format string, args ...any) {
+	const every = 10 * time.Second
+	s.warnMu.Lock()
+	if s.warnLast == nil {
+		s.warnLast = map[string]time.Time{}
+	}
+	last, seen := s.warnLast[kind]
+	now := time.Now()
+	if seen && now.Sub(last) < every {
+		s.warnMu.Unlock()
+		return
+	}
+	s.warnLast[kind] = now
+	s.warnMu.Unlock()
+	log.Printf(format, args...)
 }
 
 type batchRequest struct {
@@ -68,12 +120,12 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	processed, status, message := s.processEvents(r, body, req.Events)
+	res, status, message := s.processEvents(r, body, req.Events)
 	if status != http.StatusAccepted {
 		writeJSON(w, status, map[string]string{"error": message})
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"status": "accepted", "processed": processed})
+	writeJSON(w, http.StatusAccepted, res.body())
 }
 
 func (s *Server) handleSingle(w http.ResponseWriter, r *http.Request) {
@@ -95,53 +147,101 @@ func (s *Server) handleSingle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Wrap single event as a synthetic batch for signature over raw body.
-	processed, status, message := s.processEvents(r, body, []enrich.TrackerEvent{ev})
+	res, status, message := s.processEvents(r, body, []enrich.TrackerEvent{ev})
 	if status != http.StatusAccepted {
 		writeJSON(w, status, map[string]string{"error": message})
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"status": "accepted", "processed": processed})
+	writeJSON(w, http.StatusAccepted, res.body())
 }
 
+// allowIP applies the per-client-IP limit. When Redis is unreachable it lets the
+// request through: rate limiting protects the service from abuse, and refusing
+// every visitor because the counter store is down would be a bigger outage than
+// the abuse it guards against.
 func (s *Server) allowIP(r *http.Request) bool {
-	ok, err := s.Limiter.Allow(r.Context(), "ip:"+clientIP(r))
+	ok, err := s.Limiter.Allow(r.Context(), "ip:"+s.clientIP(r))
 	if err != nil {
-		log.Printf("rate limit error: %v", err)
-		return false
+		s.warn("ratelimit-ip", "rate limiter unavailable, allowing traffic: %v", err)
+		return true
 	}
 	return ok
 }
 
-func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.TrackerEvent) (processed int, status int, message string) {
+// ingestResult is what a successful (202) call reports back to the SDK.
+type ingestResult struct {
+	Processed int // events published to Kafka
+	Rejected  int // events dropped for failing the tracker contract
+	Clamped   int // accepted events whose timestamp was replaced with server time
+}
+
+func (r ingestResult) body() map[string]any {
+	return map[string]any{
+		"status":    "accepted",
+		"processed": r.Processed,
+		"rejected":  r.Rejected,
+	}
+}
+
+func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.TrackerEvent) (res ingestResult, status int, message string) {
+	now := time.Now().UTC()
+
+	// Contract check first: a malformed event is dropped on its own so it can
+	// neither block the rest of the batch nor reach Kafka, where the worker
+	// could not insert it.
+	valid := make([]enrich.TrackerEvent, 0, len(events))
+	reasons := map[string]int{}
+	for _, ev := range events {
+		out, clamped, reason := validate.Event(ev, now, validate.DefaultWindow)
+		if reason != "" {
+			res.Rejected++
+			reasons[reason]++
+			continue
+		}
+		if clamped {
+			res.Clamped++
+		}
+		valid = append(valid, out)
+	}
+	if res.Rejected > 0 || res.Clamped > 0 {
+		log.Printf("ingest: batch=%d rejected=%d clamped=%d reasons=%v", len(events), res.Rejected, res.Clamped, reasons)
+	}
+	if len(valid) == 0 {
+		return ingestResult{}, http.StatusBadRequest, "No valid events in batch"
+	}
+	events = valid
+
 	resolved := map[string]*site.ResolvedSite{}
 	for _, ev := range events {
-		if !validEvent(ev) {
-			return 0, http.StatusBadRequest, "Invalid tracker event fields"
-		}
 		if _, ok := resolved[ev.SiteKey]; ok {
 			continue
 		}
 		siteRow, err := s.Sites.Resolve(r.Context(), ev.SiteKey)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return 0, http.StatusUnauthorized, "Unknown or invalid site key"
+			if errors.Is(err, site.ErrNotFound) {
+				return ingestResult{}, http.StatusUnauthorized, "Unknown or invalid site key"
 			}
-			log.Printf("site resolve error: %v", err)
-			return 0, http.StatusInternalServerError, "Site lookup failed"
+			s.warn("site-resolve", "site resolve error: %v", err)
+			return ingestResult{}, http.StatusInternalServerError, "Site lookup failed"
 		}
 		resolved[ev.SiteKey] = siteRow
 	}
 
-	// Per-site-key rate limit (stops public-key spam far better than IP alone).
-	for siteKey, siteRow := range resolved {
-		ok, err := s.Limiter.Allow(r.Context(), "site:"+siteRow.ID)
+	// Per-site rate limit (stops public-key spam far better than IP alone). Like
+	// the IP limit, it fails open if Redis is unreachable.
+	siteLimiter := s.SiteLimiter
+	if siteLimiter == nil {
+		siteLimiter = s.Limiter
+	}
+	for _, siteRow := range resolved {
+		ok, err := siteLimiter.Allow(r.Context(), "site:"+siteRow.ID)
 		if err != nil {
-			return 0, http.StatusInternalServerError, "Rate limiter unavailable"
+			s.warn("ratelimit-site", "site rate limiter unavailable, allowing traffic: %v", err)
+			continue
 		}
 		if !ok {
-			return 0, http.StatusTooManyRequests, "Site rate limit exceeded"
+			return ingestResult{}, http.StatusTooManyRequests, "Site rate limit exceeded"
 		}
-		_ = siteKey
 	}
 
 	for _, siteRow := range resolved {
@@ -152,21 +252,21 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 				siteRow.Domain,
 				siteRow.Settings.AllowLocalhostTracking,
 			) {
-				return 0, http.StatusForbidden, "Origin/Referer does not match registered site domain"
+				return ingestResult{}, http.StatusForbidden, "Origin/Referer does not match registered site domain"
 			}
 		}
 
 		if siteRow.Settings.SigningRequired {
 			secret := siteRow.Settings.SigningSecret
 			if secret == "" || !sign.Valid(secret, rawBody, r.Header.Get("X-GI-Signature")) {
-				return 0, http.StatusUnauthorized, "Valid X-GI-Signature required"
+				return ingestResult{}, http.StatusUnauthorized, "Valid X-GI-Signature required"
 			}
 		}
 
 		if siteRow.Settings.RequireConsent {
 			consent := strings.ToLower(strings.TrimSpace(r.Header.Get("X-GI-Consent")))
 			if consent != "granted" && consent != "1" && consent != "true" {
-				return 0, http.StatusForbidden, "Consent required before tracking"
+				return ingestResult{}, http.StatusForbidden, "Consent required before tracking"
 			}
 		}
 	}
@@ -174,7 +274,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 	headerMap := flattenHeaders(r.Header)
 	ua := r.Header.Get("User-Agent")
 	classification := enrich.ClassifyUA(ua)
-	ip := clientIP(r)
+	ip := s.clientIP(r)
 	country, city := "", ""
 	if s.Geo != nil {
 		country, city = s.Geo.Lookup(headerMap, ip)
@@ -184,7 +284,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 	// IP is discarded after geo — never attached to the enriched event.
 	_ = ip
 
-	receivedAt := time.Now().UTC().Format(time.RFC3339Nano)
+	receivedAt := now.Format(time.RFC3339Nano)
 	dnt := r.Header.Get("DNT") == "1"
 
 	enriched := make([]enrich.EnrichedEvent, 0, len(events))
@@ -227,7 +327,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 	}
 
 	if len(enriched) == 0 {
-		return 0, http.StatusAccepted, ""
+		return res, http.StatusAccepted, ""
 	}
 
 	// Reserve quota atomically before Kafka publish so concurrent batches
@@ -237,24 +337,29 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 		siteRow := firstSiteForWorkspace(resolved, workspaceID)
 		allowed, err := s.Quota.TryReserve(r.Context(), workspaceID, siteRow.MonthlyEventQuota, delta)
 		if err != nil {
-			log.Printf("quota reserve error: %v", err)
+			if s.QuotaFailOpen {
+				s.warn("quota", "quota counter unavailable, accepting events without reserving: %v", err)
+				continue
+			}
+			s.warn("quota", "quota reserve error: %v", err)
 			_ = s.Quota.Release(r.Context(), reserved)
-			return 0, http.StatusInternalServerError, "Quota check failed"
+			return ingestResult{}, http.StatusInternalServerError, "Quota check failed"
 		}
 		if !allowed {
 			_ = s.Quota.Release(r.Context(), reserved)
-			return 0, http.StatusPaymentRequired, "Monthly event quota exceeded"
+			return ingestResult{}, http.StatusPaymentRequired, "Monthly event quota exceeded"
 		}
 		reserved[workspaceID] = delta
 	}
 
 	if err := s.Publisher.Publish(r.Context(), enriched); err != nil {
-		log.Printf("publish error: %v", err)
+		s.warn("publish", "publish error: %v", err)
 		_ = s.Quota.Release(r.Context(), reserved)
-		return 0, http.StatusInternalServerError, "Failed to enqueue events"
+		return ingestResult{}, http.StatusInternalServerError, "Failed to enqueue events"
 	}
 
-	return len(enriched), http.StatusAccepted, ""
+	res.Processed = len(enriched)
+	return res, http.StatusAccepted, ""
 }
 
 func firstSiteForWorkspace(resolved map[string]*site.ResolvedSite, workspaceID string) *site.ResolvedSite {
@@ -264,24 +369,6 @@ func firstSiteForWorkspace(resolved map[string]*site.ResolvedSite, workspaceID s
 		}
 	}
 	return &site.ResolvedSite{}
-}
-
-func validEvent(ev enrich.TrackerEvent) bool {
-	if ev.SchemaVersion != 1 {
-		return false
-	}
-	if ev.EventID == "" || ev.SiteKey == "" || ev.SessionID == "" || ev.VisitorPseudonym == "" {
-		return false
-	}
-	if ev.URL == "" || ev.Path == "" || ev.OccurredAt == "" {
-		return false
-	}
-	switch ev.Type {
-	case "pageview", "custom", "web_vital":
-		return true
-	default:
-		return false
-	}
 }
 
 func readBody(w http.ResponseWriter, r *http.Request, max int64) ([]byte, error) {
@@ -300,19 +387,8 @@ func flattenHeaders(h http.Header) map[string]string {
 	return out
 }
 
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-		return strings.TrimSpace(realIP)
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
+func (s *Server) clientIP(r *http.Request) string {
+	return clientip.FromRequest(r, s.TrustedProxyHops)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -332,6 +408,8 @@ func withCORS(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, DNT, X-GI-Signature, X-GI-Consent")
 		if r.Method == http.MethodOptions {
+			// Without this the browser repeats the preflight every few seconds.
+			w.Header().Set("Access-Control-Max-Age", "86400")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}

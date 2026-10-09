@@ -7,6 +7,7 @@ import { db, sites, eq, and } from "@trackme/db";
 import { env } from "@trackme/config";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { invalidateIngestSiteCache } from "@/lib/ingest-cache";
 
 const AddSiteSchema = z.object({
   domain: z
@@ -98,6 +99,9 @@ export async function POST(
     if (!newSite) {
       throw new AppError(500, "SITE_CREATE_FAILED", "Failed to create site.");
     }
+
+    // The edge remembers unknown keys for a few seconds; tell it this one now exists.
+    await invalidateIngestSiteCache(publicKeyHash);
 
     return NextResponse.json({
       site: newSite,

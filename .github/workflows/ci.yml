@@ -54,3 +54,33 @@ jobs:
       - name: Build Packages & Services
         run: pnpm build
 
+
+  go-edge:
+    name: Go edge vet and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ingestion-go
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/ingestion-go/go.mod
+          cache-dependency-path: services/ingestion-go/go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Vet ingest-proxy
+        working-directory: services/ingest-proxy
+        run: go vet ./...
+
+      - name: Test ingest-proxy
+        working-directory: services/ingest-proxy
+        run: go test ./...
