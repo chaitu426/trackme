@@ -1,0 +1,334 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Same Linear / Vercel dark system as apps/web */
+    --background: #09090b;
+    --foreground: #ededed;
+
+    --card: #0c0c0e;
+    --card-foreground: #fafafa;
+
+    --border: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.05);
+
+    --primary: #fafafa;
+    --primary-foreground: #09090b;
+
+    --muted: #18181b;
+    --muted-foreground: #a1a1aa;
+
+    --accent: #3b82f6;
+    --accent-foreground: #eff6ff;
+
+    --success: #22c55e;
+    --warning: #eab308;
+    --danger: #ef4444;
+
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+    --radius: 8px;
+    --radius-sm: 6px;
+    --radius-lg: 12px;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    scroll-padding-top: 4.5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background-color: rgba(59, 130, 246, 0.35);
+    color: #fafafa;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgba(59, 130, 246, 0.7);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+@layer utilities {
+  .surface-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .linear-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .linear-card:hover {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  .pulse-live {
+    animation: livePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes livePulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.9);
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.22s ease both;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.15s ease both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in-up,
+    .animate-slide-down,
+    .pulse-live {
+      animation: none;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Long-form documentation typography. Scoped to .doc so the shell, cards and
+   code blocks keep their own styles.
+   ------------------------------------------------------------------------ */
+@layer components {
+  .doc {
+    color: #d4d4d8;
+    font-size: 14.5px;
+    line-height: 1.75;
+  }
+
+  .doc > * + * {
+    margin-top: 1rem;
+  }
+
+  .doc h2 {
+    margin-top: 2.75rem;
+    padding-top: 0.25rem;
+    font-size: 1.3rem;
+    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #fafafa;
+  }
+
+  .doc h3 {
+    margin-top: 2rem;
+    font-size: 1.02rem;
+    line-height: 1.4;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: #f4f4f5;
+  }
+
+  .doc h4 {
+    margin-top: 1.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #a1a1aa;
+  }
+
+  /* :where() keeps these at zero specificity so utility classes on nested
+     components (callouts, cards) still win. */
+  .doc :where(p, li) {
+    color: #c4c4cb;
+  }
+
+  .doc :where(strong) {
+    color: #fafafa;
+    font-weight: 600;
+  }
+
+  .doc a:not(.no-underline-link) {
+    color: #93c5fd;
+    text-decoration: underline;
+    text-decoration-color: rgba(147, 197, 253, 0.35);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s ease, color 0.15s ease;
+  }
+
+  .doc a:not(.no-underline-link):hover {
+    color: #bfdbfe;
+    text-decoration-color: rgba(191, 219, 254, 0.8);
+  }
+
+  .doc ul,
+  .doc ol {
+    padding-left: 1.25rem;
+  }
+
+  .doc ul {
+    list-style: disc;
+  }
+
+  .doc ol {
+    list-style: decimal;
+  }
+
+  .doc li + li {
+    margin-top: 0.4rem;
+  }
+
+  .doc li::marker {
+    color: #52525b;
+  }
+
+  .doc :not(pre) > code {
+    padding: 0.12rem 0.38rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    color: #e4e4e7;
+    word-break: break-word;
+  }
+
+  .doc hr {
+    margin: 2.5rem 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .doc table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .doc th {
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #a1a1aa;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .doc td {
+    padding: 0.65rem 0.75rem;
+    vertical-align: top;
+    border-bottom: 1px solid var(--border-subtle);
+    color: #c4c4cb;
+  }
+
+  .doc tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .doc blockquote {
+    padding-left: 1rem;
+    border-left: 2px solid rgba(255, 255, 255, 0.14);
+    color: #a1a1aa;
+  }
+}
+
+/* Shiki output: let our card own the background. */
+.code-body pre.shiki {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  background: transparent !important;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  letter-spacing: 0;
+  tab-size: 2;
+}
+
+.code-body pre.shiki code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.code-body pre.shiki .line {
+  display: inline-block;
+  min-height: 1.7em;
+}
