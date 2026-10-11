@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { TokenSync } from "@/components/token-sync";
 
 export const metadata: Metadata = {
   title: {
@@ -27,10 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        {children}
-        <TokenSync />
-      </body>
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">{children}</body>
     </html>
   );
 }

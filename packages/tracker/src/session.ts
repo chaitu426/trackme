@@ -13,8 +13,15 @@ export function generateUUID(): string {
 }
 
 const SESSION_KEY = "_gi_sid";
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of inactivity
 const PSEUDONYM_KEY = "_gi_pid";
 const PSEUDONYM_TTL_MS = 24 * 60 * 60 * 1000; // rotate daily
+
+type StoredSession = {
+  id: string;
+  createdAt: number;
+  lastSeenAt: number;
+};
 
 type StoredPseudonym = {
   id: string;
@@ -22,15 +29,38 @@ type StoredPseudonym = {
 };
 
 /**
- * Retrieves or creates a temporary session ID (stored only in sessionStorage, cleared on browser close)
+ * Retrieves or creates a session ID scoped to the current tab and reset after
+ * 30 minutes of inactivity. This stays distinct across tabs because it uses
+ * sessionStorage, not localStorage.
  */
 export function getSessionId(): string {
   try {
-    let sid = window.sessionStorage.getItem(SESSION_KEY);
-    if (!sid) {
-      sid = generateUUID();
-      window.sessionStorage.setItem(SESSION_KEY, sid);
+    const raw = window.sessionStorage.getItem(SESSION_KEY);
+    const now = Date.now();
+
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<StoredSession>;
+      if (parsed?.id && typeof parsed.lastSeenAt === "number") {
+        const age = now - parsed.lastSeenAt;
+        if (age <= SESSION_TIMEOUT_MS) {
+          const next: StoredSession = {
+            id: parsed.id,
+            createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : now,
+            lastSeenAt: now,
+          };
+          window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+          return next.id;
+        }
+      }
     }
+
+    const sid = generateUUID();
+    const next: StoredSession = {
+      id: sid,
+      createdAt: now,
+      lastSeenAt: now,
+    };
+    window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
     return sid;
   } catch {
     return generateUUID();

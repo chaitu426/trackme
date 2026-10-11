@@ -2,11 +2,17 @@ package site
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -107,6 +113,63 @@ func HashPublicKey(plaintext string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+const encryptedSecretPrefix = "enc:v1:"
+
+func siteSigningSecretKey() string {
+	key := strings.TrimSpace(os.Getenv("SITE_SIGNING_SECRET_KEY"))
+	if key == "" {
+		key = "dev-site-signing-secret-key-min-32-chars"
+	}
+	if len(key) < 32 {
+		return "dev-site-signing-secret-key-min-32-chars"
+	}
+	return key
+}
+
+func decryptStoredSecret(value string) (string, error) {
+	if value == "" || !strings.HasPrefix(value, encryptedSecretPrefix) {
+		return value, nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(value, encryptedSecretPrefix))
+	if err != nil {
+		return "", err
+	}
+	if len(payload) <= 28 {
+		return "", fmt.Errorf("secret payload too short")
+	}
+	key := sha256.Sum256([]byte(siteSigningSecretKey()))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return "", err
+	}
+	iv := payload[:12]
+	tag := payload[len(payload)-16:]
+	ciphertext := payload[12 : len(payload)-16]
+	stream, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	combined := append([]byte{}, ciphertext...)
+	combined = append(combined, tag...)
+	plaintext, err := stream.Open(nil, iv, combined, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
+}
+
+func normalizeSettings(settings *Settings) {
+	if settings.SigningSecret == "" {
+		return
+	}
+	plaintext, err := decryptStoredSecret(settings.SigningSecret)
+	if err == nil {
+		settings.SigningSecret = plaintext
+		return
+	}
+	log.Printf("warning: could not decrypt stored signing secret: %v", err)
+}
+
 func pgLoader(pool *pgxpool.Pool) loadFunc {
 	return func(ctx context.Context, hash string) (ResolvedSite, error) {
 		var (
@@ -131,6 +194,7 @@ func pgLoader(pool *pgxpool.Pool) loadFunc {
 		settings := DefaultSettings()
 		if len(settingsRaw) > 0 {
 			_ = json.Unmarshal(settingsRaw, &settings)
+			normalizeSettings(&settings)
 			if settings.RetentionMonths == 0 {
 				settings.RetentionMonths = 24
 			}

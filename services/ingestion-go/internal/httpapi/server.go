@@ -2,8 +2,12 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"expvar"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -86,16 +90,69 @@ type batchRequest struct {
 	Events []enrich.TrackerEvent `json:"events"`
 }
 
+var (
+	httpRequestsTotal = expvar.NewInt("http_requests_total")
+	httpRequestsInFlight = expvar.NewInt("http_requests_in_flight")
+	httpRequestLatencyMs = expvar.NewFloat("http_request_latency_ms")
+)
+
+type responseRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *responseRecorder) WriteHeader(statusCode int) {
+	r.status = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *responseRecorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(b)
+}
+
+func withRequestTracing(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		reqID := strings.TrimSpace(r.Header.Get("X-Request-ID"))
+		if reqID == "" {
+			buf := make([]byte, 12)
+			if _, err := rand.Read(buf); err == nil {
+				reqID = base64.RawURLEncoding.EncodeToString(buf)
+			} else {
+				reqID = fmt.Sprintf("req-%d", time.Now().UnixNano())
+			}
+		}
+		w.Header().Set("X-Request-ID", reqID)
+		httpRequestsInFlight.Add(1)
+		defer httpRequestsInFlight.Add(-1)
+		statusWriter := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(statusWriter, r)
+		statusCode := statusWriter.status
+		httpRequestsTotal.Add(1)
+		httpRequestLatencyMs.Add(float64(time.Since(start).Milliseconds()))
+		log.Printf("%s %s request_id=%s status=%d latency_ms=%d", r.Method, r.URL.Path, reqID, statusCode, time.Since(start).Milliseconds())
+	})
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.handleHealth)
+	mux.HandleFunc("GET /metrics", s.handleMetrics)
 	mux.HandleFunc("POST /v1/batch", s.handleBatch)
 	mux.HandleFunc("POST /v1/e", s.handleSingle)
-	return withCORS(mux)
+	return withCORS(withRequestTracing(mux))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "ingestion-go"})
+}
+
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	expvar.Handler().ServeHTTP(w, r)
 }
 
 func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {

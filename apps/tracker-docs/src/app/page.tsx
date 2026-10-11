@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import { Landing } from "@trackme/landing";
 import { DASHBOARD_URL } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: { absolute: "TrackMe — Cookieless Web Analytics" },
+  description:
+    "Privacy-first web analytics for product and growth teams. Understand your traffic without cookies or invasive tracking.",
+};
 
 export default function HomePage() {
   // Without a dashboard URL the call to action goes to the quickstart, so the page
@@ -12,8 +19,6 @@ export default function HomePage() {
         docs: "/docs",
         quickstart: "/docs/quickstart",
         frameworks: "/docs/frameworks",
-        reference: "/docs/reference/tracker-api",
-        selfHosting: "/docs/operate/self-hosting",
         getStarted: dashboard ? `${dashboard}/signup` : "/docs/quickstart",
         ...(dashboard ? { signIn: `${dashboard}/login`, privacy: `${dashboard}/legal/privacy` } : {}),
       }}

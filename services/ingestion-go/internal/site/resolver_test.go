@@ -2,8 +2,13 @@ package site
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -231,5 +236,37 @@ func TestJunkKeysCannotEvictRealSites(t *testing.T) {
 	r.mu.Unlock()
 	if size > negativeMax {
 		t.Fatalf("negative cache grew to %d, cap is %d", size, negativeMax)
+	}
+}
+
+func TestDecryptStoredSecret(t *testing.T) {
+	if err := os.Setenv("SITE_SIGNING_SECRET_KEY", "0123456789abcdef0123456789abcdef"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Unsetenv("SITE_SIGNING_SECRET_KEY")
+
+	plaintext := "gis_example_secret_value_123456"
+	key := sha256.Sum256([]byte("0123456789abcdef0123456789abcdef"))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iv := make([]byte, 12)
+	for i := range iv {
+		iv[i] = byte(i + 1)
+	}
+	ciphertext := gcm.Seal(nil, iv, []byte(plaintext), nil)
+	stored := encryptedSecretPrefix + base64.RawURLEncoding.EncodeToString(append(iv, ciphertext...))
+
+	got, err := decryptStoredSecret(stored)
+	if err != nil {
+		t.Fatalf("decryptStoredSecret returned err: %v", err)
+	}
+	if got != plaintext {
+		t.Fatalf("decryptStoredSecret() = %q, want %q", got, plaintext)
 	}
 }

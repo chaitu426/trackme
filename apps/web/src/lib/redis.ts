@@ -1,22 +1,25 @@
 import { Redis } from "ioredis";
-import { env } from "@trackme/config";
+import { getRedisURLForRole, type RedisRole } from "@trackme/config";
 
-let client: Redis | null = null;
+const clients = new Map<RedisRole, Redis>();
 
-export function getRedis(): Redis {
-  if (!client) {
-    client = new Redis(env.REDIS_URL, {
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: true,
-      retryStrategy: (times: number) => Math.min(times * 100, 3000),
-      lazyConnect: false,
-    });
+export function getRedis(role: RedisRole = "state"): Redis {
+  const existing = clients.get(role);
+  if (existing) return existing;
 
-    client.on("error", (err) => {
-      console.warn("[Redis] Connection error:", err.message);
-    });
-  }
+  const client = new Redis(getRedisURLForRole(role), {
+    maxRetriesPerRequest: 3,
+    enableReadyCheck: true,
+    retryStrategy: (times: number) => Math.min(times * 100, 3000),
+    lazyConnect: false,
+  });
+
+  client.on("error", (err) => {
+    console.warn(`[Redis:${role}] Connection error:`, err.message);
+  });
+
+  clients.set(role, client);
   return client;
 }
 
-export { client as redisClient };
+export const redisClient = getRedis("state");

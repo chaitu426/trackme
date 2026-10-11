@@ -25,7 +25,7 @@ The first release should prove reliable measurement and repeat dashboard usage. 
 
 ### Minimal Go: one focused service
 
-Use Go for the public ingestion edge only when load testing shows that the Node ingestion path is a bottleneck.
+Use Go for the public ingestion edge as the production collector; keep the design intentionally narrow.
 
 The Go service should remain deliberately small:
 
@@ -33,10 +33,10 @@ The Go service should remain deliberately small:
 - Validate the public site key, origin, payload size, and event UUIDs.
 - Apply basic rate limits and request-level enrichment.
 - Redact or reject unsafe properties.
-- Publish the normalized event envelope to the queue.
+- Publish the normalized event envelope to Kafka.
 - Return a fast acknowledgement.
 
-It must not own product rules, dashboard queries, billing, tenancy policy, or ClickHouse schema migrations. Node and Go share versioned JSON or Protobuf event contracts and contract tests. Until the need is demonstrated, run the same interface in Node/Fastify to reduce operational cost.
+It must not own product rules, dashboard queries, billing, tenancy policy, or ClickHouse schema migrations. The Go edge and the TypeScript workers share versioned JSON contracts and contract tests.
 
 ## 3. Target architecture
 
@@ -44,10 +44,10 @@ It must not own product rules, dashboard queries, billing, tenancy policy, or Cl
 Browser tracker
     |
     v
-CDN/WAF -> ingestion edge (Node first, Go later)
+CDN/WAF -> ingestion edge (Go)
     |
     v
-Managed queue -> TypeScript event worker -> ClickHouse raw events
+Kafka -> TypeScript event worker -> ClickHouse raw events
                                   |             |
                                   |             +--> hourly/daily rollups
                                   +--> Redis realtime state
@@ -67,8 +67,7 @@ apps/
   web/                         Next.js dashboard and control plane
   tracker-docs/                Installation and API documentation
 services/
-  ingestion-node/              Node/Fastify collector for MVP
-  ingestion-go/                Optional Go collector after load validation
+  ingestion-go/                Production Go collector for tracker ingestion
   event-worker/                Queue consumer and ClickHouse writer
   scheduled-worker/            Rollups, retention, alerts, exports
 packages/

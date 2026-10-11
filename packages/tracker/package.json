@@ -18,11 +18,12 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "rimraf dist && tsup && node scripts/build-versioned-tracker.mjs && node scripts/check-bundle-size.mjs",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",
-    "test": "node --import tsx --test src/transport.test.ts"
+    "test": "node --import tsx --test src/*.test.ts",
+    "check:size": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
     "@trackme/contracts": "workspace:*"

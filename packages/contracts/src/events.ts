@@ -56,6 +56,7 @@ export const TrackerEventSchema = z.object({
   siteKey: z.string().min(8).max(64),
   sessionId: z.string().min(8).max(64),
   visitorPseudonym: z.string().min(8).max(64),
+  tv: z.string().max(32).optional(),
   url: z.string().url().max(2048),
   path: z.string().max(512),
   title: z.string().max(512).optional(),

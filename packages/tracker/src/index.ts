@@ -4,6 +4,11 @@ import { Transport } from "./transport.js";
 import { listenToRouteChanges } from "./spa.js";
 import { observeWebVitals } from "./vitals.js";
 
+declare const __TRACKER_VERSION__: string;
+
+const TRACKER_VERSION = __TRACKER_VERSION__ as string;
+const DEFAULT_TRACKER_ENDPOINT = "http://localhost:3001/v1/batch";
+
 export interface TrackerConfig {
   siteKey: string;
   endpoint: string;
@@ -229,6 +234,7 @@ export class GrowthTracker {
       siteKey: this.config.siteKey,
       sessionId: getSessionId(),
       visitorPseudonym: getVisitorPseudonym(),
+      tv: TRACKER_VERSION,
       url: eventUrl,
       path,
       title: options.title || document.title || undefined,
@@ -265,6 +271,7 @@ export class GrowthTracker {
       siteKey: this.config.siteKey,
       sessionId: getSessionId(),
       visitorPseudonym: getVisitorPseudonym(),
+      tv: TRACKER_VERSION,
       url: window.location.href,
       path: window.location.pathname,
       title: document.title || undefined,
@@ -308,6 +315,7 @@ export class GrowthTracker {
       siteKey: this.config.siteKey,
       sessionId: getSessionId(),
       visitorPseudonym: getVisitorPseudonym(),
+      tv: TRACKER_VERSION,
       url: window.location.href,
       path: window.location.pathname,
       title: document.title || undefined,
@@ -354,6 +362,7 @@ export class GrowthTracker {
       siteKey: this.config.siteKey,
       sessionId: getSessionId(),
       visitorPseudonym: getVisitorPseudonym(),
+      tv: TRACKER_VERSION,
       url: window.location.href,
       path: window.location.pathname,
       webVital: metric,
@@ -409,9 +418,9 @@ function resolveTrackerScript(): HTMLScriptElement | null {
 if (typeof document !== "undefined") {
   const scriptEl = resolveTrackerScript();
   const siteKey = scriptEl?.getAttribute("data-site");
-  const endpoint = scriptEl?.getAttribute("data-endpoint");
+  const endpoint = scriptEl?.getAttribute("data-endpoint") ?? DEFAULT_TRACKER_ENDPOINT;
 
-  if (siteKey && endpoint) {
+  if (siteKey) {
     const signingSecret = scriptEl?.getAttribute("data-signing-secret") || undefined;
     const tracker = new GrowthTracker({
       siteKey,
@@ -428,9 +437,9 @@ if (typeof document !== "undefined") {
     tracker.init();
     (window as any).growth = tracker;
     (window as any).trackme = tracker;
-  } else if (siteKey && !endpoint) {
+  } else if (siteKey) {
     console.error(
-      "[GrowthIntelligence] tracker script is missing data-endpoint - it will not initialize."
+      "[GrowthIntelligence] tracker script is missing data-endpoint - falling back to the default collector endpoint."
     );
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Ensures the demo site used by test.html /apps/web/public/demo.html exists.
+ * Ensures the demo site used by the public demo page exists.
  * Idempotent: upserts by public key.
  */
 import { hashApiKey } from "@trackme/authz";

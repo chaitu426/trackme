@@ -1,13 +1,20 @@
 import * as React from "react";
 import {
   Activity,
+  ArrowDownRight,
   ArrowRight,
+  Check,
+  ChevronDown,
   Database,
-  Filter,
+  Fingerprint,
   Gauge,
+  Globe2,
+  LockKeyhole,
   Radio,
   ShieldCheck,
-  UserCheck,
+  UserRound,
+  Workflow,
+  Zap,
 } from "lucide-react";
 import { SmartLink } from "./smart-link";
 import { ProductPreview } from "./preview";
@@ -17,8 +24,8 @@ export interface LandingLinks {
   docs: string;
   quickstart: string;
   frameworks: string;
-  reference: string;
-  selfHosting: string;
+  reference?: string;
+  selfHosting?: string;
   /** Omit to hide the "Sign in" link. */
   signIn?: string;
   /** Primary call to action. */
@@ -32,331 +39,516 @@ export interface LandingProps {
 }
 
 const primaryButton =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-zinc-100 px-5 text-sm font-medium text-zinc-950 transition hover:bg-white";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-500 px-5 text-sm font-semibold text-white shadow-[0_8px_28px_-10px_rgba(59,130,246,0.75)] transition hover:bg-blue-400";
 const outlineButton =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-md border border-white/10 px-5 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.04] hover:text-zinc-50";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-5 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.06]";
+
+const BENEFITS = [
+  { icon: Fingerprint, label: "No tracking cookies" },
+  { icon: Radio, label: "Live activity" },
+  { icon: Gauge, label: "Real-user Web Vitals" },
+  { icon: Workflow, label: "Funnels and goals" },
+] as const;
 
 const FEATURES = [
   {
     icon: Radio,
-    title: "Realtime",
-    body: "See who is on your site and which pages they are reading, updated every second.",
+    eyebrow: "Know what is happening now",
+    title: "Realtime, not yesterday’s news",
+    body: "See active visitors and the pages they are viewing, updated from the events arriving at your site.",
   },
   {
-    icon: Filter,
-    title: "Funnels and goals",
-    body: "Define conversion goals and multi-step funnels from pageviews or your own events.",
+    icon: Workflow,
+    eyebrow: "Follow the moments that matter",
+    title: "Events, goals and funnels",
+    body: "Track meaningful actions, define conversion goals, and see where people move through a multi-step journey.",
   },
   {
     icon: Gauge,
-    title: "Web Vitals",
-    body: "LCP, INP, CLS, FCP and TTFB from real visitors, summarised at the 75th percentile.",
+    eyebrow: "Measure the experience",
+    title: "Web Vitals from real visits",
+    body: "Understand LCP, INP, CLS, FCP and TTFB with p75 summaries and useful page and device breakdowns.",
   },
   {
-    icon: UserCheck,
-    title: "User profiles",
-    body: "Identify signed-in users with your own ids and follow their activity over time.",
+    icon: UserRound,
+    eyebrow: "Connect product activity",
+    title: "People, in context",
+    body: "Associate activity with your own user identifiers to understand what happens before and after key actions.",
   },
   {
     icon: ShieldCheck,
-    title: "Privacy controls",
-    body: "No cookies. Per-site Do Not Track, consent gating, domain allow-listing and signed requests.",
+    eyebrow: "Respect the people behind the data",
+    title: "Privacy controls that matter",
+    body: "Cookieless collection, optional consent gating, per-site Do Not Track support and domain allow-listing.",
   },
   {
     icon: Database,
+    eyebrow: "Keep control of your stack",
     title: "Your data, your infrastructure",
-    body: "Self-host the whole stack on ClickHouse, Postgres, Redis and Kafka, with configurable retention.",
+    body: "Self-host with a production-oriented stack built around ClickHouse, PostgreSQL, Redis and Kafka.",
   },
 ] as const;
 
-const STEPS = [
-  {
-    title: "Add the tag",
-    body: "Paste one script into your site, or follow the guide for your framework.",
-  },
-  {
-    title: "Events are collected",
-    body: "Pageviews, navigation and your custom events are batched, validated and stored.",
-  },
-  {
-    title: "Explore the dashboard",
-    body: "Break traffic down by page, source, country and device, and watch it live.",
-  },
+const STACKS = [
+  "React",
+  "Next.js",
+  "Vue",
+  "Nuxt",
+  "Angular",
+  "SvelteKit",
+  "Astro",
+  "WordPress",
+  "Shopify",
+  "Laravel",
+  "Rails",
+  "Django",
 ] as const;
 
-const STACKS = ["React", "Next.js", "Vue", "Nuxt", "Angular", "SvelteKit", "Astro", "WordPress", "Shopify", "Laravel", "Rails", "Django"];
+const FAQS = [
+  {
+    question: "Does TrackMe use analytics cookies?",
+    answer:
+      "The browser tracker is designed to collect analytics without setting tracking cookies. You can also configure consent gating for sites that require it.",
+  },
+  {
+    question: "What can I measure with TrackMe?",
+    answer:
+      "TrackMe supports pageviews, custom events, goals and funnels, realtime activity, acquisition and geography reports, people profiles, and Core Web Vitals.",
+  },
+  {
+    question: "How do I add the tracker to my site?",
+    answer:
+      "Add a deferred script tag with your site key and ingestion endpoint. Use the quickstart for the basic setup or choose a framework guide for a platform-specific example.",
+  },
+  {
+    question: "Can I run the platform on my own infrastructure?",
+    answer:
+      "Yes. The repository includes a self-hostable stack using PostgreSQL, ClickHouse, Redis, Kafka and the TrackMe services. See the operations documentation for deployment details.",
+  },
+  {
+    question: "Is the dashboard preview showing live customer data?",
+    answer:
+      "No. The dashboard illustration on this page uses sample data for demonstration only; it is not connected to an account.",
+  },
+] as const;
 
 /** The tag itself, with light syntax colouring and no runtime dependency. */
 function Snippet() {
   return (
-    <figure className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#0c0c0e]">
-      <figcaption className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.02] px-3.5 py-2">
-        <span className="font-mono text-[11px] text-zinc-500">index.html</span>
-        <span className="text-[11px] text-zinc-600">before &lt;/head&gt;</span>
+    <figure className="overflow-hidden rounded-xl border border-white/[0.09] bg-[#0c0e13] shadow-[0_24px_80px_-32px_rgba(0,0,0,0.85)]">
+      <figcaption className="flex items-center justify-between border-b border-white/[0.07] bg-white/[0.02] px-4 py-3">
+        <span className="flex items-center gap-2 font-mono text-[11px] text-zinc-400">
+          <span className="h-2 w-2 rounded-full bg-blue-400" />
+          index.html
+        </span>
+        <span className="rounded-md border border-white/[0.07] px-2 py-1 text-[10px] text-zinc-500">
+          before &lt;/head&gt;
+        </span>
       </figcaption>
-      <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-[1.75] text-zinc-300">
+      <pre className="overflow-x-auto p-5 font-mono text-[12px] leading-[1.9] text-zinc-300 sm:text-[13px]">
         <code>
-          <span className="text-zinc-500">{"<"}</span>
-          <span className="text-emerald-300">script</span>
+          <span className="text-zinc-600">{"<"}</span>
+          <span className="text-sky-300">script</span>
           {"\n"}
           {"  "}
-          <span className="text-sky-300">defer</span>
+          <span className="text-blue-300">defer</span>
           {"\n"}
           {"  "}
-          <span className="text-sky-300">src</span>
+          <span className="text-blue-300">src</span>
           <span className="text-zinc-500">=</span>
-          <span className="text-amber-200">&quot;https://app.example.com/tracker.js&quot;</span>
+          <span className="text-emerald-300">&quot;https://app.example.com/tracker.js&quot;</span>
           {"\n"}
           {"  "}
-          <span className="text-sky-300">data-site</span>
+          <span className="text-blue-300">data-site</span>
           <span className="text-zinc-500">=</span>
           <span className="text-amber-200">&quot;YOUR_SITE_KEY&quot;</span>
           {"\n"}
           {"  "}
-          <span className="text-sky-300">data-endpoint</span>
+          <span className="text-blue-300">data-endpoint</span>
           <span className="text-zinc-500">=</span>
-          <span className="text-amber-200">&quot;https://ingest.example.com/v1/batch&quot;</span>
+          <span className="text-emerald-300">&quot;https://ingest.example.com/v1/batch&quot;</span>
           {"\n"}
-          <span className="text-zinc-500">{">"}</span>
-          <span className="text-zinc-500">{"</"}</span>
-          <span className="text-emerald-300">script</span>
-          <span className="text-zinc-500">{">"}</span>
+          <span className="text-zinc-600">{">"}</span>
+          <span className="text-zinc-600">{"</"}</span>
+          <span className="text-sky-300">script</span>
+          <span className="text-zinc-600">{">"}</span>
         </code>
       </pre>
+      <div className="flex items-center gap-2 border-t border-white/[0.06] bg-white/[0.015] px-4 py-3 text-[11px] text-zinc-500">
+        <Zap className="h-3.5 w-3.5 text-blue-400" />
+        Deferred loading · automatic SPA navigation · batched delivery
+      </div>
     </figure>
+  );
+}
+
+function SectionIntro({
+  eyebrow,
+  title,
+  children,
+  centered = false,
+}: {
+  eyebrow: string;
+  title: string;
+  children?: React.ReactNode;
+  centered?: boolean;
+}) {
+  return (
+    <div className={centered ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-400">{eyebrow}</p>
+      <h2 className="mt-3 text-balance text-3xl font-semibold leading-tight tracking-[-0.035em] text-zinc-50 sm:text-[2.6rem]">
+        {title}
+      </h2>
+      {children && <p className="mt-4 text-[15px] leading-7 text-zinc-400">{children}</p>}
+    </div>
+  );
+}
+
+function PrivacyCard() {
+  const items = [
+    ["01", "No tracking cookies", "Understand journeys without a cookie-based identifier."],
+    ["02", "Transient IP handling", "IP is used at the edge for geolocation, then discarded."],
+    ["03", "Respect visitor choices", "Configure consent gating and per-site DNT support."],
+    ["04", "Choose your retention", "Set retention for the data that matters to your team."],
+  ];
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0e13] p-5 sm:p-7">
+      <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-blue-500/[0.09] blur-3xl" />
+      <div className="relative flex items-center justify-between border-b border-white/[0.07] pb-5">
+        <div>
+          <p className="text-sm font-semibold text-zinc-100">Privacy controls</p>
+          <p className="mt-1 text-xs text-zinc-500">Built into the collection model</p>
+        </div>
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-400/[0.08] text-blue-300">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
+      </div>
+      <ul className="relative divide-y divide-white/[0.06]">
+        {items.map(([number, title, body]) => (
+          <li key={number} className="flex gap-4 py-4 first:pt-5 last:pb-1">
+            <span className="pt-0.5 font-mono text-[10px] text-blue-400/80">{number}</span>
+            <div>
+              <p className="text-[13px] font-medium text-zinc-200">{title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-500">{body}</p>
+            </div>
+            <Check className="ml-auto mt-0.5 h-4 w-4 shrink-0 text-emerald-400/80" />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function EventFlow() {
+  const stages = [
+    { icon: Globe2, title: "Your site", detail: "Lightweight browser tracker", color: "text-sky-300" },
+    { icon: Radio, title: "Go edge", detail: "Validate · rate-limit · route", color: "text-blue-300" },
+    { icon: Workflow, title: "Event stream", detail: "Reliable Kafka delivery", color: "text-violet-300" },
+    { icon: Database, title: "Your insights", detail: "ClickHouse + live dashboard", color: "text-emerald-300" },
+  ] as const;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0d12]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-4 sm:px-6">
+        <div>
+          <p className="text-sm font-semibold text-zinc-100">From event to insight</p>
+          <p className="mt-1 text-xs text-zinc-500">A look at the TrackMe collection path</p>
+        </div>
+        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.07] px-2.5 py-1 text-[10px] font-medium text-emerald-300">
+          <span className="pulse-live h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          Built for reliable delivery
+        </span>
+      </div>
+      <ol className="grid divide-y divide-white/[0.06] sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+        {stages.map(({ icon: Icon, title, detail, color }, index) => (
+          <li key={title} className="relative flex items-start gap-3 p-5 sm:flex-col sm:gap-5 sm:p-6">
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025] ${color}`}>
+              <Icon className="h-4 w-4" />
+            </span>
+            <div>
+              <span className="font-mono text-[10px] text-zinc-600">0{index + 1}</span>
+              <h3 className="mt-1 text-[13px] font-semibold text-zinc-100">{title}</h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{detail}</p>
+            </div>
+            {index < stages.length - 1 && (
+              <ArrowRight className="absolute right-5 top-1/2 hidden h-3.5 w-3.5 -translate-y-1/2 text-zinc-700 sm:block" />
+            )}
+            {index < stages.length - 1 && (
+              <ArrowDownRight className="absolute bottom-3 right-5 h-3.5 w-3.5 text-zinc-700 sm:hidden" />
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
 export function Landing({ product = "TrackMe", links }: LandingProps) {
   return (
-    <div className="min-h-screen bg-background text-foreground antialiased selection:bg-blue-500/30">
-      {/* Navigation */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-5 sm:px-6">
-          <div className="flex items-center gap-8">
-            <SmartLink href="/" className="flex items-center gap-2.5" aria-label={`${product} home`}>
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-100 text-zinc-950">
-                <Activity className="h-3.5 w-3.5" strokeWidth={2.5} />
-              </span>
-              <span className="text-[14px] font-semibold tracking-tight text-zinc-50">{product}</span>
-            </SmartLink>
-            <nav aria-label="Primary" className="hidden items-center gap-6 text-[13px] text-zinc-400 md:flex">
-              <a href="#product" className="transition hover:text-zinc-100">
-                Product
-              </a>
-              <a href="#install" className="transition hover:text-zinc-100">
-                Install
-              </a>
-              <a href="#features" className="transition hover:text-zinc-100">
-                Features
-              </a>
-              <SmartLink href={links.docs} className="transition hover:text-zinc-100">
-                Docs
-              </SmartLink>
-            </nav>
-          </div>
+    <div className="min-h-screen overflow-hidden bg-background text-foreground antialiased selection:bg-blue-500/30">
+      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#09090b]/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
+          <SmartLink href="/" className="flex shrink-0 items-center gap-2.5" aria-label={`${product} home`}>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-white shadow-[0_4px_16px_-5px_rgba(59,130,246,0.8)]">
+              <Activity className="h-4 w-4" strokeWidth={2.4} />
+            </span>
+            <span className="text-[15px] font-semibold tracking-tight text-zinc-50">{product}</span>
+          </SmartLink>
+
+          <nav aria-label="Primary" className="hidden items-center gap-7 text-[13px] text-zinc-400 md:flex">
+            <a href="#features" className="transition hover:text-zinc-100">Features</a>
+            <a href="#privacy" className="transition hover:text-zinc-100">Privacy</a>
+            <a href="#install" className="transition hover:text-zinc-100">Install</a>
+            <SmartLink href={links.docs} className="transition hover:text-zinc-100">Docs</SmartLink>
+          </nav>
 
           <div className="flex items-center gap-2">
             {links.signIn && (
               <SmartLink
                 href={links.signIn}
-                className="hidden h-8 items-center rounded-md px-3 text-[13px] font-medium text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-100 sm:inline-flex"
+                className="hidden h-9 items-center rounded-lg px-3 text-[13px] font-medium text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-100 sm:inline-flex"
               >
                 Sign in
               </SmartLink>
             )}
-            <SmartLink
-              href={links.getStarted}
-              className="inline-flex h-8 items-center rounded-md bg-zinc-100 px-3.5 text-[13px] font-medium text-zinc-950 transition hover:bg-white"
-            >
-              Get started
+            <SmartLink href={links.getStarted} className={`${primaryButton} h-9 px-3.5 text-[12px]`}>
+              Get started <ArrowRight className="h-3.5 w-3.5" />
             </SmartLink>
           </div>
         </div>
       </header>
 
       <main>
-        {/* Hero */}
-        <section
-          id="product"
-          className="relative overflow-hidden border-b border-white/[0.06] bg-[radial-gradient(ellipse_70%_50%_at_50%_-10%,rgba(59,130,246,0.14),transparent)]"
-        >
-          <div className="mx-auto max-w-6xl px-5 pb-20 pt-16 sm:px-6 sm:pt-24">
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-zinc-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Cookieless web analytics
+        <section id="product" className="relative border-b border-white/[0.06]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[34rem] bg-[radial-gradient(ellipse_55%_55%_at_50%_0%,rgba(37,99,235,0.16),transparent)]" />
+          <div className="relative mx-auto max-w-7xl px-5 pb-16 pt-20 sm:px-8 sm:pb-20 sm:pt-28">
+            <div className="mx-auto max-w-4xl text-center">
+              <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/[0.06] px-3.5 py-1.5 text-[11px] font-medium text-blue-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                Privacy-first product analytics
               </p>
-              <h1 className="text-balance text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.035em] text-zinc-50 sm:text-6xl">
-                Know what your visitors do, without tracking them.
+              <h1 className="mt-7 text-balance text-[2.65rem] font-semibold leading-[1.04] tracking-[-0.055em] text-zinc-50 sm:text-6xl lg:text-[4.5rem]">
+                Know what your visitors do.
+                <span className="block bg-gradient-to-r from-blue-300 via-sky-200 to-indigo-300 bg-clip-text text-transparent">
+                  Respect who they are.
+                </span>
               </h1>
-              <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-zinc-400 sm:text-lg">
-                Pageviews, funnels, realtime and Web Vitals from a single script tag. Built for product and growth teams
-                that want clear answers without cookies or invasive tracking.
+              <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-zinc-400 sm:text-lg sm:leading-8">
+                The signals to grow your product—pageviews, funnels, realtime and Web Vitals—without building your
+                analytics around invasive tracking.
               </p>
-              <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <SmartLink href={links.getStarted} className={`${primaryButton} w-full sm:w-auto`}>
-                  Get started
-                  <ArrowRight className="h-4 w-4" />
+                  Start with TrackMe <ArrowRight className="h-4 w-4" />
                 </SmartLink>
                 <SmartLink href={links.docs} className={`${outlineButton} w-full sm:w-auto`}>
-                  Read the docs
+                  Explore the docs
                 </SmartLink>
               </div>
             </div>
 
-            <div className="mx-auto mt-16 max-w-5xl">
+            <div className="mx-auto mt-14 max-w-5xl sm:mt-16">
               <ProductPreview />
-              <p className="mt-3 text-center text-xs text-zinc-600">
-                Illustration with sample data, not a live account.
+              <p className="mt-3 text-center text-[11px] text-zinc-600">
+                A product illustration with sample data—not a live account.
               </p>
             </div>
+
+            <ul className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              {BENEFITS.map(({ icon: Icon, label }) => (
+                <li
+                  key={label}
+                  className="flex items-center justify-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.015] px-3 py-3 text-center text-[11px] font-medium text-zinc-400 sm:text-xs"
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0 text-blue-300" />
+                  {label}
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
-        {/* Install */}
-        <section id="install" className="border-b border-white/[0.06]">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-20 sm:px-6 lg:grid-cols-2 lg:gap-16">
+        <section id="privacy" className="border-b border-white/[0.06] bg-[#0a0b0e]">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-blue-400">Install</p>
-              <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.025em] text-zinc-50 sm:text-4xl">
-                One tag. That is the whole integration.
-              </h2>
-              <ul className="mt-6 space-y-3 text-[15px] leading-relaxed text-zinc-400">
-                <li className="flex gap-3">
-                  <Check />
-                  Loads deferred, so it never blocks rendering.
-                </li>
-                <li className="flex gap-3">
-                  <Check />
-                  Follows single-page navigation on its own, with no router code.
-                </li>
-                <li className="flex gap-3">
-                  <Check />
-                  Batches events and retries when the network drops.
-                </li>
+              <SectionIntro eyebrow="Less noise. More clarity." title="Useful analytics, without the baggage.">
+                Understand what’s working without turning your product into a surveillance system. Privacy is part of
+                how TrackMe collects—not a setting you have to discover later.
+              </SectionIntro>
+              <ul className="mt-8 space-y-3">
+                {[
+                  "No analytics tracking cookies",
+                  "Transient IP processing for geolocation",
+                  "Consent controls and per-site DNT support",
+                  "Configurable data retention",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-3 text-sm text-zinc-300">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-400/10 text-blue-300">
+                      <Check className="h-3 w-3" />
+                    </span>
+                    {item}
+                  </li>
+                ))}
               </ul>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              {links.privacy && (
+                <SmartLink href={links.privacy} className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-blue-300 transition hover:text-blue-200">
+                  Read the privacy overview <ArrowRight className="h-4 w-4" />
+                </SmartLink>
+              )}
+            </div>
+            <PrivacyCard />
+          </div>
+        </section>
+
+        <section id="features" className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28">
+            <SectionIntro eyebrow="The full picture" title="Everything you need to understand your traffic.">
+              The important signals, connected in one place—from the first pageview to the moment someone becomes a
+              customer.
+            </SectionIntro>
+            <ul className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURES.map(({ icon: Icon, eyebrow, title, body }, index) => (
+                <li
+                  key={title}
+                  className="group relative overflow-hidden rounded-xl border border-white/[0.07] bg-[#0b0c10] p-6 transition duration-200 hover:-translate-y-0.5 hover:border-blue-400/25 hover:bg-[#0d1017]"
+                >
+                  <span className="absolute right-5 top-5 font-mono text-[10px] text-zinc-700">0{index + 1}</span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-400/15 bg-blue-400/[0.07] text-blue-300 transition group-hover:border-blue-300/30 group-hover:bg-blue-400/[0.12]">
+                    <Icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <p className="mt-6 text-[10px] font-medium uppercase tracking-[0.12em] text-blue-300/80">{eyebrow}</p>
+                  <h3 className="mt-2 text-[17px] font-semibold tracking-tight text-zinc-100">{title}</h3>
+                  <p className="mt-2 text-[13px] leading-6 text-zinc-500">{body}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="border-b border-white/[0.06] bg-[#0a0b0e]">
+          <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-24">
+            <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <SectionIntro eyebrow="Under the hood" title="Built for the journey from event to insight." />
+              <p className="max-w-md text-sm leading-6 text-zinc-500">
+                A lightweight browser tracker feeds a dedicated ingestion path, then a reliable event pipeline and
+                analytics store.
+              </p>
+            </div>
+            <EventFlow />
+          </div>
+        </section>
+
+        <section id="install" className="border-b border-white/[0.06]">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
+            <div>
+              <SectionIntro eyebrow="Up and running, simply" title="One small tag. A clearer picture.">
+                Add the deferred tracker, use your site key, and start collecting the events that help you make better
+                product decisions.
+              </SectionIntro>
+              <ul className="mt-7 space-y-3 text-[13px] text-zinc-400">
+                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />Loads deferred so it doesn’t block page rendering.</li>
+                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />Tracks single-page navigation without router glue.</li>
+                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />Batches events and retries when the network drops.</li>
+              </ul>
+              <div className="mt-8 flex flex-wrap gap-3">
                 <SmartLink href={links.quickstart} className={primaryButton}>
-                  Quickstart
-                  <ArrowRight className="h-4 w-4" />
+                  Read the quickstart <ArrowRight className="h-4 w-4" />
                 </SmartLink>
-                <SmartLink href={links.frameworks} className={outlineButton}>
-                  Framework guides
-                </SmartLink>
+                <SmartLink href={links.frameworks} className={outlineButton}>Framework guides</SmartLink>
               </div>
             </div>
             <Snippet />
           </div>
-
-          <div className="mx-auto max-w-6xl px-5 pb-16 sm:px-6">
-            <p className="mb-4 text-center text-xs text-zinc-600">Guides for</p>
+          <div className="mx-auto max-w-7xl px-5 pb-16 sm:px-8 sm:pb-20">
+            <p className="mb-4 text-center text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">
+              Guides for the tools you already use
+            </p>
             <ul className="flex flex-wrap items-center justify-center gap-2">
               {STACKS.map((stack) => (
-                <li
-                  key={stack}
-                  className="rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1 text-xs text-zinc-400"
-                >
+                <li key={stack} className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-400">
                   {stack}
                 </li>
               ))}
-              <li className="rounded-full border border-dashed border-white/[0.08] px-3 py-1 text-xs text-zinc-500">
-                and anything that can add a script tag
+              <li className="rounded-lg border border-dashed border-white/[0.1] px-3 py-1.5 text-xs text-zinc-500">
+                Any site that can add a script
               </li>
             </ul>
           </div>
         </section>
 
-        {/* Features */}
-        <section id="features" className="border-b border-white/[0.06]">
-          <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6">
-            <div className="max-w-2xl">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-blue-400">Features</p>
-              <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.025em] text-zinc-50 sm:text-4xl">
-                Everything you need to understand your traffic.
-              </h2>
+        <section id="faq" className="border-b border-white/[0.06] bg-[#0a0b0e]">
+          <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
+            <div>
+              <SectionIntro eyebrow="Good to know" title="A few things you might be wondering.">
+                Straight answers about how TrackMe works and what you can do with it.
+              </SectionIntro>
+              <SmartLink href={links.docs} className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-blue-300 transition hover:text-blue-200">
+                Browse the documentation <ArrowRight className="h-4 w-4" />
+              </SmartLink>
             </div>
-            <ul className="mt-12 grid gap-px overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.08] sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map(({ icon: Icon, title, body }) => (
-                <li key={title} className="bg-background p-6 transition hover:bg-white/[0.02]">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-zinc-300">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-4 text-[15px] font-semibold text-zinc-100">{title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">{body}</p>
-                </li>
+            <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+              {FAQS.map(({ question, answer }) => (
+                <details key={question} className="group py-5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-5 text-sm font-medium text-zinc-200 marker:content-none [&::-webkit-details-marker]:hidden">
+                    {question}
+                    <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500 transition group-open:rotate-180 group-open:text-blue-300" />
+                  </summary>
+                  <p className="max-w-2xl pr-8 pt-3 text-[13px] leading-6 text-zinc-500">{answer}</p>
+                </details>
               ))}
-            </ul>
+            </div>
           </div>
         </section>
 
-        {/* How it works */}
-        <section className="border-b border-white/[0.06]">
-          <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6">
-            <div className="max-w-2xl">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-blue-400">How it works</p>
-              <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.025em] text-zinc-50 sm:text-4xl">
-                From first tag to first insight in minutes.
-              </h2>
-            </div>
-            <ol className="mt-12 grid gap-8 md:grid-cols-3">
-              {STEPS.map((step, index) => (
-                <li key={step.title} className="relative">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-zinc-900 font-mono text-xs font-semibold text-zinc-300">
-                    {index + 1}
-                  </span>
-                  <h3 className="mt-4 text-[15px] font-semibold text-zinc-100">{step.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">{step.body}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* Closing call to action */}
-        <section>
-          <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6">
-            <div className="rounded-2xl border border-white/[0.08] bg-[radial-gradient(ellipse_60%_80%_at_50%_0%,rgba(59,130,246,0.12),transparent)] px-6 py-14 text-center sm:px-12">
-              <h2 className="mx-auto max-w-xl text-balance text-3xl font-semibold tracking-[-0.025em] text-zinc-50 sm:text-4xl">
-                Start measuring in minutes.
-              </h2>
-              <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
-                Create a site, copy one tag, and see your first visit appear in realtime.
-              </p>
-              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <SmartLink href={links.getStarted} className={`${primaryButton} w-full sm:w-auto`}>
-                  Get started
-                  <ArrowRight className="h-4 w-4" />
-                </SmartLink>
-                <SmartLink href={links.quickstart} className={`${outlineButton} w-full sm:w-auto`}>
-                  Read the quickstart
-                </SmartLink>
-              </div>
+        <section className="relative overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_100%,rgba(37,99,235,0.16),transparent)]" />
+          <div className="relative mx-auto max-w-5xl px-5 py-20 text-center sm:px-8 sm:py-28">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-400/[0.08] text-blue-300">
+              <LockKeyhole className="h-5 w-5" />
+            </span>
+            <h2 className="mx-auto mt-6 max-w-3xl text-balance text-3xl font-semibold leading-tight tracking-[-0.04em] text-zinc-50 sm:text-5xl">
+              Make better decisions.
+              <span className="block text-blue-300">Keep your values intact.</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-xl text-[15px] leading-7 text-zinc-400">
+              Get the product signals your team needs, with a stack you can understand and privacy choices you can
+              explain.
+            </p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <SmartLink href={links.getStarted} className={`${primaryButton} w-full sm:w-auto`}>
+                Get started with TrackMe <ArrowRight className="h-4 w-4" />
+              </SmartLink>
+              <SmartLink href={links.quickstart} className={`${outlineButton} w-full sm:w-auto`}>
+                Read the quickstart
+              </SmartLink>
             </div>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/[0.06]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-10 sm:px-6 md:flex-row md:items-start md:justify-between">
+      <footer className="border-t border-white/[0.07] bg-[#08090c]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-10 px-5 py-10 sm:px-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-100 text-zinc-950">
-                <Activity className="h-3 w-3" strokeWidth={2.5} />
+            <SmartLink href="/" className="inline-flex items-center gap-2.5" aria-label={`${product} home`}>
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 text-white">
+                <Activity className="h-3.5 w-3.5" strokeWidth={2.4} />
               </span>
-              <span className="text-[13px] font-semibold text-zinc-100">{product}</span>
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-zinc-600">Cookieless web analytics for product and growth teams.</p>
+              <span className="text-sm font-semibold text-zinc-100">{product}</span>
+            </SmartLink>
+            <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+              Privacy-first web analytics for product and growth teams.
+            </p>
+            <p className="mt-5 text-[10px] text-zinc-700">© {new Date().getFullYear()} {product}</p>
           </div>
 
-          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-14 gap-y-3 text-[13px] sm:grid-cols-3">
+          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-12 gap-y-3 text-[13px] sm:grid-cols-3">
             <FooterLink href={links.docs}>Documentation</FooterLink>
             <FooterLink href={links.quickstart}>Quickstart</FooterLink>
-            <FooterLink href={links.frameworks}>Frameworks</FooterLink>
-            <FooterLink href={links.reference}>API reference</FooterLink>
-            <FooterLink href={links.selfHosting}>Self-hosting</FooterLink>
-            {links.privacy && <FooterLink href={links.privacy}>Privacy</FooterLink>}
+            <FooterLink href={links.frameworks}>Framework guides</FooterLink>
+            {links.reference && <FooterLink href={links.reference}>API reference</FooterLink>}
+            {links.selfHosting && <FooterLink href={links.selfHosting}>Self-hosting</FooterLink>}
+            {links.privacy && <FooterLink href={links.privacy}>Privacy overview</FooterLink>}
           </nav>
         </div>
       </footer>
@@ -369,15 +561,5 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
     <SmartLink href={href} className="text-zinc-500 transition hover:text-zinc-200">
       {children}
     </SmartLink>
-  );
-}
-
-function Check() {
-  return (
-    <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
-      <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <path d="M2.5 6.2 5 8.6l4.5-5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
   );
 }

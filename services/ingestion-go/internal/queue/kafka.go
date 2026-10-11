@@ -11,8 +11,9 @@ import (
 )
 
 // Publisher writes enriched events to Kafka with acks=all.
-// Message key = eventId so retries land on the same partition and
-// ClickHouse ReplacingMergeTree(event_id) can collapse duplicates.
+// Message key = siteId:sessionId keeps a session's events ordered while
+// still spreading load across partitions. eventId remains in the payload for
+// idempotent dedupe downstream.
 type Publisher struct {
 	writer *kafka.Writer
 	topic  string
@@ -40,8 +41,15 @@ func (p *Publisher) Publish(ctx context.Context, events []enrich.EnrichedEvent) 
 		if err != nil {
 			return fmt.Errorf("marshal event %s: %w", event.EventID, err)
 		}
+		key := event.SiteID + ":" + event.SessionID
+		if key == ":" || event.SessionID == "" {
+			key = event.SiteID + ":" + event.VisitorPseudonym
+		}
+		if key == ":" {
+			key = event.SiteID
+		}
 		msgs = append(msgs, kafka.Message{
-			Key:   []byte(event.EventID),
+			Key:   []byte(key),
 			Value: payload,
 			Headers: []kafka.Header{
 				{Key: "site_id", Value: []byte(event.SiteID)},

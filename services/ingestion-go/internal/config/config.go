@@ -12,13 +12,18 @@ import (
 // production process must never run on them; see Config.ProductionProblems.
 const (
 	DefaultDatabaseURL = "postgres://growth_admin:growth_secure_pass@localhost:5432/growth_intelligence"
-	DefaultRedisURL    = "redis://:redis_dev_secret@localhost:6379"
+	DefaultRedisURL      = "redis://:redis_dev_secret@localhost:6379"
+	DefaultSiteSecretKey = "dev-site-signing-secret-key-min-32-chars"
 )
 
 type Config struct {
 	Port              int
 	DatabaseURL       string
 	RedisURL          string
+	RedisRateLimitURL string
+	RedisCacheURL     string
+	RedisStateURL     string
+	RedisCoordURL     string
 	KafkaBrokers      []string
 	KafkaTopic        string
 	RateLimitMax      int
@@ -29,21 +34,23 @@ type Config struct {
 	DefaultRetention  int
 	GeoIPMMDBPath     string
 	TrustedProxyHops  int
+	SiteSecretKey     string
 }
 
 func Load() Config {
 	_ = godotenv.Load()
 	_ = godotenv.Load("../../.env")
 
-	topic := envStr("KAFKA_TOPIC", "")
-	if topic == "" {
-		topic = envStr("QUEUE_NAME", "growth_events")
-	}
+	topic := envStr("KAFKA_TOPIC", "growth_events")
 
 	return Config{
 		Port:              envInt("INGESTION_PORT", 3001),
 		DatabaseURL:       envStr("DATABASE_URL", DefaultDatabaseURL),
 		RedisURL:          envStr("REDIS_URL", DefaultRedisURL),
+		RedisRateLimitURL: envStr("REDIS_RATELIMIT_URL", envStr("REDIS_URL", DefaultRedisURL)),
+		RedisCacheURL:     envStr("REDIS_CACHE_URL", envStr("REDIS_URL", DefaultRedisURL)),
+		RedisStateURL:     envStr("REDIS_STATE_URL", envStr("REDIS_URL", DefaultRedisURL)),
+		RedisCoordURL:     envStr("REDIS_COORD_URL", envStr("REDIS_URL", DefaultRedisURL)),
 		KafkaBrokers:      splitCSV(envStr("KAFKA_BROKERS", "localhost:9092")),
 		KafkaTopic:        topic,
 		RateLimitMax:      envInt("INGESTION_RATE_LIMIT_MAX", 1000),
@@ -54,6 +61,7 @@ func Load() Config {
 		DefaultRetention:  envInt("DEFAULT_RETENTION_MONTHS", 24),
 		GeoIPMMDBPath:     envStr("GEOIP_MMDB_PATH", ""),
 		TrustedProxyHops:  envInt("TRUSTED_PROXY_HOPS", 1),
+		SiteSecretKey:     envStr("SITE_SIGNING_SECRET_KEY", DefaultSiteSecretKey),
 	}
 }
 
@@ -69,6 +77,21 @@ func (c Config) ProductionProblems(nodeEnv string) []string {
 	}
 	if c.RedisURL == DefaultRedisURL {
 		problems = append(problems, "REDIS_URL is unset or still the public development default")
+	}
+	if c.RedisRateLimitURL == DefaultRedisURL {
+		problems = append(problems, "REDIS_RATELIMIT_URL is unset or still the public development default")
+	}
+	if c.RedisCacheURL == DefaultRedisURL {
+		problems = append(problems, "REDIS_CACHE_URL is unset or still the public development default")
+	}
+	if c.RedisStateURL == DefaultRedisURL {
+		problems = append(problems, "REDIS_STATE_URL is unset or still the public development default")
+	}
+	if c.RedisCoordURL == DefaultRedisURL {
+		problems = append(problems, "REDIS_COORD_URL is unset or still the public development default")
+	}
+	if c.SiteSecretKey == DefaultSiteSecretKey {
+		problems = append(problems, "SITE_SIGNING_SECRET_KEY is unset or still the public development default")
 	}
 	if c.TrustedProxyHops < 0 {
 		problems = append(problems, "TRUSTED_PROXY_HOPS must not be negative")

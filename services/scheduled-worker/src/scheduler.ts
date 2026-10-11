@@ -9,7 +9,7 @@ import { withDistributedLock } from "./lock.js";
 
 console.log("⏱️ Scheduled Worker Daemon initialized.");
 
-const redis = new Redis(env.REDIS_URL, {
+const redis = new Redis(env.REDIS_STATE_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
   retryStrategy: (times: number) => Math.min(times * 100, 3000),

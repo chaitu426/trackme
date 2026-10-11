@@ -182,6 +182,25 @@ func publishedEvents(r *rig) []enrich.EnrichedEvent {
 
 // ---- accepting and rejecting events ------------------------------------------
 
+func TestMetricsEndpointAndTraceHeader(t *testing.T) {
+	r := newRig(t)
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req.Header.Set("X-Request-ID", "trace-123")
+	w := httptest.NewRecorder()
+	r.handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("X-Request-ID"); got != "trace-123" {
+		t.Fatalf("X-Request-ID = %q, want trace-123", got)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "http_requests_total") || !strings.Contains(body, "http_request_latency_ms") {
+		t.Fatalf("metrics output missing expected values: %s", body)
+	}
+}
+
 func TestValidBatchIsPublished(t *testing.T) {
 	r := newRig(t)
 	w := post(r.handler, "/v1/batch", batch(withID(1, nil), withID(2, nil)), nil)

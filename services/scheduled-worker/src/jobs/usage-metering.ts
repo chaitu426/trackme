@@ -1,7 +1,50 @@
 import { getClickHouseClient } from "@trackme/analytics";
 import { env } from "@trackme/config";
-import { db, usageCounters } from "@trackme/db";
+import { db, sql, usageCounters } from "@trackme/db";
 import { Redis } from "ioredis";
+
+export interface UsageMeteringClient {
+  query(params: {
+    query: string;
+    format: "JSONEachRow";
+    query_params?: Record<string, unknown>;
+  }): Promise<{ json<T>(): Promise<T[]> }>;
+}
+
+export interface UsageMeteringRedis {
+  eval(script: string, numkeys: number, ...args: unknown[]): Promise<unknown>;
+  disconnect(): void;
+}
+
+export interface UsageMeteringDB {
+  insert(table: unknown): {
+    values(rows: unknown[]): {
+      onConflictDoUpdate(config: {
+        target: unknown[];
+        set: Record<string, unknown>;
+      }): Promise<unknown>;
+    };
+  };
+}
+
+export interface UsageMeteringDeps {
+  client?: UsageMeteringClient;
+  redis?: UsageMeteringRedis;
+  dbClient?: UsageMeteringDB;
+  now?: Date;
+  period?: string;
+}
+
+export const USAGE_METERING_SQL = `
+  SELECT
+    workspace_id,
+    site_id,
+    sum(total_count) AS event_count
+  FROM event_rollups_daily
+  WHERE date >= {start:Date}
+    AND date < {end:Date}
+  GROUP BY workspace_id, site_id
+`;
 
 /**
  * Synchronize monthly event counts from ClickHouse → Postgres usage_counters,
@@ -21,58 +64,69 @@ redis.call('SET', key, v, 'EX', ttl)
 return v
 `;
 
-export async function runUsageMetering(): Promise<void> {
-  const client = getClickHouseClient();
-  const redis = new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: true,
-  });
+export function monthBoundsFor(now: Date): { period: string; start: Date; end: Date } {
+  const year = now.getUTCFullYear();
+  const monthIndex = now.getUTCMonth();
+  const period = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+  const start = new Date(Date.UTC(year, monthIndex, 1));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 1));
+  return { period, start, end };
+}
 
-  const currentPeriod = new Date().toISOString().substring(0, 7); // 'YYYY-MM'
+export async function runUsageMetering(deps: UsageMeteringDeps = {}): Promise<void> {
+  const now = deps.now ?? new Date();
+  const { period, start, end } = monthBoundsFor(now);
+  const currentPeriod = deps.period ?? period;
+  const client = deps.client ?? (getClickHouseClient() as unknown as UsageMeteringClient);
+  const redis =
+    deps.redis ??
+    new Redis(env.REDIS_STATE_URL, {
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+    }) as UsageMeteringRedis;
+  const dbClient = deps.dbClient ?? (db as unknown as UsageMeteringDB);
+
   console.log(`📊 Running usage metering sync for period: ${currentPeriod}`);
 
   try {
-    const query = `
-      SELECT
-        workspace_id,
-        site_id,
-        count(*) AS event_count
-      FROM events_raw
-      WHERE toYYYYMM(timestamp) = toYYYYMM(now())
-      GROUP BY workspace_id, site_id
-    `;
-
-    const resultSet = await client.query({ query, format: "JSONEachRow" });
+    const resultSet = await client.query({
+      query: USAGE_METERING_SQL,
+      format: "JSONEachRow",
+      query_params: { start, end },
+    });
     const rows = await resultSet.json<{
       workspace_id: string;
-      site_id: string;
+      site_id: string | null;
       event_count: string | number;
     }>();
 
-    const workspaceTotals = new Map<string, number>();
+    if (rows.length > 0) {
+      const values = rows.map((row) => ({
+        workspaceId: row.workspace_id,
+        siteId: row.site_id,
+        period: currentPeriod,
+        eventCount: Number(row.event_count || 0),
+      }));
 
+      await dbClient
+        .insert(usageCounters)
+        .values(values)
+        .onConflictDoUpdate({
+          target: [usageCounters.workspaceId, usageCounters.siteId, usageCounters.period],
+          set: {
+            eventCount: sql`excluded.event_count`,
+            updatedAt: new Date(),
+          },
+        });
+    }
+
+    const workspaceTotals = new Map<string, number>();
     for (const row of rows) {
       const eventCount = Number(row.event_count || 0);
       workspaceTotals.set(
         row.workspace_id,
         (workspaceTotals.get(row.workspace_id) ?? 0) + eventCount
       );
-
-      await db
-        .insert(usageCounters)
-        .values({
-          workspaceId: row.workspace_id,
-          siteId: row.site_id,
-          period: currentPeriod,
-          eventCount,
-        })
-        .onConflictDoUpdate({
-          target: [usageCounters.workspaceId, usageCounters.siteId, usageCounters.period],
-          set: {
-            eventCount,
-            updatedAt: new Date(),
-          },
-        });
     }
 
     const ttl = 40 * 24 * 60 * 60;
@@ -83,6 +137,10 @@ export async function runUsageMetering(): Promise<void> {
 
     console.log(`✅ Usage metering sync complete for ${rows.length} site records.`);
   } finally {
-    redis.disconnect();
+    if (deps.redis === undefined) {
+      redis.disconnect();
+    }
   }
 }
+
+export default runUsageMetering;

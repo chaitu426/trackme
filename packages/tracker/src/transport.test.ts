@@ -1,5 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { TrackerEventSchema } from "@trackme/contracts";
 import { Transport, classifyStatus } from "./transport.js";
 
 type Call = { url: string; init: { method: string; headers: Record<string, string>; body: string } };
@@ -92,6 +93,15 @@ test("classifyStatus retries only failures that can clear up", () => {
   for (const s of [200, 202]) assert.equal(classifyStatus(s), "sent");
   for (const s of [408, 429, 500, 502, 503]) assert.equal(classifyStatus(s), "retry");
   for (const s of [400, 401, 402, 403, 404, 413]) assert.equal(classifyStatus(s), "drop");
+});
+
+test("tracker events include a tracker-version field for rollout monitoring", () => {
+  const parsed = TrackerEventSchema.parse({
+    ...event(),
+    tv: "0.1.0",
+  });
+
+  assert.equal(parsed.tv, "0.1.0");
 });
 
 test("a large buffer is split into requests the edge accepts", async () => {

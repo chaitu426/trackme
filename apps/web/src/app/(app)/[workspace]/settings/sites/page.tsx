@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { requireWorkspaceBySlug, listWorkspaceSites } from "@/lib/tenancy";
 import { env } from "@trackme/config";
+import { resolveTrackerScriptUrl } from "@/lib/tracker-url";
 import { WorkspaceSitesClient } from "./workspace-sites-client";
 
 export default async function WorkspaceSitesPage(props: {
@@ -30,7 +31,7 @@ export default async function WorkspaceSitesPage(props: {
     <WorkspaceSitesClient
       workspace={workspace}
       initialSites={initialSites}
-      appUrl={env.APP_URL}
+      trackerScriptUrl={resolveTrackerScriptUrl()}
       ingestionUrl={env.INGESTION_URL}
     />
   );
