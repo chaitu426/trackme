@@ -1,64 +1,121 @@
 import { getClickHouseClient } from "@trackme/analytics";
 import { env } from "@trackme/config";
+import { db, sites, sql } from "@trackme/db";
 
-/**
- * Retention via DROP PARTITION (cheap) — not ALTER DELETE mutations.
- * Table TTL (migration 005) is the safety net; this job drops whole months
- * older than DEFAULT_RETENTION_MONTHS.
- */
-export async function runRetentionCleanup(): Promise<void> {
-  const months = env.DEFAULT_RETENTION_MONTHS;
-  const client = getClickHouseClient();
+export interface RetentionClient {
+  command(params: { query: string }): Promise<unknown>;
+}
 
-  const cutoff = new Date();
-  cutoff.setUTCMonth(cutoff.getUTCMonth() - months);
-  cutoff.setUTCDate(1);
-  cutoff.setUTCHours(0, 0, 0, 0);
-  const cutoffPartition = `${cutoff.getUTCFullYear()}${String(cutoff.getUTCMonth() + 1).padStart(2, "0")}`;
+export interface RetentionSiteRow {
+  id: string;
+  retentionMonths: number | null;
+}
 
-  console.log(
-    `🧹 Retention: DROP PARTITION where YYYYMM < ${cutoffPartition} (keep ${months} months)...`
-  );
+export interface RetentionDB {
+  select: (config: unknown) => {
+    from: (table: unknown) => Promise<RetentionSiteRow[]>;
+  };
+}
 
-  const tables = [
-    "events_raw",
-    "web_vitals",
-    "pageview_rollups_hourly",
-    "pageview_rollups_daily",
-    "event_rollups_daily",
-    "session_engagement_daily",
-    "daily_uniques",
-  ];
+export interface RetentionDeps {
+  client?: RetentionClient;
+  dbClient?: RetentionDB;
+  now?: Date;
+}
 
-  for (const table of tables) {
+export const RETENTION_TABLES = [
+  { table: "events_raw", column: "timestamp", kind: "datetime" },
+  { table: "web_vitals", column: "timestamp", kind: "datetime" },
+  { table: "pageview_rollups_hourly", column: "hour_timestamp", kind: "datetime" },
+  { table: "pageview_rollups_daily", column: "date", kind: "date" },
+  { table: "event_rollups_daily", column: "date", kind: "date" },
+  { table: "session_engagement_daily", column: "date", kind: "date" },
+  { table: "daily_uniques", column: "date", kind: "date" },
+] as const;
+
+export function retentionMonthsForSite(value: unknown, fallback = env.DEFAULT_RETENTION_MONTHS): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(60, Math.max(1, Math.round(parsed)));
+}
+
+export function cutoffForRetention(now: Date, months: number): Date {
+  const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, 1, 0, 0, 0, 0));
+  return cutoff;
+}
+
+export function formatRetentionValue(date: Date, kind: "date" | "datetime"): string {
+  if (kind === "date") return date.toISOString().slice(0, 10);
+  return `${date.toISOString().slice(0, 19).replace("T", " ")}`;
+}
+
+export function buildRetentionDeleteQuery(
+  table: string,
+  column: string,
+  kind: "date" | "datetime",
+  cutoff: Date,
+  siteId?: string
+): string {
+  const value = formatRetentionValue(cutoff, kind);
+  const siteClause = siteId ? ` AND site_id = '${siteId.replace(/'/g, "''")}'` : "";
+  return `ALTER TABLE ${table} DELETE WHERE ${column} < '${value}'${siteClause}`;
+}
+
+async function runGlobalRetention(client: RetentionClient, months: number, now: Date): Promise<void> {
+  const cutoff = cutoffForRetention(now, months);
+  console.log(`🧹 Retention: delete rows older than ${cutoff.toISOString()} (global policy: ${months} months)`);
+
+  for (const { table, column, kind } of RETENTION_TABLES) {
     try {
-      const result = await client.query({
-        query: `
-          SELECT DISTINCT partition
-          FROM system.parts
-          WHERE database = currentDatabase()
-            AND table = {table:String}
-            AND active = 1
-            AND partition < {cutoff:String}
-          ORDER BY partition
-        `,
-        query_params: { table, cutoff: cutoffPartition },
-        format: "JSONEachRow",
-      });
-      const rows = await result.json<{ partition: string }>();
-
-      for (const row of rows) {
-        const partition = row.partition;
-        if (!/^\d{6}$/.test(partition)) continue;
-        await client.command({
-          query: `ALTER TABLE ${table} DROP PARTITION '${partition}'`,
-        });
-        console.log(`  dropped ${table} partition ${partition}`);
-      }
+      const query = buildRetentionDeleteQuery(table, column, kind, cutoff);
+      await client.command({ query });
+      console.log(`  dropped ${table} older than ${formatRetentionValue(cutoff, kind)}`);
     } catch (error) {
       console.warn(`Retention skip for ${table}:`, error);
     }
   }
-
-  console.log("✅ Retention partition drops submitted.");
 }
+
+async function runSiteRetention(client: RetentionClient, dbClient: RetentionDB, now: Date): Promise<void> {
+  const rows = (await dbClient
+    .select({
+      id: sites.id,
+      retentionMonths: sql<number>`COALESCE((settings ->> 'retentionMonths')::int, ${env.DEFAULT_RETENTION_MONTHS})`,
+    })
+    .from(sites)) as RetentionSiteRow[];
+
+  if (rows.length === 0) {
+    await runGlobalRetention(client, env.DEFAULT_RETENTION_MONTHS, now);
+    return;
+  }
+
+  for (const row of rows) {
+    const months = retentionMonthsForSite(row.retentionMonths, env.DEFAULT_RETENTION_MONTHS);
+    const cutoff = cutoffForRetention(now, months);
+
+    for (const { table, column, kind } of RETENTION_TABLES) {
+      try {
+        const query = buildRetentionDeleteQuery(table, column, kind, cutoff, row.id);
+        await client.command({ query });
+        console.log(`  dropped ${table} for site ${row.id} older than ${formatRetentionValue(cutoff, kind)}`);
+      } catch (error) {
+        console.warn(`Retention skip for ${table} site=${row.id}:`, error);
+      }
+    }
+  }
+}
+
+/**
+ * Apply retention using each site's configured value, falling back to the global
+ * setting when there are no site rows to read from Postgres.
+ */
+export async function runRetentionCleanup(deps: RetentionDeps = {}): Promise<void> {
+  const client = deps.client ?? (getClickHouseClient() as unknown as RetentionClient);
+  const dbClient = deps.dbClient ?? (db as unknown as RetentionDB);
+  const now = deps.now ?? new Date();
+
+  await runSiteRetention(client, dbClient, now);
+  console.log("✅ Retention cleanup submitted.");
+}
+
+export default runRetentionCleanup;

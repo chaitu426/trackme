@@ -10,7 +10,7 @@
     "start": "node dist/scheduler.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",
-    "test": "node --import tsx --test src/jobs/window.test.ts src/jobs/daily-rollups.test.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "test:integration": "node --import tsx --test src/jobs/rollups.integration.test.ts"
   },
   "dependencies": {

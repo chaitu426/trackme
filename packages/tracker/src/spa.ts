@@ -11,9 +11,10 @@ export function listenToRouteChanges(callback: RouteChangeCallback): () => void 
   let currentPath = window.location.pathname + window.location.search;
   let pending: { nextPath: string; previousPath: string } | null = null;
   let frame: number | null = null;
+  let enabled = true;
 
   const deliverAfterRender = () => {
-    if (frame !== null) return;
+    if (frame !== null || !enabled) return;
     // Framework routers update history before React, Vue, Svelte, or Angular
     // has committed the new route. Waiting one frame captures the settled URL
     // and document title without asking the application to add route hooks.
@@ -21,11 +22,12 @@ export function listenToRouteChanges(callback: RouteChangeCallback): () => void 
       frame = null;
       const change = pending;
       pending = null;
-      if (change) callback(change.nextPath, change.previousPath);
+      if (change && enabled) callback(change.nextPath, change.previousPath);
     });
   };
 
   const handleUrlChange = () => {
+    if (!enabled) return;
     const nextPath = window.location.pathname + window.location.search;
     if (nextPath !== currentPath) {
       const prev = currentPath;
@@ -42,21 +44,31 @@ export function listenToRouteChanges(callback: RouteChangeCallback): () => void 
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
 
-  history.pushState = function (...args) {
-    originalPushState.apply(this, args);
+  const wrappedPushState = function (this: History, ...args: Parameters<typeof history.pushState>) {
+    const result = originalPushState.apply(this, args);
     handleUrlChange();
+    return result;
   };
 
-  history.replaceState = function (...args) {
-    originalReplaceState.apply(this, args);
+  const wrappedReplaceState = function (this: History, ...args: Parameters<typeof history.replaceState>) {
+    const result = originalReplaceState.apply(this, args);
     handleUrlChange();
+    return result;
   };
+
+  history.pushState = wrappedPushState;
+  history.replaceState = wrappedReplaceState;
 
   window.addEventListener("popstate", handleUrlChange);
 
   return () => {
-    history.pushState = originalPushState;
-    history.replaceState = originalReplaceState;
+    enabled = false;
+    if (history.pushState === wrappedPushState) {
+      history.pushState = originalPushState;
+    }
+    if (history.replaceState === wrappedReplaceState) {
+      history.replaceState = originalReplaceState;
+    }
     window.removeEventListener("popstate", handleUrlChange);
     if (frame !== null) window.cancelAnimationFrame(frame);
   };

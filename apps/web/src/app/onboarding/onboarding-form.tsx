@@ -156,7 +156,7 @@ export function OnboardingForm() {
         return `<!-- Custom HTML Tag in Google Tag Manager -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>\n<!-- Trigger: All Pages (Page View) -->`;
       case "html":
       default:
-        return `<!-- TrackMe Cookieless Telemetry (<2KB, zero cookies) -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
+        return `<!-- TrackMe Cookieless Telemetry (~5 KB gzipped, zero cookies) -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
     }
   }
 

@@ -9,6 +9,11 @@ const prod = {
   DATABASE_URL: "postgres://app:s3cret@db.internal:5432/growth",
   CLICKHOUSE_PASSWORD: "a-real-clickhouse-password",
   REDIS_URL: "redis://:a-real-redis-password@cache.internal:6379",
+  REDIS_RATELIMIT_URL: "redis://:a-real-redis-password@ratelimit.internal:6379",
+  REDIS_CACHE_URL: "redis://:a-real-redis-password@cache.internal:6379",
+  REDIS_STATE_URL: "redis://:a-real-redis-password@state.internal:6379",
+  REDIS_COORD_URL: "redis://:a-real-redis-password@coord.internal:6379",
+  SITE_SIGNING_SECRET_KEY: strong,
 };
 
 // Parsing logs to stderr on failure; keep test output readable.
@@ -55,7 +60,7 @@ test("the production check is skipped while next build runs", () => {
 test("the problems list names each offending variable", () => {
   const env = loadEnvironment({ NODE_ENV: "development" });
   const problems = productionProblems(env);
-  assert.equal(problems.length, 4);
+  assert.equal(problems.length, 9);
   for (const key of Object.keys(DEV_DEFAULTS)) assert.ok(problems.some((p) => p.startsWith(key)), key);
 });
 

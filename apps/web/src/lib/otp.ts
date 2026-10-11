@@ -50,7 +50,7 @@ function generateOtpCode(): string {
  * Throws if the email has already been sent too many OTPs in the window.
  */
 async function checkSendRateLimit(email: string, purpose: OtpPurpose): Promise<void> {
-  const redis = getRedis();
+  const redis = getRedis("ratelimit");
   const key = `otp_send_limit:${purpose}:${email}`;
   const count = await redis.incr(key);
   if (count === 1) {

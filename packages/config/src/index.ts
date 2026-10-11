@@ -13,13 +13,34 @@ export const DEV_DEFAULTS = {
   DATABASE_URL: "postgres://growth_admin:growth_secure_pass@localhost:5432/growth_intelligence",
   CLICKHOUSE_PASSWORD: "clickhouse_dev_secret",
   REDIS_URL: "redis://:redis_dev_secret@localhost:6379",
+  REDIS_RATELIMIT_URL: "redis://:redis_dev_secret@localhost:6379",
+  REDIS_CACHE_URL: "redis://:redis_dev_secret@localhost:6379",
+  REDIS_STATE_URL: "redis://:redis_dev_secret@localhost:6379",
+  REDIS_COORD_URL: "redis://:redis_dev_secret@localhost:6379",
   NEXTAUTH_SECRET: "dev-secret-key-must-be-changed-in-prod-min-32-chars",
+  SITE_SIGNING_SECRET_KEY: "dev-site-signing-secret-key-min-32-chars",
 } as const;
+
+export type RedisRole = "ratelimit" | "cache" | "state" | "coord";
+
+export function getRedisURLForRole(role: RedisRole, source: NodeJS.ProcessEnv = process.env): string {
+  const urlByRole: Record<RedisRole, string | undefined> = {
+    ratelimit: source.REDIS_RATELIMIT_URL,
+    cache: source.REDIS_CACHE_URL,
+    state: source.REDIS_STATE_URL,
+    coord: source.REDIS_COORD_URL,
+  };
+
+  const value = urlByRole[role];
+  if (value && value.trim()) return value.trim();
+  return source.REDIS_URL ?? "redis://:redis_dev_secret@localhost:6379";
+}
 
 const EnvironmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(3000),
   APP_URL: z.string().url().default("http://localhost:3000"),
+  TRACKER_CDN_URL: z.string().url().or(z.literal("")) .default(""),
   INGESTION_URL: z.string().url().default("http://localhost:3001"),
 
   // PostgreSQL
@@ -31,12 +52,19 @@ const EnvironmentSchema = z.object({
   CLICKHOUSE_PASSWORD: z.string().default(DEV_DEFAULTS.CLICKHOUSE_PASSWORD),
   CLICKHOUSE_DB: z.string().default("growth_analytics"),
 
-  // Redis (realtime + rate limit + quota — not the event bus)
+  // Redis (shared default for development; production should split by failure domain)
   REDIS_URL: z.string().default(DEV_DEFAULTS.REDIS_URL),
+  REDIS_RATELIMIT_URL: z.string().default(DEV_DEFAULTS.REDIS_RATELIMIT_URL),
+  REDIS_CACHE_URL: z.string().default(DEV_DEFAULTS.REDIS_CACHE_URL),
+  REDIS_STATE_URL: z.string().default(DEV_DEFAULTS.REDIS_STATE_URL),
+  REDIS_COORD_URL: z.string().default(DEV_DEFAULTS.REDIS_COORD_URL),
 
   // Auth
   NEXTAUTH_SECRET: z.string().min(16).default(DEV_DEFAULTS.NEXTAUTH_SECRET),
   NEXTAUTH_URL: z.string().url().default("http://localhost:3000"),
+
+  // Sensitive application keys
+  SITE_SIGNING_SECRET_KEY: z.string().min(32).default(DEV_DEFAULTS.SITE_SIGNING_SECRET_KEY),
 
   // Ingestion Edge (Go only)
   INGESTION_PORT: z.coerce.number().default(3001),
@@ -56,8 +84,6 @@ const EnvironmentSchema = z.object({
   KAFKA_TOPIC: z.string().default("growth_events"),
   KAFKA_DLQ_TOPIC: z.string().default("growth_events_dlq"),
   KAFKA_CONSUMER_GROUP: z.string().default("event_worker_group"),
-  /** @deprecated Use KAFKA_TOPIC. Kept so old .env files still parse. */
-  QUEUE_NAME: z.string().default("growth_events"),
 
   // Geolocation & Privacy
   DERIVE_GEO_AT_EDGE: z
@@ -95,6 +121,9 @@ export function productionProblems(candidate: Environment): string[] {
   }
   if (candidate.NEXTAUTH_SECRET !== DEV_DEFAULTS.NEXTAUTH_SECRET && candidate.NEXTAUTH_SECRET.length < 32) {
     problems.push("NEXTAUTH_SECRET must be at least 32 characters in production");
+  }
+  if (candidate.SITE_SIGNING_SECRET_KEY !== DEV_DEFAULTS.SITE_SIGNING_SECRET_KEY && candidate.SITE_SIGNING_SECRET_KEY.length < 32) {
+    problems.push("SITE_SIGNING_SECRET_KEY must be at least 32 characters in production");
   }
   return problems;
 }

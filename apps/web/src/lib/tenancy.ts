@@ -1,3 +1,4 @@
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { NextRequest } from "next/server";
 import {
   AppError,
@@ -29,6 +30,59 @@ import {
   workspaces,
 } from "@trackme/db";
 import { requireApiUser } from "./auth";
+
+const SITE_SIGNING_SECRET_PREFIX = "enc:v1:";
+
+export function siteSigningSecretKey(): string {
+  const key = process.env.SITE_SIGNING_SECRET_KEY ?? "dev-site-signing-secret-key-min-32-chars";
+  if (key.length < 32) {
+    throw new AppError(500, "CONFIG_ERROR", "SITE_SIGNING_SECRET_KEY must be at least 32 chars");
+  }
+  return key;
+}
+
+export function encryptSiteSigningSecret(value: string): string {
+  if (!value || value.startsWith(SITE_SIGNING_SECRET_PREFIX)) {
+    return value;
+  }
+  const key = createHash("sha256").update(siteSigningSecretKey()).digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${SITE_SIGNING_SECRET_PREFIX}${Buffer.concat([iv, ciphertext, tag]).toString("base64url")}`;
+}
+
+export function decryptSiteSigningSecret(value: string | undefined): string | undefined {
+  if (!value || !value.startsWith(SITE_SIGNING_SECRET_PREFIX)) {
+    return value;
+  }
+  const key = createHash("sha256").update(siteSigningSecretKey()).digest();
+  const payload = Buffer.from(value.slice(SITE_SIGNING_SECRET_PREFIX.length), "base64url");
+  if (payload.length <= 28) {
+    throw new AppError(500, "CONFIG_ERROR", "Site signing secret is corrupted");
+  }
+  const iv = payload.subarray(0, 12);
+  const tag = payload.subarray(payload.length - 16);
+  const ciphertext = payload.subarray(12, payload.length - 16);
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+}
+
+function encryptSiteSettingsSecret(settings: SiteSettings): SiteSettings {
+  if (!settings.signingSecret) {
+    return settings;
+  }
+  return { ...settings, signingSecret: encryptSiteSigningSecret(settings.signingSecret) };
+}
+
+function decryptSiteSettingsSecret(settings: SiteSettings): SiteSettings {
+  if (!settings.signingSecret) {
+    return settings;
+  }
+  return { ...settings, signingSecret: decryptSiteSigningSecret(settings.signingSecret) };
+}
 
 function parseRole(role: string): WorkspaceRole {
   const parsed = WorkspaceRoleSchema.safeParse(role);
@@ -252,12 +306,13 @@ const SITE_COLUMNS = {
 };
 
 function publicSettings(settings: SiteSettings): SiteSettings {
+  const plaintextSecret = decryptSiteSigningSecret(settings.signingSecret);
   const { signingSecret: _secret, ...rest } = settings;
   return SiteSettingsSchema.parse({
     ...rest,
     signingSecretHash:
       settings.signingSecretHash ||
-      (settings.signingSecret ? hashApiKey(settings.signingSecret) : undefined),
+      (plaintextSecret ? hashApiKey(plaintextSecret) : undefined),
   });
 }
 
@@ -280,7 +335,7 @@ async function getSiteSettingsRaw(siteId: string): Promise<SiteSettings | null> 
     .where(eq(sites.id, siteId))
     .limit(1);
   if (!rows[0]) return null;
-  return SiteSettingsSchema.parse(rows[0].settings ?? {});
+  return decryptSiteSettingsSecret(SiteSettingsSchema.parse(rows[0].settings ?? {}));
 }
 
 export async function requireSiteByDomain(
@@ -391,9 +446,10 @@ export async function updateSiteSettings(
   // stripped from the public dashboard view.
   const current = (await getSiteSettingsRaw(siteId)) ?? site.settings;
   const merged = SiteSettingsSchema.parse({ ...current, ...patch });
+  const persisted = encryptSiteSettingsSecret(merged);
   await db
     .update(sites)
-    .set({ settings: merged, updatedAt: new Date() })
+    .set({ settings: persisted, updatedAt: new Date() })
     .where(eq(sites.id, siteId));
 
   const hashRows = await db
@@ -428,10 +484,11 @@ export async function rotateIngestSigningSecret(siteId: string): Promise<{
     signingSecret,
     signingSecretHash: hashApiKey(signingSecret),
   });
+  const persisted = encryptSiteSettingsSecret(merged);
 
   await db
     .update(sites)
-    .set({ settings: merged, updatedAt: new Date() })
+    .set({ settings: persisted, updatedAt: new Date() })
     .where(eq(sites.id, siteId));
 
   const hashRows = await db

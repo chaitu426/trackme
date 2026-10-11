@@ -31,14 +31,14 @@ interface WorkspaceSitesClientProps {
     role: string;
   };
   initialSites: SiteItem[];
-  appUrl: string;
+  trackerScriptUrl: string;
   ingestionUrl: string;
 }
 
 export function WorkspaceSitesClient({
   workspace,
   initialSites,
-  appUrl,
+  trackerScriptUrl,
   ingestionUrl,
 }: WorkspaceSitesClientProps) {
   const [sitesList, setSitesList] = React.useState<SiteItem[]>(initialSites);
@@ -47,7 +47,7 @@ export function WorkspaceSitesClient({
   const [busySiteId, setBusySiteId] = React.useState<string | null>(null);
 
   function getSnippetForSite(site: SiteItem) {
-    return `<script defer src="${appUrl}/tracker.js" data-site="${site.publicKey}" data-endpoint="${ingestionUrl}/v1/batch"></script>`;
+    return `<script defer src="${trackerScriptUrl}" data-site="${site.publicKey}" data-endpoint="${ingestionUrl}/v1/batch"></script>`;
   }
 
   function handleCopySnippet(site: SiteItem) {

@@ -11,7 +11,7 @@ import { checkEvent } from "./contract.js";
 import { isDataError } from "./errors.js";
 import { writeIsolating } from "./isolate.js";
 
-const redis = new Redis(env.REDIS_URL, {
+const redis = new Redis(env.REDIS_STATE_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
   retryStrategy: (times: number) => Math.min(times * 100, 3000),

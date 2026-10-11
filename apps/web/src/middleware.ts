@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 const PUBLIC_EXACT = new Set(["/", "/login", "/signup", "/tracker.js", "/demo.html"]);
+const PUBLIC_API_PREFIXES = [
+  "/api/auth/login",
+  "/api/auth/signup",
+  "/api/auth/session",
+  "/api/v1/invites/accept",
+];
 
-function isPublicPath(pathname: string): boolean {
+export function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) {
     return true;
   }
@@ -21,11 +27,8 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/invite")) {
     return true;
   }
-  if (pathname.startsWith("/api/auth/login") || pathname.startsWith("/api/auth/signup")) {
-    return true;
-  }
   if (pathname.startsWith("/api/")) {
-    return true;
+    return PUBLIC_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
   }
   return false;
 }
@@ -41,6 +44,10 @@ export async function middleware(request: NextRequest) {
   const session = token && secret ? await verifySessionToken(token, secret) : null;
   if (session) {
     return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "UNAUTHENTICATED", message: "Authentication is required." }, { status: 401 });
   }
 
   const loginUrl = request.nextUrl.clone();

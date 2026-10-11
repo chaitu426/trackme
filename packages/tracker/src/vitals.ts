@@ -46,13 +46,34 @@ export function observeWebVitals(onMetric: MetricCallback): void {
     return;
   }
 
+  const reported = new Set<WebVitalMetric["name"]>();
+  const latestValues = new Map<WebVitalMetric["name"], number>();
+  const navigationType =
+    performance.getEntriesByType("navigation").length > 0
+      ? (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type
+      : undefined;
+
+  const flushFinalMetrics = (): void => {
+    for (const name of ["LCP", "CLS", "FCP", "INP", "FID", "TTFB"] as const) {
+      const value = latestValues.get(name);
+      if (typeof value === "number" && !reported.has(name)) {
+        reported.add(name);
+        emit(onMetric, name, value, navigationType);
+      }
+    }
+  };
+
+  const remember = (name: WebVitalMetric["name"], value: number): void => {
+    latestValues.set(name, value);
+  };
+
   try {
-    // LCP
+    // LCP: one final value per page view; avoid counting every intermediate value.
     const lcpObserver = new PerformanceObserver((entryList) => {
       const entries = entryList.getEntries();
       const lastEntry = entries[entries.length - 1];
       if (lastEntry) {
-        emit(onMetric, "LCP", Math.round(lastEntry.startTime));
+        remember("LCP", Math.round(lastEntry.startTime));
       }
     });
     lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
@@ -61,16 +82,15 @@ export function observeWebVitals(onMetric: MetricCallback): void {
   }
 
   try {
-    // CLS
+    // CLS: accumulate the current total and emit once, on final page teardown.
     let clsValue = 0;
     const clsObserver = new PerformanceObserver((entryList) => {
-      for (const entry of entryList.getEntries() as PerformanceEntry[]) {
-        const layout = entry as PerformanceEntry & { hadRecentInput?: boolean; value?: number };
-        if (!layout.hadRecentInput && typeof layout.value === "number") {
-          clsValue += layout.value;
+      for (const entry of entryList.getEntries() as Array<PerformanceEntry & { hadRecentInput?: boolean; value?: number }>) {
+        if (!entry.hadRecentInput && typeof entry.value === "number") {
+          clsValue += entry.value;
         }
       }
-      emit(onMetric, "CLS", Math.round(clsValue * 1000) / 1000);
+      remember("CLS", Math.round(clsValue * 1000) / 1000);
     });
     clsObserver.observe({ type: "layout-shift", buffered: true });
   } catch {
@@ -78,11 +98,11 @@ export function observeWebVitals(onMetric: MetricCallback): void {
   }
 
   try {
-    // FCP
+    // FCP: the first contentful paint is stable for a given page load.
     const paintObserver = new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries()) {
         if (entry.name === "first-contentful-paint") {
-          emit(onMetric, "FCP", Math.round(entry.startTime));
+          remember("FCP", Math.round(entry.startTime));
         }
       }
     });
@@ -92,7 +112,7 @@ export function observeWebVitals(onMetric: MetricCallback): void {
   }
 
   try {
-    // INP (Interaction to Next Paint) via Event Timing
+    // INP: use the worst interaction duration seen so far and report only once.
     let worstInp = 0;
     const inpObserver = new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries() as PerformanceEntry[]) {
@@ -110,11 +130,10 @@ export function observeWebVitals(onMetric: MetricCallback): void {
               : 0;
         if (duration > worstInp) {
           worstInp = duration;
-          emit(onMetric, "INP", Math.round(worstInp));
+          remember("INP", Math.round(worstInp));
         }
       }
     });
-    // durationThreshold keeps noise down on busy pages
     inpObserver.observe({
       type: "event",
       buffered: true,
@@ -130,7 +149,7 @@ export function observeWebVitals(onMetric: MetricCallback): void {
       for (const entry of entryList.getEntries() as PerformanceEntry[]) {
         const fid = entry as PerformanceEntry & { processingStart?: number; startTime?: number };
         if (typeof fid.processingStart === "number" && typeof fid.startTime === "number") {
-          emit(onMetric, "FID", Math.round(fid.processingStart - fid.startTime));
+          remember("FID", Math.round(fid.processingStart - fid.startTime));
         }
       }
     });
@@ -140,13 +159,31 @@ export function observeWebVitals(onMetric: MetricCallback): void {
   }
 
   try {
-    // TTFB from Navigation Timing
+    // TTFB from navigation timing. This is stable per page load and not noisy.
     const navEntries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
     const nav = navEntries[0];
     if (nav && typeof nav.responseStart === "number" && nav.responseStart >= 0) {
-      emit(onMetric, "TTFB", Math.round(nav.responseStart), nav.type);
+      remember("TTFB", Math.round(nav.responseStart));
     }
   } catch {
     // unsupported
+  }
+
+  const flushOnHidden = () => {
+    flushFinalMetrics();
+  };
+
+  // Final flush on teardown/visibility changes: this is the production-safe,
+  // quota-friendly pattern used by metrics systems to send one observation per
+  // metric per page view without spamming every observer callback.
+  window.addEventListener("pagehide", flushOnHidden, { once: true });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      flushOnHidden();
+    }
+  }, { once: true });
+
+  if (document.visibilityState === "hidden") {
+    flushFinalMetrics();
   }
 }

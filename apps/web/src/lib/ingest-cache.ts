@@ -1,11 +1,11 @@
 import { Redis } from "ioredis";
-import { env } from "@trackme/config";
+import { getRedisURLForRole } from "@trackme/config";
 
 let client: Redis | null = null;
 
 function getRedis(): Redis {
   if (!client) {
-    client = new Redis(env.REDIS_URL, {
+    client = new Redis(getRedisURLForRole("cache"), {
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
     });

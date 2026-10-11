@@ -59,7 +59,7 @@ export async function createRegisteredSession(params: {
 
   // Cache in Redis for ultra-fast validation
   try {
-    const redis = getRedis();
+    const redis = getRedis("state");
     const redisKey = `session:${tokenHash}`;
     await redis.set(
       redisKey,
@@ -106,7 +106,7 @@ export async function validateRegisteredSession(
 
   // 2. Check Redis cache for fast revocation lookup
   try {
-    const redis = getRedis();
+    const redis = getRedis("state");
     const cached = await redis.get(`session:${tokenHash}`);
     if (cached) {
       const data = JSON.parse(cached);
@@ -143,7 +143,7 @@ export async function validateRegisteredSession(
     }
 
     // Populate Redis cache asynchronously
-    getRedis()
+    getRedis("state")
       .set(
         `session:${tokenHash}`,
         JSON.stringify({
@@ -174,7 +174,7 @@ export async function revokeRegisteredSession(token: string | undefined): Promis
 
   // Invalidate in Redis
   try {
-    const redis = getRedis();
+    const redis = getRedis("state");
     await redis.set(
       `session:${tokenHash}`,
       JSON.stringify({ revoked: true }),

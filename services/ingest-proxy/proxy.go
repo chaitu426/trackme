@@ -3,9 +3,12 @@ package main
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"expvar"
 	"fmt"
 	"io"
 	"log"
@@ -94,12 +97,55 @@ var hopByHop = map[string]bool{
 	"transfer-encoding": true, "upgrade": true, "content-length": true,
 }
 
+var (
+	httpRequestsTotal = expvar.NewInt("ingest_proxy_http_requests_total")
+	httpRequestsInFlight = expvar.NewInt("ingest_proxy_http_requests_in_flight")
+	httpRequestLatencyMs = expvar.NewFloat("ingest_proxy_http_request_latency_ms")
+)
+
+type responseRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *responseRecorder) WriteHeader(statusCode int) {
+	r.status = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func withRequestTracing(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		reqID := strings.TrimSpace(r.Header.Get("X-Request-ID"))
+		if reqID == "" {
+			buf := make([]byte, 12)
+			if _, err := rand.Read(buf); err == nil {
+				reqID = base64.RawURLEncoding.EncodeToString(buf)
+			} else {
+				reqID = fmt.Sprintf("req-%d", time.Now().UnixNano())
+			}
+		}
+		w.Header().Set("X-Request-ID", reqID)
+		httpRequestsInFlight.Add(1)
+		defer httpRequestsInFlight.Add(-1)
+		statusWriter := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(statusWriter, r)
+		httpRequestsTotal.Add(1)
+		httpRequestLatencyMs.Add(float64(time.Since(start).Milliseconds()))
+		log.Printf("%s %s request_id=%s status=%d latency_ms=%d", r.Method, r.URL.Path, reqID, statusWriter.status, time.Since(start).Milliseconds())
+	})
+}
+
 func newHandler(cfg config, client *http.Client) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok","service":"ingest-proxy"}`))
+	})
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		expvar.Handler().ServeHTTP(w, r)
 	})
 
 	mux.HandleFunc("OPTIONS /v1/batch", func(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +222,7 @@ func newHandler(cfg config, client *http.Client) http.Handler {
 		_, _ = io.Copy(w, res.Body)
 	})
 
-	return mux
+	return withRequestTracing(mux)
 }
 
 func setCORS(w http.ResponseWriter, origin string) {

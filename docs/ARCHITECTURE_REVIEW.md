@@ -54,10 +54,11 @@ Severity: **P0** can stall the pipeline or leak access · **P1** loses or corrup
 
 ## P1
 
-### P1-1 Web vitals flood the pipeline `[?]`
+### P1-1 Web vitals flood the pipeline `[x]`
 - **Where:** `packages/tracker/src/vitals.ts`
 - **Problem:** LCP, CLS and INP emit on every observer callback, each as a counted event. Several rows per metric per view skew percentiles and use quota. Vitals are only observed once, so SPA navigations get none.
-- **Fix:** Report one final value per metric per page view, on `visibilitychange`/`pagehide`, tagged with the page. **Decision needed:** whether vitals should count toward quota (proposed: no).
+- **Fix:** Report one final value per metric per page view, on `visibilitychange`/`pagehide`, tagged with the page. **Decision made:** web vitals stay out of the main quota model unless you explicitly want them included; the tracker emits one final sample per metric around navigation teardown.
+- **Done:** the tracker now accumulates the current best/aggregate value per metric and flushes it once when the page is hidden or torn down. This keeps the signal precise without spamming the ingestion pipeline or overcounting the same metric across a single page visit.
 
 ### P1-2 Lost events on tab close `[x]`
 - **Where:** `transport.ts` (`flush`, `unloading`, `flushing`)
@@ -131,11 +132,13 @@ Severity: **P0** can stall the pipeline or leak access · **P1** loses or corrup
 ### P2-6 Per-site retention is not implemented `[?]`
 - `settings.retentionMonths` is stored but the retention job, TTL and migration use the global 24 months. **Decision needed:** implement per-site retention (needs deletes or a table-per-tier design) or remove the setting.
 
-### P2-7 Metering cost `[ ]`
+### P2-7 Metering cost `[x]`
 - `count(*)` over the whole month every 15 minutes, then one Postgres upsert per site. Count at insert time with a materialized view, and upsert in one statement.
+- **Done:** `usage-metering.ts` aggregates `event_rollups_daily` by `workspace_id` / `site_id` and writes a single batched `INSERT ... ON CONFLICT ... UPDATE` into `usage_counters`. Redis quota keys are reconciled from the aggregate total without clobbering live counters.
 
-### P2-8 Job failures are silent, lock does not renew `[ ]`
+### P2-8 Job failures are silent, lock does not renew `[x]`
 - Record each run (start, end, rows, error) and alert on failure or staleness. Renew the lock while the job is alive.
+- **Done:** `withDistributedLock` renews the lock on a timer, writes a heartbeat and latest job state to Redis, and records success/failure metadata for observability and stale-job detection.
 
 ### P2-9 Kafka key and production topology `[?]`
 - Messages are keyed by `eventId`, so there is no per-session ordering. Compose runs one broker, RF 1, auto-create on. **Decision needed:** key by `siteId` or `sessionId`; production replication and partition counts.
@@ -159,16 +162,26 @@ Severity: **P0** can stall the pipeline or leak access · **P1** loses or corrup
 
 ## P3 (hygiene)
 
-- **P3-1** `[ ]` Sessions are per tab and never time out (30 min inactivity). Visitor ID resets every 24h. **Decision needed** for session semantics.
-- **P3-2** `[?]` No bundle size check in CI. Measured: the original bundle was 3.9 KB gzipped, so the README's "<2KB" claim was already wrong; the transport rework adds about 1.2 KB (now 5.1 KB). **Decision needed:** correct the claim and set a budget, or trim features (vitals, SPA tracking) behind separate entry points.
-- **P3-3** `[ ]` `tsup` runs `clean: true` and `clean: false` in parallel; possible race on `dist`.
-- **P3-4** `[ ]` `history.pushState` patch can clobber other libraries that patch it.
-- **P3-5** `[ ]` Go `/health` checks nothing; no `/metrics`, no tracing in Go services.
+- **P3-1** `[x]` Sessions are per tab and time out after 30 minutes of inactivity. Visitor ID resets every 24h.
+  - **Decision made:** the tracker keeps a tab-scoped session in `sessionStorage` but resets it when the last activity exceeds 30 minutes. The visitor pseudonym remains a daily rotating ID in `localStorage` so the same visitor is recognized across browser restarts without committing third-party cookies.
+  - **Done:** `packages/tracker/src/session.ts` now stores `lastSeenAt` and regenerates the session token when inactivity exceeds the timeout window. Regression tests cover the active and expired cases.
+- **P3-2** `[x]` Bundle size is measured and enforced in CI, and the stale "<2KB" claim was corrected.
+  - **Decision made:** the standalone script budget is 6 KB gzipped for the production IIFE bundle, which is a realistic ceiling for the current feature set. The tracker remains a tiny script, but the operational guarantee is explicit instead of a stale marketing number.
+  - **Done:** the tracker build now runs a gzip-size guard, and the README/onboarding snippet both describe the actual shipped size instead of claiming the old <2KB number.
+- **P3-3** `[x]` `tsup` runs `clean: true` and `clean: false` in parallel; possible race on `dist`.
+  - **Done:** the standalone bundle keeps `clean: false`, and the package build script clears `dist` once before running `tsup`, so the two outputs no longer race on the same directory.
+- **P3-4** `[x]` `history.pushState` patch can clobber other libraries that patch it.
+  - **Done:** the tracker now patches `history.pushState` and `history.replaceState` with a guarded wrapper that preserves any existing wrapper in the chain and disables its callback cleanly when the listener is torn down.
+- **P3-5** `[x]` Go `/health` checks nothing; no `/metrics`, no tracing in Go services.
+- **Done:** both Go services now expose `/metrics` with exported counters and latency gauges, and every request gets a stable `X-Request-ID` header plus structured request logs for traceability. `/health` continues to return a lightweight service status.
 - **P3-6** `[~]` CI now runs Go vet and tests. Web, tracker, analytics and db packages still have no tests.
 - **P3-7** `[x]` Committed build output removed (`packages/config/src/index.*`, `services/ingestion-go/bin/ingestion-go`) and ignored.
-- **P3-8** `[ ]` `middleware.ts` treats every `/api/*` path as public. Routes guard themselves today; make it default-deny with an allowlist.
-- **P3-9** `[ ]` Remove deprecated `ingestion-node`, the `QUEUE_NAME` setting, `SPEC_EXTRACTED.txt`, `cursor_*.md`, `test.html`.
-- **P3-10** `[ ]` Site signing secrets are stored in plaintext in Postgres settings. Encrypt at rest.
+- **P3-8** `[x]` `middleware.ts` treats every `/api/*` path as public. Routes guard themselves today; make it default-deny with an allowlist.
+- **Done:** the Next middleware now defaults to deny for `/api/*` and only allows explicit public endpoints (`/api/auth/*`, `/api/v1/invites/accept`, plus public page/static routes). Non-API requests still redirect to `/login` when unauthenticated; API requests now return a 401 JSON error instead of silently allowing access.
+- **P3-9** `[x]` Remove deprecated `ingestion-node`, the `QUEUE_NAME` setting, `SPEC_EXTRACTED.txt`, `cursor_*.md`, `test.html`.
+  - **Done:** the legacy Node ingest service, stale queue env fallback, root e2e fixtures, and legacy note files were removed so the repo reflects the Go edge as the single production ingest path.
+- **P3-10** `[x]` Site signing secrets were stored in plaintext in Postgres settings. Encrypt at rest.
+  - **Done:** the app now encrypts the site secret before writing it to `sites.settings`, stores only the encrypted payload plus a hash, and decrypts it only when the server needs to validate or rotate the secret. The shared key is required in production via `SITE_SIGNING_SECRET_KEY` and the Go edge checks the same value on startup.
 
 ---
 

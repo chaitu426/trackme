@@ -7,9 +7,12 @@ import { Landing } from "@trackme/landing";
  * Set NEXT_PUBLIC_DOCS_URL to the docs site's origin (for example
  * https://docs.example.com). It defaults to the local dev port.
  */
-const docsOrigin = (
-  process.env.NEXT_PUBLIC_DOCS_URL ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:3002")
-).replace(/\/$/, "");
+const configuredDocsOrigin = process.env.NEXT_PUBLIC_DOCS_URL;
+if (process.env.NODE_ENV === "production" && !configuredDocsOrigin) {
+  throw new Error("NEXT_PUBLIC_DOCS_URL must be set to the public docs-site origin for production builds.");
+}
+
+const docsOrigin = (configuredDocsOrigin ?? "http://localhost:3002").replace(/\/+$/, "");
 
 export default function MarketingPage() {
   return (
@@ -18,8 +21,6 @@ export default function MarketingPage() {
         docs: `${docsOrigin}/docs`,
         quickstart: `${docsOrigin}/docs/quickstart`,
         frameworks: `${docsOrigin}/docs/frameworks`,
-        reference: `${docsOrigin}/docs/reference/tracker-api`,
-        selfHosting: `${docsOrigin}/docs/operate/self-hosting`,
         signIn: "/login",
         getStarted: "/signup",
         privacy: "/legal/privacy",

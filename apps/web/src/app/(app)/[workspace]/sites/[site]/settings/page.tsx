@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
 import { requireDashboardSite, listApiKeys, getWorkspaceUsage } from "@/lib/tenancy";
 import { listWorkspaceAuditLogs } from "@/lib/audit";
+import { resolveTrackerScriptUrl } from "@/lib/tracker-url";
 import { SitePrivacyForm } from "@/components/site-privacy-form";
 import { ApiKeysManager, type ApiKeySummary } from "@/components/api-keys-manager";
 import { UsageQuotaCard } from "@/components/usage-quota-card";
@@ -43,7 +44,7 @@ export default async function SiteSettingsPage({
     createdAt: key.createdAt.toISOString(),
   }));
 
-  const snippet = `<script defer src="${env.APP_URL}/tracker.js" data-site="${site.publicKey}" data-endpoint="${env.INGESTION_URL}/v1/batch"></script>`;
+  const snippet = `<script defer src="${resolveTrackerScriptUrl()}" data-site="${site.publicKey}" data-endpoint="${env.INGESTION_URL}/v1/batch"></script>`;
 
   return (
     <div className="space-y-8 max-w-4xl">

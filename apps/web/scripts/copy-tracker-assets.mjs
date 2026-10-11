@@ -1,26 +1,34 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-// Publishes the browser tracker bundle at /tracker.js so the snippet shown
-// in onboarding and site settings (`{APP_URL}/tracker.js`) actually resolves.
-// Must run after @trackme/tracker has been built.
+// Publishes the immutable CDN bundle and the short-lived alias so the tracker
+// can be served from the app origin during rollout without depending on the
+// CDN host for same-origin demos.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// tsup names the IIFE build "tracker.global.js" since the same entry name
-// is also used for the ESM/CJS npm build ("index.js"/"index.mjs").
-const source = path.resolve(__dirname, "../../../packages/tracker/dist/tracker.global.js");
+const distDir = path.resolve(__dirname, "../../../packages/tracker/dist");
+const manifestPath = path.join(distDir, "manifest.json");
 const destDir = path.resolve(__dirname, "../public");
-const dest = path.join(destDir, "tracker.js");
+const v1Dir = path.join(destDir, "t", "v1");
 
-if (!existsSync(source)) {
+if (!existsSync(manifestPath)) {
   console.error(
-    `[copy-tracker-assets] Missing built tracker bundle at ${source}.\n` +
+    `[copy-tracker-assets] Missing tracker manifest at ${manifestPath}.\n` +
       "Build it first: pnpm --filter @trackme/tracker build"
   );
   process.exit(1);
 }
 
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const source = path.join(distDir, manifest.file);
+if (!existsSync(source)) {
+  console.error(`[copy-tracker-assets] Missing immutable tracker build ${manifest.file}`);
+  process.exit(1);
+}
+
 mkdirSync(destDir, { recursive: true });
-copyFileSync(source, dest);
-console.log(`[copy-tracker-assets] Copied tracker bundle -> ${dest}`);
+mkdirSync(v1Dir, { recursive: true });
+copyFileSync(source, path.join(destDir, "tracker.js"));
+copyFileSync(source, path.join(v1Dir, "tracker.js"));
+console.log(`[copy-tracker-assets] Copied tracker bundle -> ${path.join(destDir, "tracker.js")}`);

@@ -1,5 +1,5 @@
 import { Redis } from "ioredis";
-import { env } from "@trackme/config";
+import { getRedisURLForRole } from "@trackme/config";
 import { getRealtimeSnapshot, type RealtimeSnapshot } from "./realtime.js";
 
 type SnapshotListener = (snapshot: RealtimeSnapshot) => void;
@@ -18,7 +18,7 @@ const CHANNEL_PREFIX = "rt:notify:";
 
 function ensurePubSub(): void {
   if (subClient) return;
-  subClient = new Redis(env.REDIS_URL, {
+  subClient = new Redis(getRedisURLForRole("coord"), {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
   });

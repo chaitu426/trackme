@@ -14,8 +14,8 @@ export async function checkRateLimit(
   errorMessage = "Too many requests. Please try again later."
 ): Promise<{ remaining: number; resetInSeconds: number }> {
   try {
-    const redis = getRedis();
-    const redisKey = `ratelimit:${key}`;
+    const redis = getRedis("ratelimit");
+    const redisKey = `rl:${key}`;
     const count = await redis.incr(redisKey);
 
     if (count === 1) {
@@ -71,7 +71,7 @@ export async function recordFailedLoginAttempt(
   lockoutSeconds = 15 * 60
 ): Promise<{ attempts: number; isLocked: boolean; remainingAttempts: number }> {
   try {
-    const redis = getRedis();
+    const redis = getRedis("ratelimit");
     const key = `auth_failures:${identifier.toLowerCase()}`;
     const attempts = await redis.incr(key);
 
@@ -95,7 +95,7 @@ export async function recordFailedLoginAttempt(
  */
 export async function clearFailedLoginAttempts(identifier: string): Promise<void> {
   try {
-    const redis = getRedis();
+    const redis = getRedis("ratelimit");
     await redis.del(`auth_failures:${identifier.toLowerCase()}`);
   } catch {
     // Non-fatal
