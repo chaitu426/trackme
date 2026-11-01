@@ -12,7 +12,7 @@ Go Ingestion Edge (services/ingestion-go)   ← only production collector
     │   Redis: rate limit + quota
     ▼
 Apache Kafka (growth_events / growth_events_dlq)
-    │   key=eventId · acks=all · at-least-once delivery
+    │   key=siteId:sessionId · acks=all · at-least-once delivery
     ▼
 TypeScript Event Worker (services/event-worker) ──► ClickHouse events_raw
     │   (ReplacingMergeTree collapses duplicate event_id)
@@ -102,6 +102,18 @@ http://localhost:3002. `NEXT_PUBLIC_DOCS_URL` and `NEXT_PUBLIC_DASHBOARD_URL` in
 `.env` must be set to the public origins of the docs and dashboard apps when
 deploying; both variables are included in Turbo's environment cache key so a
 build cannot reuse landing links generated for different origins.
+
+## Tests
+
+Tests are kept beside the source they cover and use the `*.test.ts` naming
+convention. Run all workspace tests with `pnpm test`, or run one package's tests
+with `pnpm --filter @trackme/tracker test` (replace the package name as needed).
+The Go services keep tests beside their packages and use Go's standard
+`*_test.go` convention; run them with `go test ./...` from the service directory.
+
+The scheduled worker's ClickHouse integration test is skipped in the normal
+test run unless `CLICKHOUSE_TEST_URL` is configured. To run it explicitly, use
+`pnpm --filter @trackme/scheduled-worker test:integration`.
 
 ## Core Principles & Guarantees
 - **Privacy by Default**: No tracking cookies required. IP addresses are processed transiently for geolocation then immediately discarded.

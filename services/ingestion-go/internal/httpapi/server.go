@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"expvar"
 	"fmt"
 	"io"
 	"log"
@@ -17,7 +16,9 @@ import (
 
 	"github.com/trackme/ingestion-go/internal/clientip"
 	"github.com/trackme/ingestion-go/internal/enrich"
+	"github.com/trackme/ingestion-go/internal/gate"
 	"github.com/trackme/ingestion-go/internal/geo"
+	"github.com/trackme/ingestion-go/internal/metrics"
 	"github.com/trackme/ingestion-go/internal/origin"
 	"github.com/trackme/ingestion-go/internal/sign"
 	"github.com/trackme/ingestion-go/internal/site"
@@ -40,7 +41,18 @@ type QuotaGate interface {
 }
 
 type EventPublisher interface {
-	Publish(ctx context.Context, events []enrich.EnrichedEvent) error
+	Publish(ctx context.Context, events []enrich.EnrichedEvent) (publishedIndices []int, err error)
+}
+
+type EventDeduper interface {
+	Claim(ctx context.Context, eventIDs []string) ([]bool, error)
+	Confirm(ctx context.Context, eventIDs []string) error
+	Release(ctx context.Context, eventIDs []string) error
+}
+
+// Admitter applies the site limit, event claims and quota in one Redis round trip.
+type Admitter interface {
+	Admit(ctx context.Context, req gate.Request) (gate.Result, error)
 }
 
 type Server struct {
@@ -51,8 +63,14 @@ type Server struct {
 	// one visitor's IP, so it needs its own, larger budget. Falls back to Limiter.
 	SiteLimiter RateLimiter
 	Quota       QuotaGate
-	Geo         *geo.Resolver
-	MaxBody     int64
+	Deduper     EventDeduper
+	EdgeDedupe  bool
+	// Gate, when set, replaces SiteLimiter + Deduper.Claim + Quota.TryReserve with
+	// one atomic script (EDGE_GATE_SCRIPT). Deduper and Quota are still used to
+	// confirm and release after publishing.
+	Gate    Admitter
+	Geo     *geo.Resolver
+	MaxBody int64
 
 	// TrustedProxyHops is how many reverse proxies sit in front of this server;
 	// see internal/clientip. Zero means no proxy and X-Forwarded-For is ignored.
@@ -62,6 +80,18 @@ type Server struct {
 	// reached, instead of rejecting them. Usage metering later reconciles the
 	// real count from ClickHouse, so the cost is briefly looser enforcement.
 	QuotaFailOpen bool
+
+	// AsyncConfirm confirms event claims after the 202 is sent instead of before it.
+	// The confirm only extends a dedupe marker's lifetime (a failure is already just
+	// logged), so the client need not wait a Redis round trip for it.
+	AsyncConfirm bool
+
+	// ReadyChecks back GET /ready. Empty means always ready.
+	ReadyChecks []ReadyCheck
+	ready       readyState
+
+	// HideMetrics removes /metrics from this listener because it is served on a private port.
+	HideMetrics bool
 
 	warnMu   sync.Mutex
 	warnLast map[string]time.Time
@@ -89,12 +119,6 @@ func (s *Server) warn(kind, format string, args ...any) {
 type batchRequest struct {
 	Events []enrich.TrackerEvent `json:"events"`
 }
-
-var (
-	httpRequestsTotal = expvar.NewInt("http_requests_total")
-	httpRequestsInFlight = expvar.NewInt("http_requests_in_flight")
-	httpRequestLatencyMs = expvar.NewFloat("http_request_latency_ms")
-)
 
 type responseRecorder struct {
 	http.ResponseWriter
@@ -126,21 +150,33 @@ func withRequestTracing(next http.Handler) http.Handler {
 			}
 		}
 		w.Header().Set("X-Request-ID", reqID)
-		httpRequestsInFlight.Add(1)
-		defer httpRequestsInFlight.Add(-1)
+		metrics.Default.HTTPRequestsInFlight.Inc()
+		defer metrics.Default.HTTPRequestsInFlight.Dec()
 		statusWriter := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(statusWriter, r)
+		duration := time.Since(start)
 		statusCode := statusWriter.status
-		httpRequestsTotal.Add(1)
-		httpRequestLatencyMs.Add(float64(time.Since(start).Milliseconds()))
-		log.Printf("%s %s request_id=%s status=%d latency_ms=%d", r.Method, r.URL.Path, reqID, statusCode, time.Since(start).Milliseconds())
+		metrics.Default.HTTPRequests.WithLabelValues(routeLabel(r.Method, r.URL.Path), fmt.Sprintf("%dxx", statusCode/100)).Observe(duration.Seconds())
+		log.Printf("%s %s request_id=%s status=%d latency_ms=%d", r.Method, r.URL.Path, reqID, statusCode, duration.Milliseconds())
 	})
+}
+
+func routeLabel(method, path string) string {
+	switch method + " " + path {
+	case "GET /health", "GET /ready", "GET /metrics", "POST /v1/batch", "POST /v1/e":
+		return method + " " + path
+	default:
+		return "other"
+	}
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.handleHealth)
-	mux.HandleFunc("GET /metrics", s.handleMetrics)
+	mux.HandleFunc("GET /ready", s.handleReady)
+	if !s.HideMetrics {
+		mux.HandleFunc("GET /metrics", s.handleMetrics)
+	}
 	mux.HandleFunc("POST /v1/batch", s.handleBatch)
 	mux.HandleFunc("POST /v1/e", s.handleSingle)
 	return withCORS(withRequestTracing(mux))
@@ -151,8 +187,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	expvar.Handler().ServeHTTP(w, r)
+	metrics.Handler().ServeHTTP(w, r)
 }
 
 func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +254,7 @@ func (s *Server) handleSingle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) allowIP(r *http.Request) bool {
 	ok, err := s.Limiter.Allow(r.Context(), "ip:"+s.clientIP(r))
 	if err != nil {
+		metrics.Default.RedisErrors.WithLabelValues("gate").Inc()
 		s.warn("ratelimit-ip", "rate limiter unavailable, allowing traffic: %v", err)
 		return true
 	}
@@ -227,16 +263,20 @@ func (s *Server) allowIP(r *http.Request) bool {
 
 // ingestResult is what a successful (202) call reports back to the SDK.
 type ingestResult struct {
-	Processed int // events published to Kafka
-	Rejected  int // events dropped for failing the tracker contract
-	Clamped   int // accepted events whose timestamp was replaced with server time
+	Processed   int // events published to Kafka
+	Rejected    int // events dropped for failing the tracker contract
+	Duplicates  int // already accepted event IDs dropped by edge dedupe
+	Clamped     int // accepted events whose timestamp was replaced with server time
+	DroppedBots int // known crawlers dropped at the edge (not billed)
 }
 
 func (r ingestResult) body() map[string]any {
 	return map[string]any{
-		"status":    "accepted",
-		"processed": r.Processed,
-		"rejected":  r.Rejected,
+		"status":      "accepted",
+		"processed":   r.Processed,
+		"rejected":    r.Rejected,
+		"duplicates":  r.Duplicates,
+		"droppedBots": r.DroppedBots,
 	}
 }
 
@@ -248,26 +288,35 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 	// could not insert it.
 	valid := make([]enrich.TrackerEvent, 0, len(events))
 	reasons := map[string]int{}
+	normalized := 0
 	for _, ev := range events {
+		ev, cut, dropped := validate.Normalize(ev)
+		if cut > 0 || dropped > 0 {
+			normalized++
+			metrics.Default.EdgeEvents.WithLabelValues("normalized").Inc()
+		}
 		out, clamped, reason := validate.Event(ev, now, validate.DefaultWindow)
 		if reason != "" {
 			res.Rejected++
+			metrics.Default.EdgeEvents.WithLabelValues("rejected").Inc()
 			reasons[reason]++
 			continue
 		}
 		if clamped {
 			res.Clamped++
+			metrics.Default.EdgeEvents.WithLabelValues("clamped").Inc()
 		}
 		valid = append(valid, out)
 	}
-	if res.Rejected > 0 || res.Clamped > 0 {
-		log.Printf("ingest: batch=%d rejected=%d clamped=%d reasons=%v", len(events), res.Rejected, res.Clamped, reasons)
+	if res.Rejected > 0 || res.Clamped > 0 || normalized > 0 {
+		log.Printf("ingest: batch=%d rejected=%d clamped=%d normalized=%d reasons=%v", len(events), res.Rejected, res.Clamped, normalized, reasons)
 	}
 	if len(valid) == 0 {
 		return ingestResult{}, http.StatusBadRequest, "No valid events in batch"
 	}
 	events = valid
 
+	stages := stageTimer{start: time.Now()}
 	resolved := map[string]*site.ResolvedSite{}
 	for _, ev := range events {
 		if _, ok := resolved[ev.SiteKey]; ok {
@@ -284,6 +333,8 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 		resolved[ev.SiteKey] = siteRow
 	}
 
+	stages.mark("resolve")
+
 	// Per-site rate limit (stops public-key spam far better than IP alone). Like
 	// the IP limit, it fails open if Redis is unreachable.
 	siteLimiter := s.SiteLimiter
@@ -291,8 +342,12 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 		siteLimiter = s.Limiter
 	}
 	for _, siteRow := range resolved {
+		if s.Gate != nil {
+			break // the gate applies the site limit together with claims and quota
+		}
 		ok, err := siteLimiter.Allow(r.Context(), "site:"+siteRow.ID)
 		if err != nil {
+			metrics.Default.RedisErrors.WithLabelValues("gate").Inc()
 			s.warn("ratelimit-site", "site rate limiter unavailable, allowing traffic: %v", err)
 			continue
 		}
@@ -345,26 +400,35 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 	dnt := r.Header.Get("DNT") == "1"
 
 	enriched := make([]enrich.EnrichedEvent, 0, len(events))
-	byWorkspace := map[string]int{}
+	quotaByWorkspace := map[string]int{}
 
 	for _, ev := range events {
 		siteRow := resolved[ev.SiteKey]
+		if classification.BotStatus == "known_bot" {
+			res.DroppedBots++
+			metrics.Default.EdgeEvents.WithLabelValues("dropped_bot").Inc()
+			continue
+		}
 		if siteRow.Settings.RespectDoNotTrack && dnt {
+			metrics.Default.EdgeEvents.WithLabelValues("skipped_dnt").Inc()
 			continue
 		}
 		if !siteRow.Settings.AllowLocalhostTracking && enrich.IsLocalOrFileURL(ev.URL) {
+			metrics.Default.EdgeEvents.WithLabelValues("skipped_local").Inc()
 			continue
 		}
 		if ev.Type == "web_vital" && !siteRow.Settings.CollectWebVitals {
+			metrics.Default.EdgeEvents.WithLabelValues("skipped_vitals_disabled").Inc()
 			continue
 		}
 		if !enrich.HostAllowed(ev.URL, siteRow.Domain, siteRow.Settings.AllowLocalhostTracking) {
+			metrics.Default.EdgeEvents.WithLabelValues("skipped_host_mismatch").Inc()
+			s.warn("host-mismatch", "dropped event: host of %q does not match registered domain %q (site %s)", ev.URL, siteRow.Domain, siteRow.ID)
 			continue
 		}
 
-		sanitizedURL, sanitizedPath := enrich.SanitizeURL(ev.URL)
-		ev.URL = sanitizedURL
-		ev.Path = sanitizedPath
+		// URL and path were reduced to the allowed query parameters by validate.Normalize.
+		ev.Referrer = enrich.StripSelfReferrer(ev.Referrer, siteRow.Domain)
 
 		out := enrich.EnrichedEvent{
 			TrackerEvent: ev,
@@ -380,52 +444,234 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 			BotStatus:    classification.BotStatus,
 		}
 		enriched = append(enriched, out)
-		byWorkspace[siteRow.WorkspaceID]++
+		quotaByWorkspace[siteRow.WorkspaceID] = siteRow.MonthlyEventQuota
 	}
 
 	if len(enriched) == 0 {
 		return res, http.StatusAccepted, ""
 	}
+	stages.mark("enrich")
+	var (
+		claimedIDs    []string
+		claimedEvents []enrich.EnrichedEvent
+		reserved      map[string]int
+	)
+	if s.Gate != nil {
+		var (
+			rejection int
+			message   string
+		)
+		claimedIDs, claimedEvents, reserved, rejection, message = s.admitWithGate(r.Context(), enriched, quotaByWorkspace, &res)
+		if rejection != 0 {
+			return ingestResult{}, rejection, message
+		}
+		if len(claimedEvents) == 0 {
+			res.Processed = res.Duplicates
+			return res, http.StatusAccepted, ""
+		}
+	} else {
+		if s.EdgeDedupe && s.Deduper == nil {
+			s.warn("dedupe-config", "EDGE_DEDUPE is enabled but no deduper is configured")
+			return ingestResult{}, http.StatusServiceUnavailable, "Event dedupe is unavailable"
+		}
 
-	// Reserve quota atomically before Kafka publish so concurrent batches
-	// cannot race past the monthly limit. Redis is the hard ingest gate.
-	reserved := make(map[string]int, len(byWorkspace))
-	for workspaceID, delta := range byWorkspace {
-		siteRow := firstSiteForWorkspace(resolved, workspaceID)
-		allowed, err := s.Quota.TryReserve(r.Context(), workspaceID, siteRow.MonthlyEventQuota, delta)
-		if err != nil {
-			if s.QuotaFailOpen {
-				s.warn("quota", "quota counter unavailable, accepting events without reserving: %v", err)
-				continue
+		claimedIDs = make([]string, 0, len(enriched))
+		claimedEvents = enriched
+		if s.EdgeDedupe && s.Deduper != nil {
+			ids := make([]string, len(enriched))
+			for i, event := range enriched {
+				ids[i] = event.EventID
 			}
-			s.warn("quota", "quota reserve error: %v", err)
-			_ = s.Quota.Release(r.Context(), reserved)
-			return ingestResult{}, http.StatusInternalServerError, "Quota check failed"
+			claimed, err := s.Deduper.Claim(r.Context(), ids)
+			if err != nil {
+				metrics.Default.RedisErrors.WithLabelValues("dedupe").Inc()
+				s.warn("dedupe", "event dedupe unavailable, accepting without claims: %v", err)
+			} else {
+				claimedEvents = make([]enrich.EnrichedEvent, 0, len(enriched))
+				for i, event := range enriched {
+					if claimed[i] {
+						claimedIDs = append(claimedIDs, event.EventID)
+						claimedEvents = append(claimedEvents, event)
+					} else {
+						res.Duplicates++
+						metrics.Default.EdgeEvents.WithLabelValues("duplicate").Inc()
+					}
+				}
+				if res.Duplicates > 0 {
+					log.Printf("ingest: batch=%d duplicates=%d", len(enriched), res.Duplicates)
+				}
+				if len(claimedEvents) == 0 {
+					res.Processed = res.Duplicates
+					return res, http.StatusAccepted, ""
+				}
+			}
 		}
-		if !allowed {
-			_ = s.Quota.Release(r.Context(), reserved)
-			return ingestResult{}, http.StatusPaymentRequired, "Monthly event quota exceeded"
+
+		billableByWorkspace := make(map[string]int)
+		for _, event := range claimedEvents {
+			if event.BotStatus == "human" {
+				billableByWorkspace[event.WorkspaceID]++
+			}
 		}
-		reserved[workspaceID] = delta
+
+		// Reserve quota atomically before Kafka publish so concurrent batches
+		// cannot race past the monthly limit. Redis is the hard ingest gate.
+		// Known bots never reach here. Heuristic bots are stored but not billed.
+		reserved = make(map[string]int, len(billableByWorkspace))
+		for workspaceID, delta := range billableByWorkspace {
+			allowed, err := s.Quota.TryReserve(r.Context(), workspaceID, quotaByWorkspace[workspaceID], delta)
+			if err != nil {
+				metrics.Default.RedisErrors.WithLabelValues("gate").Inc()
+				if s.QuotaFailOpen {
+					s.warn("quota", "quota counter unavailable, accepting events without reserving: %v", err)
+					continue
+				}
+				s.warn("quota", "quota reserve error: %v", err)
+				if len(reserved) > 0 {
+					if releaseErr := s.Quota.Release(r.Context(), reserved); releaseErr != nil {
+						s.warn("quota-release", "failed to roll back quota after reserve error: %v", releaseErr)
+					}
+				}
+				if err := s.releaseClaims(r.Context(), claimedIDs); err != nil {
+					s.warn("dedupe-release", "failed to release event claims after quota error: %v", err)
+				}
+				return ingestResult{}, http.StatusInternalServerError, "Quota check failed"
+			}
+			if !allowed {
+				if len(reserved) > 0 {
+					if releaseErr := s.Quota.Release(r.Context(), reserved); releaseErr != nil {
+						s.warn("quota-release", "failed to roll back quota after quota rejection: %v", releaseErr)
+					}
+				}
+				if err := s.releaseClaims(r.Context(), claimedIDs); err != nil {
+					s.warn("dedupe-release", "failed to release event claims after quota rejection: %v", err)
+				}
+				return ingestResult{}, http.StatusPaymentRequired, "Monthly event quota exceeded"
+			}
+			reserved[workspaceID] = delta
+		}
+
 	}
 
-	if err := s.Publisher.Publish(r.Context(), enriched); err != nil {
-		s.warn("publish", "publish error: %v", err)
-		_ = s.Quota.Release(r.Context(), reserved)
+	stages.mark("admit")
+	publishedIndices, publishErr := s.Publisher.Publish(r.Context(), claimedEvents)
+	stages.mark("publish")
+	publishedSet := make(map[int]struct{}, len(publishedIndices))
+	for _, i := range publishedIndices {
+		if i >= 0 && i < len(claimedEvents) {
+			publishedSet[i] = struct{}{}
+		}
+	}
+	publishedIDs := make([]string, 0, len(publishedSet))
+	failedIDs := make([]string, 0, len(claimedEvents)-len(publishedSet))
+	failedBillable := make(map[string]int)
+	for i, event := range claimedEvents {
+		if _, ok := publishedSet[i]; ok {
+			publishedIDs = append(publishedIDs, event.EventID)
+		} else {
+			failedIDs = append(failedIDs, event.EventID)
+			if event.BotStatus == "human" {
+				failedBillable[event.WorkspaceID]++
+			}
+		}
+	}
+	if len(publishedSet) > 0 {
+		metrics.Default.EdgeEvents.WithLabelValues("accepted").Add(float64(len(publishedSet)))
+	}
+
+	if publishErr != nil {
+		s.warn("publish", "publish error: %v", publishErr)
+		releaseQuota := make(map[string]int, len(failedBillable))
+		for workspaceID, failed := range failedBillable {
+			if alreadyReserved := reserved[workspaceID]; alreadyReserved > 0 {
+				if failed > alreadyReserved {
+					failed = alreadyReserved
+				}
+				releaseQuota[workspaceID] = failed
+			}
+		}
+		if len(releaseQuota) > 0 {
+			if err := s.Quota.Release(r.Context(), releaseQuota); err != nil {
+				s.warn("quota-release", "failed to release quota for unpublished events: %v", err)
+			}
+		}
+		if err := s.releaseClaims(r.Context(), failedIDs); err != nil {
+			s.warn("dedupe-release", "failed to release claims for unpublished events: %v", err)
+		}
+		if err := s.confirmClaims(r.Context(), publishedIDs); err != nil {
+			metrics.Default.RedisErrors.WithLabelValues("dedupe").Inc()
+			s.warn("dedupe-confirm", "failed to confirm claims for published events: %v", err)
+		}
 		return ingestResult{}, http.StatusInternalServerError, "Failed to enqueue events"
 	}
 
-	res.Processed = len(enriched)
+	if s.AsyncConfirm {
+		ids := claimedIDs
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if err := s.confirmClaims(ctx, ids); err != nil {
+				metrics.Default.RedisErrors.WithLabelValues("dedupe").Inc()
+				s.warn("dedupe-confirm", "failed to confirm published event claims: %v", err)
+			}
+		}()
+	} else if err := s.confirmClaims(r.Context(), claimedIDs); err != nil {
+		metrics.Default.RedisErrors.WithLabelValues("dedupe").Inc()
+		s.warn("dedupe-confirm", "failed to confirm published event claims: %v", err)
+	}
+	stages.mark("confirm")
+	s.logIfSlow(&stages)
+	res.Processed = len(claimedEvents) + res.Duplicates
 	return res, http.StatusAccepted, ""
 }
 
-func firstSiteForWorkspace(resolved map[string]*site.ResolvedSite, workspaceID string) *site.ResolvedSite {
-	for _, s := range resolved {
-		if s.WorkspaceID == workspaceID {
-			return s
-		}
+// stageTimer records how long each phase of processEvents took, so a slow request
+// can say where the time went instead of just that it was slow.
+type stageTimer struct {
+	start time.Time
+	last  time.Time
+	names []string
+	durs  []time.Duration
+}
+
+func (t *stageTimer) mark(name string) {
+	now := time.Now()
+	if t.last.IsZero() {
+		t.last = t.start
 	}
-	return &site.ResolvedSite{}
+	t.names = append(t.names, name)
+	t.durs = append(t.durs, now.Sub(t.last))
+	t.last = now
+}
+
+const slowIngest = 150 * time.Millisecond
+
+// logIfSlow reports the per-stage breakdown of requests slower than slowIngest
+// (rate-limited like the other warnings).
+func (s *Server) logIfSlow(t *stageTimer) {
+	total := time.Since(t.start)
+	if total < slowIngest {
+		return
+	}
+	var b strings.Builder
+	for i, name := range t.names {
+		fmt.Fprintf(&b, " %s=%dms", name, t.durs[i].Milliseconds())
+	}
+	s.warn("slow-ingest", "slow ingest total=%dms stages:%s", total.Milliseconds(), b.String())
+}
+
+func (s *Server) confirmClaims(ctx context.Context, ids []string) error {
+	if !s.EdgeDedupe || s.Deduper == nil || len(ids) == 0 {
+		return nil
+	}
+	return s.Deduper.Confirm(ctx, ids)
+}
+
+func (s *Server) releaseClaims(ctx context.Context, ids []string) error {
+	if !s.EdgeDedupe || s.Deduper == nil || len(ids) == 0 {
+		return nil
+	}
+	return s.Deduper.Release(ctx, ids)
 }
 
 func readBody(w http.ResponseWriter, r *http.Request, max int64) ([]byte, error) {

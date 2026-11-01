@@ -192,10 +192,10 @@ export async function dispatchToEmail(
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>${payload.title}</title></head>
-<body style="background:#09090b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:40px 0;">
+<body style="background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:40px 0;">
   <div style="max-width:540px;margin:0 auto;background:#18181b;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);">
     <!-- Header -->
-    <div style="background:linear-gradient(135deg,#6c5ce7,#a78bfa);padding:28px 32px;">
+    <div style="background:linear-gradient(135deg,#a2a2a2,#c2c2c2);padding:28px 32px;">
       <p style="margin:0;color:rgba(255,255,255,0.8);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;">TrackMe Alert</p>
       <h1 style="margin:8px 0 0;color:#fff;font-size:22px;font-weight:700;">${payload.title}</h1>
     </div>
@@ -204,12 +204,12 @@ export async function dispatchToEmail(
       <p style="margin:0 0 20px;color:#a1a1aa;font-size:15px;line-height:1.6;">${payload.message}</p>
       ${
         fieldRows
-          ? `<table style="width:100%;border-collapse:collapse;background:#09090b;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);">${fieldRows}</table>`
+          ? `<table style="width:100%;border-collapse:collapse;background:#0a0a0a;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);">${fieldRows}</table>`
           : ""
       }
       ${
         payload.dashboardUrl
-          ? `<div style="margin-top:28px;"><a href="${payload.dashboardUrl}" style="display:inline-block;background:#6c5ce7;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;">Open Dashboard →</a></div>`
+          ? `<div style="margin-top:28px;"><a href="${payload.dashboardUrl}" style="display:inline-block;background:#a2a2a2;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;">Open Dashboard →</a></div>`
           : ""
       }
     </div>

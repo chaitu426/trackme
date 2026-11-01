@@ -9,7 +9,21 @@ import { updateRealtimeState } from "./state/redis-realtime.js";
 import { sendToDLQ } from "./dlq.js";
 import { checkEvent } from "./contract.js";
 import { isDataError } from "./errors.js";
+import { kafkaConnection } from "./kafka-config.js";
+import { registerZstdCodec } from "./zstd-codec.js";
 import { writeIsolating } from "./isolate.js";
+import {
+  batchRows,
+  consumerLag,
+  deadLettered,
+  eventsStored,
+  insertDuration,
+  lagAfter,
+  realtimeErrors,
+  v2WriteErrors,
+  startMetricsServer,
+  type DeadLetterReason,
+} from "./metrics.js";
 
 const redis = new Redis(env.REDIS_STATE_URL, {
   maxRetriesPerRequest: null,
@@ -21,15 +35,22 @@ const writeEventsToClickHouse = createClickHouseWriter({
   client: getClickHouseClient(),
   asyncInsert: env.CLICKHOUSE_ASYNC_INSERT,
   flushIntervalMs: env.EVENT_FLUSH_INTERVAL_MS,
+  writeMode: env.WORKER_WRITE_V2,
+  onV2Error: (error) => {
+    v2WriteErrors.inc();
+    console.error("⚠️ Shadow write to events_ingest failed:", error);
+  },
 });
 
 const TOPIC = env.KAFKA_TOPIC;
 const GROUP_ID = env.KAFKA_CONSUMER_GROUP;
 const CONSUMER_NAME = `${os.hostname()}-${process.pid}`;
 
+registerZstdCodec();
+
 const kafka = new Kafka({
   clientId: `event-worker-${CONSUMER_NAME}`,
-  brokers: env.KAFKA_BROKERS.split(",").map((b) => b.trim()).filter(Boolean),
+  ...kafkaConnection(env),
   logLevel: logLevel.WARN,
   retry: {
     initialRetryTime: 300,
@@ -41,7 +62,10 @@ const consumer = kafka.consumer({
   groupId: GROUP_ID,
   sessionTimeout: 30_000,
   heartbeatInterval: 3_000,
-  maxBytesPerPartition: 1_048_576,
+  // Large, infrequent inserts: wait for ~1 MB but never longer than maxWaitTimeInMs.
+  minBytes: env.WORKER_FETCH_MIN_BYTES,
+  maxWaitTimeInMs: env.WORKER_FETCH_MAX_WAIT_MS,
+  maxBytesPerPartition: env.WORKER_FETCH_MAX_BYTES_PER_PARTITION,
 });
 
 let isRunning = true;
@@ -89,35 +113,55 @@ async function processBatch({
   );
 
   const good: EnrichedEvent[] = [];
-  const deadLetters: { raw: string; reason: string }[] = [];
+  const deadLetters: { raw: string; reason: string; kind: DeadLetterReason }[] = [];
 
   for (const entry of parsed) {
     if (entry.decoded === null) {
-      deadLetters.push({ raw: entry.raw, reason: "Malformed event payload" });
+      deadLetters.push({ raw: entry.raw, reason: "Malformed event payload", kind: "malformed" });
       continue;
     }
     const verdict = checkEvent(entry.decoded);
     if (verdict.ok) {
       good.push(verdict.event);
     } else {
-      deadLetters.push({ raw: entry.raw, reason: verdict.reason });
+      deadLetters.push({ raw: entry.raw, reason: verdict.reason, kind: "contract" });
     }
   }
   await heartbeat();
 
-  const refused = await writeIsolating(good, writeEventsToClickHouse, isDataError);
+  // Realtime is non-fatal and independent of the insert, so run it concurrently
+  // instead of paying its latency after the insert. A row ClickHouse later
+  // refuses may briefly show as active; that is harmless and self-expires.
+  const realtimeUpdate: Promise<void> =
+    good.length > 0
+      ? updateRealtimeState(redis, good).catch((error) => {
+          realtimeErrors.inc();
+          console.error("⚠️ Failed to update realtime state:", error);
+        })
+      : Promise.resolve();
+
+  let refused: Awaited<ReturnType<typeof writeIsolating<EnrichedEvent>>>;
+  const stopInsertTimer = insertDuration.startTimer();
+  try {
+    refused = await writeIsolating(good, writeEventsToClickHouse, isDataError);
+  } finally {
+    stopInsertTimer();
+    await realtimeUpdate;
+  }
   const refusedIds = new Set<string>();
   for (const { item, error } of refused) {
     refusedIds.add(item.eventId);
     deadLetters.push({
       raw: JSON.stringify(item),
       reason: `clickhouse rejected row: ${error instanceof Error ? error.message : String(error)}`,
+      kind: "clickhouse_rejected",
     });
   }
   const written = refusedIds.size === 0 ? good : good.filter((e) => !refusedIds.has(e.eventId));
 
   for (const letter of deadLetters) {
     await sendToDLQ(letter.raw, letter.reason);
+    deadLettered.inc({ reason: letter.kind });
   }
   await heartbeat();
 
@@ -125,12 +169,11 @@ async function processBatch({
     resolveOffset(message.offset);
   }
 
-  if (written.length > 0) {
-    try {
-      await updateRealtimeState(redis, written);
-    } catch (error) {
-      console.error("⚠️ Failed to update realtime state (events already committed):", error);
-    }
+  batchRows.observe(batch.messages.length);
+  eventsStored.inc(written.length);
+  const lastMessage = batch.messages[batch.messages.length - 1];
+  if (lastMessage) {
+    consumerLag.set({ partition: String(batch.partition) }, lagAfter(batch.highWatermark, lastMessage.offset));
   }
 
   console.log(
@@ -143,6 +186,7 @@ async function main(): Promise<void> {
     `👷 Event Worker started. Kafka brokers=${env.KAFKA_BROKERS} topic=${TOPIC} group=${GROUP_ID} as ${CONSUMER_NAME}`
   );
 
+  startMetricsServer(env.WORKER_METRICS_PORT);
   await consumer.connect();
   // fromBeginning only applies when the group has no committed offset yet. With
   // false, a new or renamed group would silently skip everything already in the
@@ -152,6 +196,7 @@ async function main(): Promise<void> {
   await consumer.run({
     autoCommit: true,
     autoCommitInterval: 5000,
+    partitionsConsumedConcurrently: env.WORKER_PARTITION_CONCURRENCY,
     eachBatchAutoResolve: false,
     eachBatch: processBatch,
   });

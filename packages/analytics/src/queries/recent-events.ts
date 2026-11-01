@@ -1,4 +1,4 @@
-import { getClickHouseClient } from "../client.js";
+import { dispatch, readClient, type ReadVariant } from "../read-mode.js";
 
 export type RecentEvent = {
   eventId: string;
@@ -16,12 +16,20 @@ export type RecentEvent = {
  * activity tail. Ordered by ingestion time (received_at) rather than the
  * client-reported occurredAt, since clocks on the client are untrusted.
  */
-export async function getRecentEvents(
+export function getRecentEvents(workspaceId: string, siteId: string, limit = 20): Promise<RecentEvent[]> {
+  return dispatch("getRecentEvents", (variant) => getRecentEventsImpl(workspaceId, siteId, limit, variant), {
+    // v1 stores an unknown country as two spaces, v2 as ''.
+    normalize: (rows) => rows.map((r) => ({ ...r, country: r.country.trim() })),
+  });
+}
+
+async function getRecentEventsImpl(
   workspaceId: string,
   siteId: string,
-  limit = 20
+  limit: number,
+  variant: ReadVariant
 ): Promise<RecentEvent[]> {
-  const client = getClickHouseClient();
+  const client = readClient(variant);
 
   const resultSet = await client.query({
     query: `
@@ -38,6 +46,7 @@ export async function getRecentEvents(
       WHERE workspace_id = {workspaceId:UUID}
         AND site_id = {siteId:UUID}
         AND bot_status = 'human'
+        AND type != 'engagement'
       ORDER BY received_at DESC
       LIMIT {limit:UInt32}
     `,

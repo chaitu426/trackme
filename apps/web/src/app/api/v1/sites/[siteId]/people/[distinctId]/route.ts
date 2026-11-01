@@ -4,8 +4,9 @@ import { db, siteUserProfiles, sites, eq, and } from "@trackme/db";
 import { getUserTimeline } from "@trackme/analytics";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { timedRoute } from "@/lib/metrics-registry";
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   props: { params: Promise<{ siteId: string; distinctId: string }> }
 ) {
@@ -61,3 +62,5 @@ export async function GET(
     return jsonError(error);
   }
 }
+
+export const GET = timedRoute("person_timeline", handleGet);

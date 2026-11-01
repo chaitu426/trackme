@@ -1,8 +1,11 @@
 import { TrackerEvent, EventProperties } from "@trackme/contracts";
-import { generateUUID, getSessionId, getVisitorPseudonym } from "./session.js";
+import { generateUUID, getSessionId, getSessionSource, getVisitorPseudonym, resetVisit, type SessionSource } from "./session.js";
 import { Transport } from "./transport.js";
 import { listenToRouteChanges } from "./spa.js";
 import { observeWebVitals } from "./vitals.js";
+import { EngagementClock } from "./engagement.js";
+import { isSameSite, listenForLinkClicks, listenForScrollDepth } from "./autocapture.js";
+import { limitEvent } from "./limits.js";
 
 declare const __TRACKER_VERSION__: string;
 
@@ -18,6 +21,8 @@ export interface TrackerConfig {
   autoTrackSpa?: boolean;
   /** Wait for grantConsent() before sending (GDPR/CCPA gate). */
   requireConsent?: boolean;
+  /** Record outbound link clicks, file downloads and scroll depth without any code. */
+  autoEvents?: boolean;
   /**
    * HMAC secret for X-GI-Signature. Prefer a first-party proxy that injects
    * the secret server-side instead of embedding it in public HTML.
@@ -30,7 +35,10 @@ export interface PageviewOptions {
   url?: string;
   /** Title at the time the route is considered ready. */
   title?: string;
-  /** The preceding internal route for client-side navigation. */
+  /**
+   * Accepted for compatibility and ignored. Moving between pages of the same site is not a
+   * traffic source: every page of a visit carries the visit's own referrer and campaign.
+   */
   referrer?: string;
   /** Send even if this URL was just observed by a router and History API. */
   force?: boolean;
@@ -102,6 +110,11 @@ export class GrowthTracker {
   private lifecycleUnlisten: (() => void) | null = null;
   private lastPageviewUrl: string | null = null;
   private lastPageviewAt = 0;
+  private clock: EngagementClock | null = null;
+  private scrollDepth: { reset: () => void; stop: () => void } | null = null;
+  private teardown: Array<() => void> = [];
+  /** The page the document was loaded on. Web vitals describe it, whatever route the visitor is on when they leave. */
+  private landing: { url: string; path: string } | null = null;
 
   constructor(config: TrackerConfig) {
     this.config = {
@@ -109,14 +122,19 @@ export class GrowthTracker {
       collectWebVitals: true,
       autoTrackSpa: true,
       requireConsent: false,
+      autoEvents: true,
       ...config,
     };
 
     if (typeof window !== "undefined") {
       this.consent = readStoredConsent();
-      const stored = readStoredUser();
-      this.identifiedUserId = stored.userId;
-      this.identifiedUserTraits = stored.traits;
+      if (this.consent === "denied") {
+        writeStoredUser(null, null);
+      } else if (this.mayStore()) {
+        const stored = readStoredUser();
+        this.identifiedUserId = stored.userId;
+        this.identifiedUserTraits = stored.traits;
+      }
     }
 
     this.transport = new Transport({
@@ -130,7 +148,7 @@ export class GrowthTracker {
   public init(): void {
     if (this.isInitialized || typeof window === "undefined") return;
 
-    if (this.config.respectDNT && navigator.doNotTrack === "1") {
+    if (this.blockedByDnt()) {
       return;
     }
 
@@ -152,9 +170,21 @@ export class GrowthTracker {
     this.consent = "granted";
     writeStoredConsent("granted");
     this.transport.setConsent("granted");
-    if (!this.isInitialized) {
+    // An identity given while consent was pending is only kept now.
+    if (this.identifiedUserId) writeStoredUser(this.identifiedUserId, this.identifiedUserTraits);
+    // Consent does not override Do Not Track: a visitor who sends it is still not tracked.
+    if (!this.isInitialized && !this.blockedByDnt()) {
       this.start();
     }
+  }
+
+  private blockedByDnt(): boolean {
+    return this.config.respectDNT === true && typeof navigator !== "undefined" && navigator.doNotTrack === "1";
+  }
+
+  /** Identity may be written to the browser unless consent is required and not given, or was refused. */
+  private mayStore(): boolean {
+    return this.consent !== "denied" && (!this.config.requireConsent || this.consent === "granted");
   }
 
   /** Call after the visitor declines analytics. */
@@ -162,6 +192,9 @@ export class GrowthTracker {
     this.consent = "denied";
     writeStoredConsent("denied");
     this.transport.setConsent("denied");
+    this.identifiedUserId = null;
+    this.identifiedUserTraits = null;
+    writeStoredUser(null, null);
     if (this.spaUnlisten) {
       this.spaUnlisten();
       this.spaUnlisten = null;
@@ -170,6 +203,7 @@ export class GrowthTracker {
       this.lifecycleUnlisten();
       this.lifecycleUnlisten = null;
     }
+    this.stopListeners();
     this.isInitialized = false;
   }
 
@@ -181,17 +215,44 @@ export class GrowthTracker {
     if (this.isInitialized || typeof window === "undefined") return;
     this.isInitialized = true;
 
+    this.landing = { url: window.location.href, path: window.location.pathname + window.location.search };
+    this.clock = new EngagementClock();
+
     this.trackPageview({ force: true });
     if (this.config.autoTrackSpa) {
       this.spaUnlisten = listenToRouteChanges((newPath, previousPath) => {
-        this.trackNavigation(newPath, { referrer: previousPath });
+        // Close out the page being left before the next one opens.
+        this.sendEngagement(previousPath);
+        this.scrollDepth?.reset();
+        this.trackNavigation(newPath);
       });
+    }
+
+    // Active time is sent whenever the page is hidden or left, in pieces that add up.
+    const onHide = () => {
+      if (document.visibilityState === "hidden") this.sendEngagement();
+    };
+    const onPageHide = () => this.sendEngagement();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    this.teardown.push(() => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+    });
+
+    if (this.config.autoEvents) {
+      const track = (name: string, properties: EventProperties) => this.trackEvent(name, properties);
+      this.teardown.push(listenForLinkClicks(track, () => this.transport.flushOnHide()));
+      this.scrollDepth = listenForScrollDepth(track);
     }
 
     // A back/forward-cache restore does not re-run application bootstrap.
     // Treat the restored document as a new view automatically.
     const onPageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) this.trackPageview({ force: true });
+      if (event.persisted) {
+        this.scrollDepth?.reset();
+        this.trackPageview({ force: true });
+      }
     };
     window.addEventListener("pageshow", onPageShow);
     this.lifecycleUnlisten = () => window.removeEventListener("pageshow", onPageShow);
@@ -226,26 +287,17 @@ export class GrowthTracker {
       ? pathOrOptions
       : `${new URL(eventUrl).pathname}${new URL(eventUrl).search}`;
 
-    const event: TrackerEvent = {
-      schemaVersion: 1,
-      eventId: generateUUID(),
-      type: "pageview",
-      occurredAt: new Date().toISOString(),
-      siteKey: this.config.siteKey,
-      sessionId: getSessionId(),
-      visitorPseudonym: getVisitorPseudonym(),
-      tv: TRACKER_VERSION,
-      url: eventUrl,
-      path,
-      title: options.title || document.title || undefined,
-      referrer: options.referrer ? this.resolveNavigationUrl(options.referrer) ?? undefined : document.referrer || undefined,
-      campaign: this.extractUTMs(),
-      ...(this.identifiedUserId ? { userId: this.identifiedUserId } : {}),
-      ...(this.identifiedUserTraits ? { userTraits: this.identifiedUserTraits } : {}),
-      properties: this.identifiedUserId ? { distinctId: this.identifiedUserId } : undefined,
-    };
-
-    this.transport.enqueue(event);
+    const source = this.sessionSource();
+    this.transport.enqueue(
+      this.build("pageview", {
+        url: eventUrl,
+        path,
+        title: options.title || document.title || undefined,
+        referrer: source.referrer,
+        campaign: this.extractUTMs() ?? (source.campaign as TrackerEvent["campaign"]),
+        properties: this.identifiedUserId ? { distinctId: this.identifiedUserId } : undefined,
+      })
+    );
     this.lastPageviewUrl = eventUrl;
     this.lastPageviewAt = now;
     return true;
@@ -263,28 +315,16 @@ export class GrowthTracker {
   public trackEvent(eventName: string, properties?: EventProperties): void {
     if (typeof window === "undefined" || !this.isInitialized) return;
 
-    const event: TrackerEvent = {
-      schemaVersion: 1,
-      eventId: generateUUID(),
-      type: "custom",
-      occurredAt: new Date().toISOString(),
-      siteKey: this.config.siteKey,
-      sessionId: getSessionId(),
-      visitorPseudonym: getVisitorPseudonym(),
-      tv: TRACKER_VERSION,
-      url: window.location.href,
-      path: window.location.pathname,
-      title: document.title || undefined,
-      ...(this.identifiedUserId ? { userId: this.identifiedUserId } : {}),
-      ...(this.identifiedUserTraits ? { userTraits: this.identifiedUserTraits } : {}),
-      properties: {
-        eventName,
-        ...(this.identifiedUserId ? { distinctId: this.identifiedUserId } : {}),
-        ...(properties || {}),
-      },
-    };
-
-    this.transport.enqueue(event);
+    this.transport.enqueue(
+      this.build("custom", {
+        title: document.title || undefined,
+        properties: {
+          eventName,
+          ...(this.identifiedUserId ? { distinctId: this.identifiedUserId } : {}),
+          ...(properties || {}),
+        },
+      })
+    );
   }
 
   /**
@@ -303,32 +343,18 @@ export class GrowthTracker {
     if (typeof window === "undefined" || !userId) return;
     this.identifiedUserId = userId;
     this.identifiedUserTraits = traits || null;
-    writeStoredUser(userId, traits || null);
+    if (this.mayStore()) writeStoredUser(userId, traits || null);
 
     if (!this.isInitialized) return;
 
-    const event: TrackerEvent = {
-      schemaVersion: 1,
-      eventId: generateUUID(),
-      type: "identify",
-      occurredAt: new Date().toISOString(),
-      siteKey: this.config.siteKey,
-      sessionId: getSessionId(),
-      visitorPseudonym: getVisitorPseudonym(),
-      tv: TRACKER_VERSION,
-      url: window.location.href,
-      path: window.location.pathname,
-      title: document.title || undefined,
-      userId,
-      userTraits: traits,
-      properties: {
-        eventName: "$identify",
-        distinctId: userId,
-        ...(traits || {}),
-      },
-    };
-
-    this.transport.enqueue(event);
+    this.transport.enqueue(
+      this.build("identify", {
+        title: document.title || undefined,
+        userId,
+        userTraits: traits,
+        properties: { eventName: "$identify", distinctId: userId, ...(traits || {}) },
+      })
+    );
   }
 
   /**
@@ -339,6 +365,8 @@ export class GrowthTracker {
     this.identifiedUserTraits = null;
     if (typeof window !== "undefined") {
       writeStoredUser(null, null);
+      // The next person on this browser is not a continuation of this visit.
+      resetVisit();
     }
   }
 
@@ -354,10 +382,66 @@ export class GrowthTracker {
   private trackWebVital(metric: any): void {
     if (typeof window === "undefined" || !this.isInitialized) return;
 
-    const event: TrackerEvent = {
+    // Vitals describe the page, not the person, so no identity fields are attached. They belong
+    // to the page the document loaded on, even if the visitor has navigated on since.
+    const page = this.landing ? { url: this.landing.url, path: this.landing.path } : {};
+    this.transport.enqueue(this.build("web_vital", { webVital: metric, ...page }, false));
+  }
+
+  /**
+   * Sends the active time since the last report. `path` names the page being left on a
+   * client-side navigation, when the address bar has already moved on.
+   */
+  private sendEngagement(path?: string): void {
+    if (!this.clock || !this.isInitialized) return;
+    const ms = Math.round(this.clock.take());
+    if (ms < 100) return;
+    const page = path ? { url: this.resolveNavigationUrl(path) ?? window.location.href, path } : {};
+    this.transport.enqueue(this.build("engagement", { properties: { engagementMs: ms }, ...page }));
+    // The page may be going away: do not wait for the batch timer.
+    this.transport.flushOnHide();
+  }
+
+  /** Where this visit came from, fixed when it began. Visits from the site's own pages carry no referrer. */
+  private sessionSource(): SessionSource {
+    getSessionId();
+    return getSessionSource(() => {
+      const external = document.referrer && !this.isSelfReferrer(document.referrer) ? document.referrer : undefined;
+      const campaign = this.extractUTMs();
+      return {
+        ...(external ? { referrer: external } : {}),
+        ...(campaign ? { campaign: campaign as Record<string, string> } : {}),
+      };
+    });
+  }
+
+  private isSelfReferrer(referrer: string): boolean {
+    try {
+      return isSameSite(new URL(referrer).hostname, window.location.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  private stopListeners(): void {
+    for (const stop of this.teardown) stop();
+    this.teardown = [];
+    this.clock?.stop();
+    this.clock = null;
+    this.scrollDepth?.stop();
+    this.scrollDepth = null;
+  }
+
+  /** Fields every event shares; `fields` overrides them (a pageview supplies its own url and path). */
+  private build(
+    type: TrackerEvent["type"],
+    fields: Partial<TrackerEvent>,
+    withIdentity = true
+  ): TrackerEvent {
+    return limitEvent({
       schemaVersion: 1,
       eventId: generateUUID(),
-      type: "web_vital",
+      type,
       occurredAt: new Date().toISOString(),
       siteKey: this.config.siteKey,
       sessionId: getSessionId(),
@@ -365,10 +449,10 @@ export class GrowthTracker {
       tv: TRACKER_VERSION,
       url: window.location.href,
       path: window.location.pathname,
-      webVital: metric,
-    };
-
-    this.transport.enqueue(event);
+      ...(withIdentity && this.identifiedUserId ? { userId: this.identifiedUserId } : {}),
+      ...(withIdentity && this.identifiedUserTraits ? { userTraits: this.identifiedUserTraits } : {}),
+      ...fields,
+    } as TrackerEvent);
   }
 
   private extractUTMs(): TrackerEvent["campaign"] {
@@ -396,6 +480,11 @@ export class GrowthTracker {
   }
 }
 
+const QUEUEABLE = [
+  "trackPageview", "trackNavigation", "trackEvent", "trackGoal", "trackFunnelStep",
+  "identify", "reset", "grantConsent", "denyConsent",
+];
+
 function parseBoolAttr(value: string | null, fallback: boolean): boolean {
   if (value === null) return fallback;
   const normalized = value.trim().toLowerCase();
@@ -420,7 +509,11 @@ if (typeof document !== "undefined") {
   const siteKey = scriptEl?.getAttribute("data-site");
   const endpoint = scriptEl?.getAttribute("data-endpoint") ?? DEFAULT_TRACKER_ENDPOINT;
 
-  if (siteKey) {
+  const existing = (window as any).trackme;
+  // A second copy of the snippet (GTM plus a hard-coded tag, a hot reload) would send every event twice.
+  const alreadyRunning = typeof existing?.trackPageview === "function";
+
+  if (siteKey && !alreadyRunning) {
     const signingSecret = scriptEl?.getAttribute("data-signing-secret") || undefined;
     const tracker = new GrowthTracker({
       siteKey,
@@ -431,15 +524,22 @@ if (typeof document !== "undefined") {
         true
       ),
       autoTrackSpa: parseBoolAttr(scriptEl?.getAttribute("data-auto-track-spa") ?? null, true),
+      autoEvents: parseBoolAttr(scriptEl?.getAttribute("data-auto-events") ?? null, true),
       requireConsent: parseBoolAttr(scriptEl?.getAttribute("data-require-consent") ?? null, false),
       ...(signingSecret ? { signingSecret } : {}),
     });
     tracker.init();
     (window as any).growth = tracker;
     (window as any).trackme = tracker;
-  } else if (siteKey) {
-    console.error(
-      "[GrowthIntelligence] tracker script is missing data-endpoint - falling back to the default collector endpoint."
-    );
+    // Calls made before this script loaded: `trackme.q = trackme.q || []; trackme.q.push(["trackEvent", "signup"])`.
+    for (const call of Array.isArray(existing?.q) ? existing.q : []) {
+      const [method, ...args] = Array.from(call as ArrayLike<unknown>);
+      try {
+        const fn = (tracker as any)[method as string];
+        if (QUEUEABLE.includes(method as string) && typeof fn === "function") fn.apply(tracker, args);
+      } catch {
+        // A bad queued call must not stop the rest.
+      }
+    }
   }
 }

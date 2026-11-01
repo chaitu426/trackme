@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
 import Link from "next/link";
 import {
@@ -91,35 +92,17 @@ export function WorkspaceSitesClient({
 
   return (
     <div className="w-full space-y-8 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.06] text-zinc-200">
-            <Globe className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-100">
-              Websites & Web Properties
-            </h1>
-            <p className="text-xs text-zinc-400">
-              Manage all domains and apps tracked under <span className="font-semibold text-zinc-200">{workspace.name}</span>.
-            </p>
-          </div>
-        </div>
-
-        <Button
-          onClick={() => setShowAddModal(true)}
-          className="h-10 text-xs font-semibold gap-1.5 shadow-md"
-        >
-          <Plus className="w-4 h-4" />
-          Add Website to Organization
-        </Button>
-      </div>
+      <PageHeader title="Websites" art="stream" actions={<Button onClick={() => setShowAddModal(true)} className="h-9 gap-2 text-sm">
+          <Plus className="h-4 w-4" />
+          Add website
+        </Button>}>
+        Domains and apps tracked under {workspace.name}.
+      </PageHeader>
 
       {/* Sites Grid / Table */}
       <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <h3 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
             Tracked Domains ({sitesList.length})
           </h3>
         </div>
@@ -136,7 +119,7 @@ export function WorkspaceSitesClient({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-zinc-100">
+                    <span className="font-medium text-sm text-zinc-100">
                       {site.displayName || site.domain}
                     </span>
                     <a
@@ -156,9 +139,9 @@ export function WorkspaceSitesClient({
                 {/* View Realtime Dashboard */}
                 <Link
                   href={`/${workspace.slug}/sites/${site.domain}/realtime`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 font-medium transition"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 font-medium transition"
                 >
-                  <Radio className="w-3.5 h-3.5 text-emerald-400" />
+                  <Radio className="w-3.5 h-3.5 text-[#4cc38a]" />
                   Live View
                 </Link>
 
@@ -166,12 +149,12 @@ export function WorkspaceSitesClient({
                 <button
                   type="button"
                   onClick={() => handleCopySnippet(site)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition"
                 >
                   {copiedDomain === site.domain ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Copied!</span>
+                      <Check className="w-3.5 h-3.5 text-[#4cc38a]" />
+                      <span className="text-[#4cc38a]">Copied!</span>
                     </>
                   ) : (
                     <>
@@ -184,7 +167,7 @@ export function WorkspaceSitesClient({
                 {/* Site Settings */}
                 <Link
                   href={`/${workspace.slug}/sites/${site.domain}/settings`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition"
                 >
                   <Settings2 className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Configure</span>
@@ -196,7 +179,7 @@ export function WorkspaceSitesClient({
                     type="button"
                     onClick={() => handleDeleteSite(site.id, site.domain)}
                     disabled={busySiteId === site.id}
-                    className="p-2 text-zinc-500 hover:text-rose-400 transition rounded-lg hover:bg-rose-500/10"
+                    className="p-2 text-zinc-500 hover:text-[#e5484d] transition rounded-lg hover:bg-[#e5484d]/10"
                     title="Remove website from organization"
                   >
                     <Trash2 className="w-4 h-4" />

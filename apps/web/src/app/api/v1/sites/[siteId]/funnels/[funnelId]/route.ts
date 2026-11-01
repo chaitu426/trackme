@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
 import { db, siteFunnels, sites, eq, and } from "@trackme/db";
+import { cachedFunnel } from "@/lib/query-cache";
 import { analyzeFunnel, type FunnelStepDefinition } from "@trackme/analytics";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { timedRoute } from "@/lib/metrics-registry";
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   props: { params: Promise<{ siteId: string; funnelId: string }> }
 ) {
@@ -41,13 +43,16 @@ export async function GET(
     const from = request.nextUrl.searchParams.get("from") || thirtyDaysAgo.toISOString();
     const to = request.nextUrl.searchParams.get("to") || now.toISOString();
 
-    const analysis = await analyzeFunnel(
+    const steps = (funnel.steps as unknown as FunnelStepDefinition[]) || [];
+    const analysis = await cachedFunnel(
       {
         workspaceId: siteRow.workspaceId,
         siteId,
         dateRange: { from, to, granularity: "day" },
       },
-      (funnel.steps as unknown as FunnelStepDefinition[]) || []
+      steps,
+      86400,
+      (normalized) => analyzeFunnel(normalized, steps)
     );
 
     return NextResponse.json({
@@ -92,3 +97,5 @@ export async function DELETE(
     return jsonError(error);
   }
 }
+
+export const GET = timedRoute("funnel", handleGet);

@@ -71,3 +71,12 @@ test("an invalid or reversed range is an error, not a silent empty answer", () =
 test("ClickHouse literals match the format the other queries use", () => {
   assert.equal(toClickHouseDateTime(new Date("2026-10-04T00:00:00.000Z")), "2026-10-04 00:00:00.000");
 });
+
+import { assertRawScanRange } from "./range-split.js";
+import { AnalyticsRangeTooWideError } from "../errors.js";
+
+test("raw scans are limited to 31 days", () => {
+  assert.doesNotThrow(() => assertRawScanRange("2026-09-12T00:00:00Z", "2026-10-12T00:00:00Z")); // 30 d
+  assert.throws(() => assertRawScanRange("2026-08-01T00:00:00Z", "2026-10-12T00:00:00Z"), AnalyticsRangeTooWideError);
+  assert.doesNotThrow(() => assertRawScanRange("2026-01-01T00:00:00Z", "2026-10-12T00:00:00Z", 365));
+});

@@ -14,3 +14,4 @@ export * from "./funnels.js";
 export * from "./alert-channels.js";
 export * from "./alert-rules.js";
 
+export * from "./segments.js";

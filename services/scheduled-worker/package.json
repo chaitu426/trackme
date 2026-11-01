@@ -10,7 +10,7 @@
     "start": "node dist/scheduler.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",
-    "test": "node --import tsx --test src/**/*.test.ts",
+    "test": "node --import tsx --test",
     "test:integration": "node --import tsx --test src/jobs/rollups.integration.test.ts"
   },
   "dependencies": {
@@ -18,7 +18,8 @@
     "@trackme/config": "workspace:*",
     "@trackme/db": "workspace:*",
     "ioredis": "^5.6.0",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "prom-client": "^15"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",

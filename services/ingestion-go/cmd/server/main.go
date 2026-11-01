@@ -13,8 +13,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/trackme/ingestion-go/internal/config"
+	"github.com/trackme/ingestion-go/internal/dedupe"
+	"github.com/trackme/ingestion-go/internal/gate"
 	"github.com/trackme/ingestion-go/internal/geo"
 	"github.com/trackme/ingestion-go/internal/httpapi"
+	"github.com/trackme/ingestion-go/internal/metrics"
 	"github.com/trackme/ingestion-go/internal/queue"
 	"github.com/trackme/ingestion-go/internal/quota"
 	"github.com/trackme/ingestion-go/internal/ratelimit"
@@ -31,7 +34,16 @@ func main() {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("postgres url parse failed: %v", err)
+	}
+	// Keep a few connections open so the first lookup after startup or an idle period
+	// does not pay a TCP+auth handshake (seconds on a cold dev database).
+	if poolCfg.MinConns < 2 {
+		poolCfg.MinConns = 2
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		log.Fatalf("postgres connect failed: %v", err)
 	}
@@ -44,32 +56,65 @@ func main() {
 	if err != nil {
 		log.Fatalf("redis url parse failed: %v", err)
 	}
+	if opt.MinIdleConns < 4 {
+		opt.MinIdleConns = 4 // pre-dialed, so a burst never waits on connection setup
+	}
 	rdb := redis.NewClient(opt)
 	defer rdb.Close()
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatalf("redis ping failed: %v", err)
 	}
 
-	publisher := queue.NewPublisher(cfg.KafkaBrokers, cfg.KafkaTopic)
+	compression, err := queue.ParseCompression(cfg.KafkaCompression)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	kafkaTransport, err := queue.Security{
+		SSL:           cfg.KafkaSSL,
+		SASLMechanism: cfg.KafkaSASLMech,
+		Username:      cfg.KafkaSASLUser,
+		Password:      cfg.KafkaSASLPassword,
+		CACertPath:    cfg.KafkaCACertPath,
+	}.Transport()
+	if err != nil {
+		log.Fatalf("kafka security: %v", err)
+	}
+	publisher := queue.NewPublisher(cfg.KafkaBrokers, cfg.KafkaTopic, compression).
+		WithTransport(kafkaTransport).
+		WithTimeout(time.Duration(cfg.KafkaPublishTimeoutMs) * time.Millisecond)
 	defer publisher.Close()
 
-	geoResolver := geo.New(cfg.GeoIPMMDBPath)
+	geoResolver := geo.New(cfg.GeoIPMMDBPath).WithLoopbackIP(cfg.GeoLoopbackIP)
 	defer geoResolver.Close()
 
 	sitesResolver := site.NewResolver(pool)
 	site.WatchInvalidations(ctx, rdb, sitesResolver)
 
 	srv := &httpapi.Server{
-		Sites:     sitesResolver,
-		Publisher: publisher,
-		Limiter:   ratelimit.New(rdb, cfg.RateLimitMax, cfg.RateLimitWindowMs),
+		Sites:       sitesResolver,
+		Publisher:   publisher,
+		Limiter:     ratelimit.New(rdb, cfg.RateLimitMax, cfg.RateLimitWindowMs),
 		SiteLimiter: ratelimit.New(rdb, cfg.SiteRateLimitMax, cfg.RateLimitWindowMs),
-		Quota:     quota.New(rdb),
-		Geo:       geoResolver,
-		MaxBody:   cfg.MaxBodyBytes,
+		Quota:       quota.New(rdb),
+		Deduper:     dedupe.New(rdb),
+		EdgeDedupe:  cfg.EdgeDedupe,
+		Geo:         geoResolver,
+		MaxBody:     cfg.MaxBodyBytes,
+
+		HideMetrics: cfg.MetricsPort > 0,
+		ReadyChecks: []httpapi.ReadyCheck{
+			{Name: "postgres", Check: pool.Ping},
+			{Name: "redis", Check: func(ctx context.Context) error { return rdb.Ping(ctx).Err() }},
+			{Name: "kafka", Check: publisher.Ping},
+		},
 
 		TrustedProxyHops: cfg.TrustedProxyHops,
 		QuotaFailOpen:    cfg.QuotaFailOpen,
+		AsyncConfirm:     cfg.AsyncConfirm,
+	}
+	if cfg.EdgeGateScript {
+		srv.Gate = gate.New(rdb, cfg.SiteRateLimitMax, cfg.RateLimitWindowMs)
+		log.Printf("admission: single-script gate enabled (site limit + dedupe claims + quota in one Redis call)")
 	}
 
 	if cfg.TrustedProxyHops <= 0 {
@@ -85,6 +130,28 @@ func main() {
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       60 * time.Second,
+	}
+
+	if cfg.MetricsPort > 0 {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("GET /metrics", metrics.Handler())
+		go func() {
+			log.Printf("metrics on :%d (private port)", cfg.MetricsPort)
+			metricsServer := &http.Server{Addr: fmt.Sprintf(":%d", cfg.MetricsPort), Handler: metricsMux, ReadHeaderTimeout: 5 * time.Second}
+			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("metrics server error: %v", err)
+			}
+		}()
+	} else if os.Getenv("NODE_ENV") == "production" {
+		log.Printf("warning: /metrics is served on the public port; set METRICS_PORT to move it to a private listener")
+	}
+	if os.Getenv("NODE_ENV") == "production" {
+		if !cfg.EdgeDedupe {
+			log.Printf("warning: EDGE_DEDUPE is off, so a client retry after a lost response is stored twice until ClickHouse merges the duplicates")
+		}
+		if cfg.QuotaFailOpen {
+			log.Printf("warning: QUOTA_FAIL_OPEN is on, so quota and rate limits are not enforced while Redis is unreachable")
+		}
 	}
 
 	go func() {

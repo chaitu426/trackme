@@ -4,6 +4,10 @@ export interface TransportOptions {
   endpoint: string;
   /** Flush as soon as this many events are buffered. */
   batchSize?: number;
+  /**
+   * Minimum gap between requests. The first event after an idle period is sent
+   * on the next tick; events arriving inside the window are batched until it ends.
+   */
   flushIntervalMs?: number;
   /** HMAC secret for X-GI-Signature. Prefer first-party proxy over exposing in page HTML. */
   signingSecret?: string | undefined;
@@ -11,6 +15,8 @@ export interface TransportOptions {
   consent?: "granted" | "denied" | null;
   /** Keep persisted events untouched until consent is granted. */
   requireConsent?: boolean;
+  /** Source of randomness for retry jitter; tests pin it. */
+  random?: () => number;
 }
 
 const RETRY_QUEUE_KEY = "_gi_retry_queue";
@@ -22,7 +28,9 @@ const MAX_EVENTS_PER_REQUEST = 50;
 const MAX_BYTES_PER_REQUEST = 30_000; // edge body limit is 32 KB
 const ENVELOPE_BYTES = 12; // {"events":[]}
 
-// An event the edge keeps failing on is dropped rather than retried forever.
+// An event the edge keeps failing on is dropped rather than retried forever. Only answers
+// from the edge count: being offline says nothing about the event, so it waits (until it is
+// too old) instead of burning attempts.
 const MAX_ATTEMPTS = 5;
 // The edge replaces timestamps older than 24 h with receive time, so an event
 // this old would be recorded at the wrong moment. Better to drop it.
@@ -32,8 +40,8 @@ const RETRY_MAX_MS = 5 * 60 * 1000;
 // Browsers cap in-flight keepalive bodies at 64 KB across the page.
 const MAX_REQUESTS_ON_HIDE = 2;
 
-type Entry = { event: TrackerEvent; attempts: number };
-type Outcome = "sent" | "retry" | "drop";
+type Entry = { event: TrackerEvent; attempts: number; json?: string };
+type Outcome = "sent" | "retry" | "offline" | "drop";
 
 /**
  * What a response status means for the events in the request.
@@ -47,9 +55,10 @@ export function classifyStatus(status: number): Outcome {
   return "drop";
 }
 
-function byteLength(text: string): number {
-  return new TextEncoder().encode(text).length;
-}
+const encoder = new TextEncoder();
+const byteLength = (text: string): number => encoder.encode(text).length;
+// Each event is serialized once (in takeChunk, to size the request) and reused here.
+const bodyOf = (entries: Entry[]): string => `{"events":[${entries.map((e) => e.json).join(",")}]}`;
 
 function readQueue(): Entry[] {
   try {
@@ -110,17 +119,20 @@ export class Transport {
   private readonly flushIntervalMs: number;
   private readonly signingSecret: string | undefined;
   private readonly requireConsent: boolean;
+  private readonly random: () => number;
   private consent: "granted" | "denied" | null;
   private running: Promise<void> | null = null;
   private flushAgain = false;
+  private lastFlushAt = 0;
   private consecutiveFailures = 0;
 
   constructor(options: TransportOptions) {
     this.endpoint = options.endpoint;
     this.batchSize = options.batchSize ?? 5;
-    this.flushIntervalMs = options.flushIntervalMs ?? 500;
+    this.flushIntervalMs = options.flushIntervalMs ?? 100;
     this.signingSecret = options.signingSecret;
     this.requireConsent = options.requireConsent ?? false;
+    this.random = options.random ?? Math.random;
     this.consent = options.consent ?? null;
 
     if (typeof window === "undefined") return;
@@ -136,6 +148,19 @@ export class Transport {
       if (document.visibilityState === "hidden") this.flushOnHide();
     });
     window.addEventListener("pagehide", () => this.flushOnHide());
+    // Connectivity is back: retry now instead of waiting out a backoff set while offline.
+    window.addEventListener("online", () => this.retryNow());
+  }
+
+  private retryNow(): void {
+    if (this.consent === "denied") return;
+    if (this.retryTimer !== null) {
+      window.clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    this.consecutiveFailures = 0;
+    this.replayPersisted();
+    if (this.buffer.length > 0) void this.flush();
   }
 
   public setConsent(value: "granted" | "denied" | null): void {
@@ -167,6 +192,7 @@ export class Transport {
    */
   public flush(): Promise<void> {
     this.cancelTimer();
+    this.lastFlushAt = Date.now();
     if (this.running) {
       this.flushAgain = true;
       return this.running;
@@ -191,10 +217,13 @@ export class Transport {
 
   private armTimer(): void {
     if (this.timer !== null || typeof window === "undefined") return;
+    // Leading edge: an idle transport sends on the next tick (still batching
+    // events queued in the same tick); a busy one waits out the rest of the window.
+    const wait = Math.max(0, this.lastFlushAt + this.flushIntervalMs - Date.now());
     this.timer = window.setTimeout(() => {
       this.timer = null;
       void this.flush();
-    }, this.flushIntervalMs);
+    }, wait);
   }
 
   private cancelTimer(): void {
@@ -210,7 +239,8 @@ export class Transport {
     let bytes = ENVELOPE_BYTES;
     while (source.length > 0 && chunk.length < MAX_EVENTS_PER_REQUEST) {
       const next = source[0] as Entry;
-      const size = byteLength(JSON.stringify(next.event)) + 1; // +1 for the comma
+      next.json ??= JSON.stringify(next.event);
+      const size = byteLength(next.json) + 1; // +1 for the comma
       if (size + ENVELOPE_BYTES > MAX_BYTES_PER_REQUEST) {
         source.shift(); // can never fit in one request; sending it would fail the whole batch
         continue;
@@ -231,7 +261,7 @@ export class Transport {
     if (outcome === "drop") return true;
 
     this.consecutiveFailures += 1;
-    const kept = this.persist(chunk, true);
+    const kept = this.persist(chunk, outcome === "retry");
     if (kept > 0 || this.buffer.length > 0) this.scheduleRetry();
     return false;
   }
@@ -239,7 +269,7 @@ export class Transport {
   private async buildRequest(
     entries: Entry[]
   ): Promise<{ payload: string; headers: Record<string, string>; custom: boolean }> {
-    const payload = JSON.stringify({ events: entries.map((e) => e.event) });
+    const payload = bodyOf(entries);
     const headers: Record<string, string> = {};
     if (this.consent === "granted") headers["X-GI-Consent"] = "granted";
     if (this.signingSecret && typeof crypto !== "undefined" && crypto.subtle) {
@@ -257,7 +287,7 @@ export class Transport {
     try {
       const { payload, headers } = await this.buildRequest(entries);
       if (typeof fetch === "undefined") {
-        return this.beacon(payload) ? "sent" : "retry";
+        return this.beacon(payload) ? "sent" : "offline";
       }
       const res = await fetch(this.endpoint, {
         method: "POST",
@@ -267,7 +297,7 @@ export class Transport {
       });
       return classifyStatus(res.status);
     } catch {
-      return "retry";
+      return "offline";
     }
   }
 
@@ -285,7 +315,7 @@ export class Transport {
    * that the browser might cancel, so signed requests (which need an async
    * HMAC) are written to the retry queue and sent on the next page load.
    */
-  private flushOnHide(): void {
+  public flushOnHide(): void {
     if (this.consent === "denied" || this.buffer.length === 0) return;
     this.cancelTimer();
 
@@ -311,7 +341,7 @@ export class Transport {
   }
 
   private sendOnHide(chunk: Entry[]): void {
-    const payload = JSON.stringify({ events: chunk.map((e) => e.event) });
+    const payload = bodyOf(chunk);
 
     // A beacon cannot carry the consent header, so consented traffic uses fetch.
     if (this.consent !== "granted" && this.beacon(payload)) return;
@@ -369,7 +399,9 @@ export class Transport {
 
   private scheduleRetry(): void {
     if (this.retryTimer !== null || typeof window === "undefined") return;
-    const delay = Math.min(RETRY_BASE_MS * 3 ** (this.consecutiveFailures - 1), RETRY_MAX_MS);
+    // +-25% jitter, so clients that failed together (an outage, a 429) do not all come back together.
+    const backoff = Math.min(RETRY_BASE_MS * 3 ** (this.consecutiveFailures - 1), RETRY_MAX_MS);
+    const delay = Math.round(backoff * (0.75 + 0.5 * this.random()));
     this.retryTimer = window.setTimeout(() => {
       this.retryTimer = null;
       this.replayPersisted();

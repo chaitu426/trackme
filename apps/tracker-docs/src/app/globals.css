@@ -4,31 +4,33 @@
 
 @layer base {
   :root {
-    /* Same Linear / Vercel dark system as apps/web */
-    --background: #09090b;
+    /* The same graphite ramp as the dashboard and the landing page */
+    --sidebar: #0f0f10;
+    --background: #141415;
     --foreground: #ededed;
 
-    --card: #0c0c0e;
-    --card-foreground: #fafafa;
+    --card: #19191b;
+    --card-foreground: #ededed;
+    --raised: #232325;
 
-    --border: rgba(255, 255, 255, 0.08);
-    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border: rgba(237, 237, 237, 0.08);
+    --border-subtle: rgba(237, 237, 237, 0.05);
 
     --primary: #fafafa;
-    --primary-foreground: #09090b;
+    --primary-foreground: #0a0a0a;
 
     --muted: #18181b;
     --muted-foreground: #a1a1aa;
 
-    --accent: #3b82f6;
-    --accent-foreground: #eff6ff;
+    --accent: #ededed;
+    --accent-foreground: #f7f7f7;
 
     --success: #22c55e;
     --warning: #eab308;
     --danger: #ef4444;
 
-    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    --font-sans: var(--font-geist), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: var(--font-geist-mono), "Geist Mono", "SF Mono", Consolas, monospace;
 
     --radius: 8px;
     --radius-sm: 6px;
@@ -44,7 +46,6 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.011em;
     color-scheme: dark;
     scroll-behavior: smooth;
     scroll-padding-top: 4.5rem;
@@ -63,7 +64,7 @@
   }
 
   ::selection {
-    background-color: rgba(59, 130, 246, 0.35);
+    background-color: rgba(237,237,237,0.35);
     color: #fafafa;
   }
 
@@ -83,9 +84,14 @@
   }
 
   :focus-visible {
-    outline: 2px solid rgba(59, 130, 246, 0.7);
+    outline: 2px solid rgba(237,237,237,0.7);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
+  }
+
+  /* One icon weight across the site; lucide draws at 2 by default. */
+  svg.lucide {
+    stroke-width: 1.5;
   }
 }
 
@@ -104,8 +110,7 @@
   }
 
   .linear-card:hover {
-    border-color: rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.015);
+    border-color: rgba(255, 255, 255, 0.16);
   }
 
   .pulse-live {
@@ -170,7 +175,7 @@
 @layer components {
   .doc {
     color: #d4d4d8;
-    font-size: 14.5px;
+    font-size: 15px;
     line-height: 1.75;
   }
 
@@ -179,31 +184,36 @@
   }
 
   .doc h2 {
-    margin-top: 2.75rem;
-    padding-top: 0.25rem;
-    font-size: 1.3rem;
+    margin-top: 3.5rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--border);
+    font-size: 1.5rem;
     line-height: 1.3;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-weight: 500;
+    letter-spacing: -0.025em;
     color: #fafafa;
+  }
+
+  .doc > h2:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
   }
 
   .doc h3 {
     margin-top: 2rem;
-    font-size: 1.02rem;
+    font-size: 1.05rem;
     line-height: 1.4;
-    font-weight: 600;
-    letter-spacing: -0.015em;
+    font-weight: 500;
     color: #f4f4f5;
   }
 
   .doc h4 {
     margin-top: 1.5rem;
+    font-family: var(--font-mono);
     font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #a1a1aa;
+    font-weight: 500;
+    color: #a1a1a6;
   }
 
   /* :where() keeps these at zero specificity so utility classes on nested
@@ -214,20 +224,20 @@
 
   .doc :where(strong) {
     color: #fafafa;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .doc a:not(.no-underline-link) {
-    color: #93c5fd;
+    color: #c8c8c8;
     text-decoration: underline;
-    text-decoration-color: rgba(147, 197, 253, 0.35);
+    text-decoration-color: rgba(200,200,200,0.35);
     text-underline-offset: 3px;
     transition: text-decoration-color 0.15s ease, color 0.15s ease;
   }
 
   .doc a:not(.no-underline-link):hover {
-    color: #bfdbfe;
-    text-decoration-color: rgba(191, 219, 254, 0.8);
+    color: #dedede;
+    text-decoration-color: rgba(222,222,222,0.8);
   }
 
   .doc ul,
@@ -252,10 +262,10 @@
   }
 
   .doc :not(pre) > code {
-    padding: 0.12rem 0.38rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.12rem 0.4rem;
+    border: 1px solid rgba(237, 237, 237, 0.1);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.05);
+    background: #19191b;
     font-family: var(--font-mono);
     font-size: 0.82em;
     color: #e4e4e7;
@@ -275,19 +285,18 @@
   }
 
   .doc th {
-    padding: 0.55rem 0.75rem;
+    padding: 0.7rem 0.9rem;
     text-align: left;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #a1a1aa;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: #85858b;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
 
   .doc td {
-    padding: 0.65rem 0.75rem;
+    padding: 0.8rem 0.9rem;
     vertical-align: top;
     border-bottom: 1px solid var(--border-subtle);
     color: #c4c4cb;
@@ -295,6 +304,14 @@
 
   .doc tr:last-child td {
     border-bottom: 0;
+  }
+
+  .doc tbody tr {
+    transition: background-color 0.15s ease;
+  }
+
+  .doc tbody tr:hover {
+    background: rgba(255, 255, 255, 0.025);
   }
 
   .doc blockquote {

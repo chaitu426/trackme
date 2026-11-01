@@ -1,13 +1,15 @@
-import Link from "next/link";
+import { Suspense } from "react";
+import { PageHeader } from "@/components/ui/page-header";
 import { notFound } from "next/navigation";
-import { FileText } from "lucide-react";
-import { getBreakdown } from "@trackme/analytics";
+import { cachedBreakdown } from "@/lib/cached-analytics";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RankingList } from "@/components/ui/ranking-list";
 import { requireUser } from "@/lib/auth";
 import { requireDashboardSite } from "@/lib/tenancy";
 import { buildMetricRequest } from "@/lib/metrics";
-import { parseRangeKey, resolveDateRange, RANGE_OPTIONS } from "@/lib/date-range";
+import { parseRangeKey, resolveDateRange, type RangeKey } from "@/lib/date-range";
+import { RangeSwitcher } from "@/components/range-switcher";
+import { RankingCardSkeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/format";
 
 export default async function SitePagesReport({
@@ -30,41 +32,26 @@ export default async function SitePagesReport({
   }
   const { workspace, site } = context;
 
-  const { current } = resolveDateRange(range);
-  const request = buildMetricRequest(workspace.id, site.id, current, { limit: 100 });
-  const breakdown = await getBreakdown(request, "path");
-
   return (
     <div className="w-full space-y-5 text-left">
-      {/* Top Header: Strictly Left-Anchored */}
-      <div className="flex flex-col justify-between gap-4 border-b border-white/[0.06] pb-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-50">Page Performance</h1>
-          <p className="mt-1 text-xs text-zinc-400">
-            Pageview volume and engagement metrics for{" "}
-            <span className="font-mono font-medium text-zinc-300">{site.domain}</span>
-          </p>
-        </div>
+      <PageHeader title="Page Performance" art="ridge" actions={<RangeSwitcher range={range} />}>
+        Pageview volume and engagement for <span className="font-mono text-zinc-300">{site.domain}</span>
+      </PageHeader>
 
-        {/* Range switcher pills */}
-        <div className="flex items-center rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium text-zinc-400 gap-0.5">
-          {RANGE_OPTIONS.map((option) => (
-            <Link
-              key={option.key}
-              href={`?range=${option.key}`}
-              className={`rounded-[5px] px-3 py-1.5 transition-colors font-medium ${
-                option.key === range
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                  : "hover:bg-white/[0.04] hover:text-zinc-300 text-zinc-500"
-              }`}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </div>
-      </div>
+      <Suspense key={range} fallback={<RankingCardSkeleton rows={12} />}>
+        <PagesBody workspaceId={workspace.id} siteId={site.id} range={range} />
+      </Suspense>
+    </div>
+  );
+}
 
-      <Card>
+async function PagesBody({ workspaceId, siteId, range }: { workspaceId: string; siteId: string; range: RangeKey }) {
+  const { current } = resolveDateRange(range);
+  const request = buildMetricRequest(workspaceId, siteId, current, { limit: 100 });
+  const breakdown = await cachedBreakdown(request, "path");
+
+  return (
+      <Card className="reveal">
         <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
           <div>
             <CardTitle>All Visited Routes</CardTitle>
@@ -72,7 +59,7 @@ export default async function SitePagesReport({
               Ranked distribution of pageview volume and audience share ({breakdown.items.length} routes recorded)
             </CardDescription>
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+          <span className="font-mono text-xs text-zinc-500 font-medium">
             Pageviews · % Share
           </span>
         </CardHeader>
@@ -83,13 +70,11 @@ export default async function SitePagesReport({
               value: row.pageviews,
               percentage: row.percentage,
               meta: `${formatNumber(row.visitors)} unique visitors`,
-              icon: <FileText className="h-3.5 w-3.5 text-blue-400" />,
             }))}
             empty="No pageviews recorded in this date range yet."
             valueFormatter={formatNumber}
           />
         </div>
       </Card>
-    </div>
   );
 }

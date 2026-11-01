@@ -19,7 +19,7 @@ export function AuditLogViewer({ logs }: { logs: AuditLogSummary[] }) {
         </CardDescription>
       </CardHeader>
 
-      <div className="space-y-1.5 font-mono text-[11px]">
+      <div className="space-y-2 font-mono text-xs">
         {logs.length === 0 ? (
           <p className="text-xs font-sans text-zinc-400 py-3 text-center">
             No audit activity recorded yet.
@@ -28,10 +28,10 @@ export function AuditLogViewer({ logs }: { logs: AuditLogSummary[] }) {
           logs.map((log) => (
             <div
               key={log.id}
-              className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.04] transition"
+              className="px-3 py-3 rounded-lg bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.04] transition"
             >
-              <div className="flex items-center space-x-2.5 flex-wrap gap-1">
-                <Badge variant={actionBadgeVariant(log.action)} className="text-[10px]">
+              <div className="flex items-center space-x-3 flex-wrap gap-1">
+                <Badge variant={actionBadgeVariant(log.action)} className="text-xs">
                   {log.action}
                 </Badge>
                 <span className="text-zinc-400 font-sans text-xs">
@@ -44,12 +44,12 @@ export function AuditLogViewer({ logs }: { logs: AuditLogSummary[] }) {
                   )}
                 </span>
                 <span className="text-zinc-300">·</span>
-                <span className="text-zinc-500 font-sans text-[11px]">
+                <span className="text-zinc-500 font-sans text-xs">
                   target: <span className="text-zinc-300">{log.targetType}</span>
                 </span>
               </div>
 
-              <span className="text-zinc-400 font-sans text-[11px] shrink-0">
+              <span className="text-zinc-400 font-sans text-xs shrink-0">
                 {formatRelativeTime(
                   typeof log.createdAt === "string"
                     ? log.createdAt

@@ -59,22 +59,22 @@ export function SetupMenu() {
         aria-expanded={open}
         aria-haspopup="dialog"
         className={cn(
-          "flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition",
+          "flex h-9 items-center gap-2 rounded-lg border px-3 text-[13px] transition-colors",
           open || customised
-            ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
-            : "border-white/10 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
+            ? "border-white/[0.25] bg-white/[0.07] text-zinc-100"
+            : "border-white/[0.1] bg-[#19191b] text-zinc-400 hover:border-white/[0.2] hover:text-zinc-100"
         )}
       >
-        <SlidersHorizontal className="h-3.5 w-3.5" />
+        <SlidersHorizontal className="h-4 w-4" />
         <span className="hidden sm:inline">Your setup</span>
-        {customised && <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />}
+        {customised && <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />}
       </button>
 
       {open && (
         <div
           role="dialog"
           aria-label="Your setup"
-          className="animate-slide-down absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-zinc-950 p-4 shadow-float"
+          className="animate-slide-down absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/[0.12] bg-card p-5 shadow-float"
         >
           <p className="text-[13px] font-semibold text-zinc-100">Use your own values</p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-500">
@@ -93,7 +93,7 @@ export function SetupMenu() {
                   placeholder={PLACEHOLDERS[field.key]}
                   spellCheck={false}
                   autoComplete="off"
-                  className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/[0.03] px-2.5 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-blue-500/50 focus:outline-none"
+                  className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/[0.03] px-2.5 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-white/[0.25] focus:outline-none"
                 />
                 <span className="mt-1 block text-[10.5px] text-zinc-600">{field.hint}</span>
               </label>

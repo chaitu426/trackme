@@ -11,7 +11,7 @@ import (
 // Development fallbacks. They are public (they live in this repository), so a
 // production process must never run on them; see Config.ProductionProblems.
 const (
-	DefaultDatabaseURL = "postgres://growth_admin:growth_secure_pass@localhost:5432/growth_intelligence"
+	DefaultDatabaseURL   = "postgres://growth_admin:growth_secure_pass@localhost:5432/growth_intelligence"
 	DefaultRedisURL      = "redis://:redis_dev_secret@localhost:6379"
 	DefaultSiteSecretKey = "dev-site-signing-secret-key-min-32-chars"
 )
@@ -26,15 +26,29 @@ type Config struct {
 	RedisCoordURL     string
 	KafkaBrokers      []string
 	KafkaTopic        string
+	KafkaCompression  string
+	KafkaSSL          bool
+	KafkaSASLMech     string
+	KafkaSASLUser     string
+	KafkaSASLPassword string
+	KafkaCACertPath   string
 	RateLimitMax      int
 	RateLimitWindowMs int
 	SiteRateLimitMax  int
 	QuotaFailOpen     bool
-	MaxBodyBytes      int64
-	DefaultRetention  int
-	GeoIPMMDBPath     string
-	TrustedProxyHops  int
-	SiteSecretKey     string
+	AsyncConfirm      bool
+	EdgeDedupe        bool
+	EdgeGateScript    bool
+	// MetricsPort, when set, serves /metrics on its own listener and removes it from the public port.
+	MetricsPort int
+	// KafkaPublishTimeoutMs bounds one publish so a stalled broker cannot hold requests past the HTTP write timeout.
+	KafkaPublishTimeoutMs int
+	MaxBodyBytes          int64
+	DefaultRetention      int
+	GeoIPMMDBPath         string
+	GeoLoopbackIP         string
+	TrustedProxyHops      int
+	SiteSecretKey         string
 }
 
 func Load() Config {
@@ -44,24 +58,36 @@ func Load() Config {
 	topic := envStr("KAFKA_TOPIC", "growth_events")
 
 	return Config{
-		Port:              envInt("INGESTION_PORT", 3001),
-		DatabaseURL:       envStr("DATABASE_URL", DefaultDatabaseURL),
-		RedisURL:          envStr("REDIS_URL", DefaultRedisURL),
-		RedisRateLimitURL: envStr("REDIS_RATELIMIT_URL", envStr("REDIS_URL", DefaultRedisURL)),
-		RedisCacheURL:     envStr("REDIS_CACHE_URL", envStr("REDIS_URL", DefaultRedisURL)),
-		RedisStateURL:     envStr("REDIS_STATE_URL", envStr("REDIS_URL", DefaultRedisURL)),
-		RedisCoordURL:     envStr("REDIS_COORD_URL", envStr("REDIS_URL", DefaultRedisURL)),
-		KafkaBrokers:      splitCSV(envStr("KAFKA_BROKERS", "localhost:9092")),
-		KafkaTopic:        topic,
-		RateLimitMax:      envInt("INGESTION_RATE_LIMIT_MAX", 1000),
-		RateLimitWindowMs: envInt("INGESTION_RATE_LIMIT_WINDOW_MS", 60000),
-		SiteRateLimitMax:  envInt("SITE_RATE_LIMIT_MAX", 10000),
-		QuotaFailOpen:     envBool("QUOTA_FAIL_OPEN", true),
-		MaxBodyBytes:      int64(envInt("MAX_EVENT_PAYLOAD_BYTES", 32768)),
-		DefaultRetention:  envInt("DEFAULT_RETENTION_MONTHS", 24),
-		GeoIPMMDBPath:     envStr("GEOIP_MMDB_PATH", ""),
-		TrustedProxyHops:  envInt("TRUSTED_PROXY_HOPS", 1),
-		SiteSecretKey:     envStr("SITE_SIGNING_SECRET_KEY", DefaultSiteSecretKey),
+		Port:                  envInt("INGESTION_PORT", 3001),
+		DatabaseURL:           envStr("DATABASE_URL", DefaultDatabaseURL),
+		RedisURL:              envStr("REDIS_URL", DefaultRedisURL),
+		RedisRateLimitURL:     envStr("REDIS_RATELIMIT_URL", envStr("REDIS_URL", DefaultRedisURL)),
+		RedisCacheURL:         envStr("REDIS_CACHE_URL", envStr("REDIS_URL", DefaultRedisURL)),
+		RedisStateURL:         envStr("REDIS_STATE_URL", envStr("REDIS_URL", DefaultRedisURL)),
+		RedisCoordURL:         envStr("REDIS_COORD_URL", envStr("REDIS_URL", DefaultRedisURL)),
+		KafkaBrokers:          splitCSV(envStr("KAFKA_BROKERS", "localhost:9092")),
+		KafkaTopic:            topic,
+		KafkaCompression:      envStr("KAFKA_COMPRESSION", "zstd"),
+		KafkaSSL:              envBool("KAFKA_SSL", false),
+		KafkaSASLMech:         envStr("KAFKA_SASL_MECHANISM", ""),
+		KafkaSASLUser:         envStr("KAFKA_SASL_USERNAME", ""),
+		KafkaSASLPassword:     envStr("KAFKA_SASL_PASSWORD", ""),
+		KafkaCACertPath:       envStr("KAFKA_CA_CERT_PATH", ""),
+		RateLimitMax:          envInt("INGESTION_RATE_LIMIT_MAX", 1000),
+		RateLimitWindowMs:     envInt("INGESTION_RATE_LIMIT_WINDOW_MS", 60000),
+		SiteRateLimitMax:      envInt("SITE_RATE_LIMIT_MAX", 10000),
+		QuotaFailOpen:         envBool("QUOTA_FAIL_OPEN", true),
+		AsyncConfirm:          envBool("EDGE_ASYNC_CONFIRM", true),
+		EdgeDedupe:            envBool("EDGE_DEDUPE", false),
+		EdgeGateScript:        envBool("EDGE_GATE_SCRIPT", false),
+		MetricsPort:           envInt("METRICS_PORT", 0),
+		KafkaPublishTimeoutMs: envInt("KAFKA_PUBLISH_TIMEOUT_MS", 4000),
+		MaxBodyBytes:          int64(envInt("MAX_EVENT_PAYLOAD_BYTES", 32768)),
+		DefaultRetention:      envInt("DEFAULT_RETENTION_MONTHS", 24),
+		GeoIPMMDBPath:         envStr("GEOIP_MMDB_PATH", ""),
+		GeoLoopbackIP:         envStr("GEO_LOOPBACK_IP", ""),
+		TrustedProxyHops:      envInt("TRUSTED_PROXY_HOPS", 1),
+		SiteSecretKey:         envStr("SITE_SIGNING_SECRET_KEY", DefaultSiteSecretKey),
 	}
 }
 
@@ -72,6 +98,9 @@ func (c Config) ProductionProblems(nodeEnv string) []string {
 		return nil
 	}
 	var problems []string
+	if c.GeoLoopbackIP != "" {
+		problems = append(problems, "GEO_LOOPBACK_IP is a development setting and would mislocate every private-address client")
+	}
 	if c.DatabaseURL == DefaultDatabaseURL {
 		problems = append(problems, "DATABASE_URL is unset or still the public development default")
 	}

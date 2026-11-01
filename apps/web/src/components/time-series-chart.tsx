@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useChartSync } from "@/components/chart-sync";
+import { MatrixArt } from "@/components/ui/matrix-art";
 import type { TimeSeriesPoint } from "@trackme/analytics";
 
 type SeriesKey = "visitors" | "sessions" | "pageviews";
 
-const SERIES_COLORS: Record<SeriesKey, string> = {
-  visitors: "#3b82f6", // vibrant blue
-  sessions: "#a855f7", // purple
-  pageviews: "#22c55e", // emerald
-};
+// One accent leads. Whatever it is compared with sits in a neutral step.
+const ACCENT = "#ededed";
+const NEUTRAL = "#8b8b92";
+const seriesColor = (key: SeriesKey, primary: SeriesKey) => (key === primary ? ACCENT : NEUTRAL);
 
 export function TimeSeriesChart({
   points,
@@ -20,19 +21,29 @@ export function TimeSeriesChart({
   primary?: SeriesKey;
   secondary?: SeriesKey | null;
 }) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const sync = useChartSync();
+  const [localHover, setLocalHover] = useState<number | null>(null);
+  // Inside a ChartSyncProvider the hover is shared with the KPI sparklines, both ways.
+  const hoverIndex = sync ? sync.index : localHover;
+  const setHoverIndex = sync ? sync.set : setLocalHover;
 
-  if (!points.length) {
+  const hasTraffic = points.some((p) => p.visitors > 0 || p.sessions > 0 || p.pageviews > 0);
+  if (!points.length || !hasTraffic) {
+    // Day one: the same glyph picture the landing page uses for traffic, so the card already
+    // shows what it will become.
     return (
-      <div className="flex h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-zinc-500">
-        <p>A traffic chart will appear as tracked pageviews arrive.</p>
-      </div>
+      <MatrixArt variant="ridge" className="mx-5 h-[320px]" strength={0.7}>
+        <p className="text-sm font-medium text-zinc-200">No traffic yet</p>
+        <p className="mt-1 max-w-xs text-xs leading-4 text-zinc-400">
+          Visitors and sessions chart here as soon as your site starts sending events.
+        </p>
+      </MatrixArt>
     );
   }
 
   const width = 800;
-  const height = 260;
-  const pad = { top: 20, right: 24, bottom: 36, left: 44 };
+  const height = 320;
+  const pad = { top: 16, right: 24, bottom: 36, left: 48 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
 
@@ -41,8 +52,8 @@ export function TimeSeriesChart({
   const max = Math.max(...primaryValues, ...secondaryValues, 1);
   const yTicks = buildTicks(max);
 
-  const primaryColor = SERIES_COLORS[primary];
-  const secondaryColor = secondary ? SERIES_COLORS[secondary] : "var(--chart-muted)";
+  const primaryColor = ACCENT;
+  const secondaryColor = secondary ? seriesColor(secondary, primary) : NEUTRAL;
 
   const toPoints = (values: number[]) =>
     values.map((value, index) => {
@@ -57,11 +68,9 @@ export function TimeSeriesChart({
   const primaryPath = smoothPath(primaryPts);
   const secondaryPath = secondaryPts.length ? smoothPath(secondaryPts) : "";
   const primaryAreaPath = areaPath(primaryPts, pad, innerH);
-  const secondaryAreaPath = secondaryPts.length ? areaPath(secondaryPts, pad, innerH) : "";
-
+  
   const labelStep = Math.max(1, Math.ceil(points.length / 7));
   const primaryId = `grad-primary-${primary}`;
-  const secondaryId = `grad-secondary-${secondary ?? "none"}`;
 
   const hoveredPoint = hoverIndex !== null ? points[hoverIndex] : null;
   const hoveredPrimaryPt = hoverIndex !== null ? primaryPts[hoverIndex] : null;
@@ -69,48 +78,40 @@ export function TimeSeriesChart({
   return (
     <div className="relative w-full overflow-hidden select-none">
       {/* Top Legend Bar & Hover Live Indicator */}
-      <div className="flex items-center justify-between px-5 pb-2 text-xs">
+      <div className="flex h-8 items-center justify-between px-5 pb-2 text-xs">
         <div className="flex items-center gap-4">
           <LegendDot color={primaryColor} label={capitalize(primary)} />
           {secondary && <LegendDot color={secondaryColor} label={capitalize(secondary)} />}
         </div>
         {hoveredPoint ? (
-          <div className="flex items-center gap-3 font-mono text-[11px] text-zinc-300">
-            <span className="text-zinc-500">{formatLabel(hoveredPoint.timestamp)}:</span>
-            <span className="flex items-center gap-1 font-semibold text-blue-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+          <div className="flex items-center gap-4 font-mono text-xs tabular-nums text-zinc-200">
+            <span className="text-zinc-500">{formatLabel(hoveredPoint.timestamp)}</span>
+            <span className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: primaryColor }} />
               {hoveredPoint[primary].toLocaleString()}
             </span>
             {secondary && (
-              <span className="flex items-center gap-1 font-semibold text-purple-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+              <span className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: secondaryColor }} />
                 {hoveredPoint[secondary].toLocaleString()}
               </span>
             )}
           </div>
-        ) : (
-          <span className="text-[11px] text-zinc-600 font-sans">Hover points to inspect</span>
-        )}
+        ) : null}
       </div>
 
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-[250px] w-full overflow-visible"
+        className="h-[320px] w-full overflow-visible"
         role="img"
         aria-label="Traffic over time"
         onMouseLeave={() => setHoverIndex(null)}
       >
         <defs>
           <linearGradient id={primaryId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={primaryColor} stopOpacity="0.22" />
+            <stop offset="0%" stopColor={primaryColor} stopOpacity="0.16" />
             <stop offset="85%" stopColor={primaryColor} stopOpacity="0.01" />
           </linearGradient>
-          {secondary && (
-            <linearGradient id={secondaryId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={secondaryColor} stopOpacity="0.14" />
-              <stop offset="85%" stopColor={secondaryColor} stopOpacity="0.01" />
-            </linearGradient>
-          )}
         </defs>
 
         {/* Horizontal grid lines & Y labels */}
@@ -123,15 +124,14 @@ export function TimeSeriesChart({
                 x2={width - pad.right}
                 y1={y}
                 y2={y}
-                stroke="rgba(255,255,255,0.06)"
-                strokeDasharray="3 4"
+                stroke="rgba(237,237,237,0.06)"
               />
               <text
                 x={pad.left - 10}
                 y={y + 3.5}
                 textAnchor="end"
                 className="fill-zinc-500 font-mono"
-                style={{ fontSize: 10 }}
+                style={{ fontSize: 12 }}
               >
                 {formatAxis(tick)}
               </text>
@@ -139,8 +139,6 @@ export function TimeSeriesChart({
           );
         })}
 
-        {/* Area gradients */}
-        {secondaryAreaPath && <path d={secondaryAreaPath} fill={`url(#${secondaryId})`} />}
         <path d={primaryAreaPath} fill={`url(#${primaryId})`} />
 
         {/* Secondary curve line */}
@@ -149,10 +147,10 @@ export function TimeSeriesChart({
             d={secondaryPath}
             fill="none"
             stroke={secondaryColor}
-            strokeWidth={1.75}
+            strokeWidth={1.5}
             strokeLinejoin="round"
             strokeLinecap="round"
-            opacity={0.8}
+            opacity={0.7}
           />
         )}
 
@@ -161,7 +159,6 @@ export function TimeSeriesChart({
           d={primaryPath}
           fill="none"
           stroke={primaryColor}
-          strokeWidth={2.25}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -173,9 +170,8 @@ export function TimeSeriesChart({
             x2={hoveredPrimaryPt.x}
             y1={pad.top}
             y2={pad.top + innerH}
-            stroke="rgba(255,255,255,0.2)"
-            strokeDasharray="2 3"
-            strokeWidth={1.5}
+            stroke="rgba(237,237,237,0.16)"
+            strokeWidth={1}
           />
         )}
 
@@ -196,26 +192,24 @@ export function TimeSeriesChart({
                 onMouseEnter={() => setHoverIndex(index)}
               />
 
-              {/* Glowing active point markers */}
+              {/* Active point markers */}
               {isHovered && (
                 <>
                   {secondaryPts[index] && (
                     <circle
                       cx={secondaryPts[index]!.x}
                       cy={secondaryPts[index]!.y}
-                      r={4.5}
-                      fill="#0c0c0e"
+                      r={4}
+                      fill="#19191b"
                       stroke={secondaryColor}
-                      strokeWidth={2}
                     />
                   )}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={5}
-                    fill="#0c0c0e"
+                    r={4.5}
+                    fill="#19191b"
                     stroke={primaryColor}
-                    strokeWidth={2.5}
                   />
                 </>
               )}
@@ -232,7 +226,7 @@ export function TimeSeriesChart({
               y={height - 12}
               textAnchor="middle"
               className="fill-zinc-500 font-mono"
-              style={{ fontSize: 10 }}
+              style={{ fontSize: 12 }}
             >
               {formatLabel(point.timestamp)}
             </text>
@@ -245,7 +239,7 @@ export function TimeSeriesChart({
           x2={width - pad.right}
           y1={pad.top + innerH}
           y2={pad.top + innerH}
-          stroke="rgba(255,255,255,0.08)"
+          stroke="rgba(237,237,237,0.1)"
         />
       </svg>
     </div>
@@ -254,9 +248,9 @@ export function TimeSeriesChart({
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="h-2 w-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ background: color }} />
-      <span className="text-[11px] font-medium text-zinc-400">{label}</span>
+    <div className="flex items-center gap-2">
+      <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+      <span className="text-xs text-zinc-400">{label}</span>
     </div>
   );
 }

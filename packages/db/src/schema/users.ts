@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, uuid, boolean, integer } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -17,6 +18,11 @@ export const users = pgTable("users", {
   // Brute-force protection
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
+
+  /** Tokens issued before this instant are rejected (logout-all / password reset). */
+  sessionsValidAfter: timestamp("sessions_valid_after", { withTimezone: true })
+    .notNull()
+    .default(sql`'epoch'`),
 
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

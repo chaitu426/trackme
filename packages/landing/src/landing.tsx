@@ -1,23 +1,17 @@
 import * as React from "react";
-import {
-  Activity,
-  ArrowDownRight,
-  ArrowRight,
-  Check,
-  ChevronDown,
-  Database,
-  Fingerprint,
-  Gauge,
-  Globe2,
-  LockKeyhole,
-  Radio,
-  ShieldCheck,
-  UserRound,
-  Workflow,
-  Zap,
-} from "lucide-react";
+import { Activity, ArrowRight, ArrowUpRight, Database, Globe2, Server, ShieldCheck, Workflow, type LucideIcon } from "lucide-react";
 import { SmartLink } from "./smart-link";
-import { ProductPreview } from "./preview";
+import { HeroScene } from "./hero-scene";
+import { GlyphField } from "./glyph-field";
+import { DemoDashboard } from "./demo-dashboard";
+import { DEMO_ANCHOR } from "./demo-bus";
+import { Navbar } from "./navbar";
+import { FeatureStage } from "./feature-stage";
+import { PrivacyLedger } from "./privacy-ledger";
+import { InstallConsole } from "./install-console";
+import { CopySnippet } from "./copy-snippet";
+import { TryChips } from "./try-chips";
+import { CountUp, Reveal, Spot } from "./motion";
 
 export interface LandingLinks {
   /** Docs home. */
@@ -36,530 +30,437 @@ export interface LandingLinks {
 export interface LandingProps {
   product?: string;
   links: LandingLinks;
+  /** The real tracker and ingest URLs for the install snippet. Without them the page shows placeholders. */
+  snippet?: { scriptUrl: string; endpoint: string };
 }
 
+/* One neutral ramp, one accent. The glyph pictures are the only place with rich texture. */
+const INK = "#0f0f10";
+const PAGE = "#141415";
+
 const primaryButton =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-500 px-5 text-sm font-semibold text-white shadow-[0_8px_28px_-10px_rgba(59,130,246,0.75)] transition hover:bg-blue-400";
-const outlineButton =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-5 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.06]";
+  "group inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#ededed] px-5 text-[15px] font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98]";
+const secondaryButton =
+  "inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-white/[0.12] bg-[#232325]/80 px-5 text-[15px] font-medium text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[border-color,transform] duration-150 hover:border-white/[0.24] active:scale-[0.98]";
 
-const BENEFITS = [
-  { icon: Fingerprint, label: "No tracking cookies" },
-  { icon: Radio, label: "Live activity" },
-  { icon: Gauge, label: "Real-user Web Vitals" },
-  { icon: Workflow, label: "Funnels and goals" },
-] as const;
+const FACTS: { prefix?: string; to: number; suffix?: string; label: string }[] = [
+  { prefix: "< ", to: 10, suffix: " KB", label: "Gzipped tag, loaded deferred so it never blocks rendering" },
+  { to: 0, label: "Tracking cookies, and no IP address stored after the country lookup" },
+  { to: 24, suffix: " h", label: "Visitor IDs rotate daily, so a person can’t be followed across days" },
+  { to: 30, suffix: " min", label: "Of inactivity ends a session, shared across all tabs of a browser" },
+];
 
-const FEATURES = [
-  {
-    icon: Radio,
-    eyebrow: "Know what is happening now",
-    title: "Realtime, not yesterday’s news",
-    body: "See active visitors and the pages they are viewing, updated from the events arriving at your site.",
-  },
-  {
-    icon: Workflow,
-    eyebrow: "Follow the moments that matter",
-    title: "Events, goals and funnels",
-    body: "Track meaningful actions, define conversion goals, and see where people move through a multi-step journey.",
-  },
-  {
-    icon: Gauge,
-    eyebrow: "Measure the experience",
-    title: "Web Vitals from real visits",
-    body: "Understand LCP, INP, CLS, FCP and TTFB with p75 summaries and useful page and device breakdowns.",
-  },
-  {
-    icon: UserRound,
-    eyebrow: "Connect product activity",
-    title: "People, in context",
-    body: "Associate activity with your own user identifiers to understand what happens before and after key actions.",
-  },
-  {
-    icon: ShieldCheck,
-    eyebrow: "Respect the people behind the data",
-    title: "Privacy controls that matter",
-    body: "Cookieless collection, optional consent gating, per-site Do Not Track support and domain allow-listing.",
-  },
-  {
-    icon: Database,
-    eyebrow: "Keep control of your stack",
-    title: "Your data, your infrastructure",
-    body: "Self-host with a production-oriented stack built around ClickHouse, PostgreSQL, Redis and Kafka.",
-  },
-] as const;
-
-const STACKS = [
-  "React",
-  "Next.js",
-  "Vue",
-  "Nuxt",
-  "Angular",
-  "SvelteKit",
-  "Astro",
-  "WordPress",
-  "Shopify",
-  "Laravel",
-  "Rails",
-  "Django",
-] as const;
+const PIPELINE: { icon: LucideIcon; title: string; detail: string; spec: string }[] = [
+  { icon: Globe2, title: "Your site", detail: "A small tag batches events and retries when the network drops.", spec: "up to 50 events per request" },
+  { icon: Server, title: "Go edge", detail: "Validates every event, applies rate limits, reads the country, drops the IP.", spec: "limits per IP and per site" },
+  { icon: Workflow, title: "Event stream", detail: "Kafka delivery, so a slow database never loses what the edge accepted.", spec: "acks from every replica" },
+  { icon: Database, title: "Your insights", detail: "ClickHouse storage with the live dashboard reading from it.", spec: "deduplicated by event ID" },
+];
 
 const FAQS = [
   {
-    question: "Does TrackMe use analytics cookies?",
-    answer:
-      "The browser tracker is designed to collect analytics without setting tracking cookies. You can also configure consent gating for sites that require it.",
+    q: "Do I still need a cookie banner?",
+    a: "TrackMe sets no tracking cookies and stores no IP address. Whether you need a banner depends on your jurisdiction and how you use the data, so check with your counsel. If you do need consent, the tag can wait for it before sending anything.",
   },
   {
-    question: "What can I measure with TrackMe?",
-    answer:
-      "TrackMe supports pageviews, custom events, goals and funnels, realtime activity, acquisition and geography reports, people profiles, and Core Web Vitals.",
+    q: "How are visitors counted without cookies?",
+    a: "Each browser gets a random pseudonym that rotates every 24 hours. Someone who returns on several days counts once per day. That keeps data unlinkable, and it also means counts differ from tools that follow people across days.",
   },
   {
-    question: "How do I add the tracker to my site?",
-    answer:
-      "Add a deferred script tag with your site key and ingestion endpoint. Use the quickstart for the basic setup or choose a framework guide for a platform-specific example.",
+    q: "Will the numbers match Google Analytics?",
+    a: "They will usually be lower. Ad blockers, Safari and Brave protections, and Do Not Track settings all reduce what any privacy-first tool can see. Known bots are excluded.",
   },
   {
-    question: "Can I run the platform on my own infrastructure?",
-    answer:
-      "Yes. The repository includes a self-hostable stack using PostgreSQL, ClickHouse, Redis, Kafka and the TrackMe services. See the operations documentation for deployment details.",
+    q: "Where does my data live?",
+    a: "In your own infrastructure. Events pass through a Go ingestion edge into Kafka and are stored in ClickHouse, and the dashboard reads from there.",
   },
   {
-    question: "Is the dashboard preview showing live customer data?",
-    answer:
-      "No. The dashboard illustration on this page uses sample data for demonstration only; it is not connected to an account.",
+    q: "Can I share a dashboard without giving access?",
+    a: "Yes. A public read-only link shows headline numbers, top pages and channels without a login.",
   },
-] as const;
+];
 
-/** The tag itself, with light syntax colouring and no runtime dependency. */
-function Snippet() {
+
+function Container({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`mx-auto w-full max-w-[1200px] px-5 sm:px-8 ${className}`}>{children}</div>;
+}
+
+/** Every section opens the same way: a mono index, a hairline, a label, then the claim. */
+function SectionHead({ index, label, title, lead }: { index: string; label: string; title: React.ReactNode; lead?: string }) {
   return (
-    <figure className="overflow-hidden rounded-xl border border-white/[0.09] bg-[#0c0e13] shadow-[0_24px_80px_-32px_rgba(0,0,0,0.85)]">
-      <figcaption className="flex items-center justify-between border-b border-white/[0.07] bg-white/[0.02] px-4 py-3">
-        <span className="flex items-center gap-2 font-mono text-[11px] text-zinc-400">
-          <span className="h-2 w-2 rounded-full bg-blue-400" />
-          index.html
-        </span>
-        <span className="rounded-md border border-white/[0.07] px-2 py-1 text-[10px] text-zinc-500">
-          before &lt;/head&gt;
-        </span>
-      </figcaption>
-      <pre className="overflow-x-auto p-5 font-mono text-[12px] leading-[1.9] text-zinc-300 sm:text-[13px]">
-        <code>
-          <span className="text-zinc-600">{"<"}</span>
-          <span className="text-sky-300">script</span>
-          {"\n"}
-          {"  "}
-          <span className="text-blue-300">defer</span>
-          {"\n"}
-          {"  "}
-          <span className="text-blue-300">src</span>
-          <span className="text-zinc-500">=</span>
-          <span className="text-emerald-300">&quot;https://app.example.com/tracker.js&quot;</span>
-          {"\n"}
-          {"  "}
-          <span className="text-blue-300">data-site</span>
-          <span className="text-zinc-500">=</span>
-          <span className="text-amber-200">&quot;YOUR_SITE_KEY&quot;</span>
-          {"\n"}
-          {"  "}
-          <span className="text-blue-300">data-endpoint</span>
-          <span className="text-zinc-500">=</span>
-          <span className="text-emerald-300">&quot;https://ingest.example.com/v1/batch&quot;</span>
-          {"\n"}
-          <span className="text-zinc-600">{">"}</span>
-          <span className="text-zinc-600">{"</"}</span>
-          <span className="text-sky-300">script</span>
-          <span className="text-zinc-600">{">"}</span>
-        </code>
-      </pre>
-      <div className="flex items-center gap-2 border-t border-white/[0.06] bg-white/[0.015] px-4 py-3 text-[11px] text-zinc-500">
-        <Zap className="h-3.5 w-3.5 text-blue-400" />
-        Deferred loading · automatic SPA navigation · batched delivery
+    <Reveal>
+      <div className="flex items-center gap-4 font-mono text-xs text-zinc-500">
+        <span className="text-zinc-300">{index}</span>
+        <span className="h-px w-10 bg-white/[0.16]" />
+        <span>{label}</span>
       </div>
-    </figure>
+      <h2 className="mt-5 max-w-3xl text-balance text-[34px] font-medium leading-[40px] tracking-[-0.03em] text-zinc-50 sm:text-[48px] sm:leading-[52px]">{title}</h2>
+      {lead && <p className="mt-4 max-w-xl text-[17px] leading-7 text-zinc-400">{lead}</p>}
+    </Reveal>
   );
 }
 
-function SectionIntro({
-  eyebrow,
-  title,
-  children,
-  centered = false,
-}: {
-  eyebrow: string;
-  title: string;
-  children?: React.ReactNode;
-  centered?: boolean;
-}) {
+function Mark() {
   return (
-    <div className={centered ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-400">{eyebrow}</p>
-      <h2 className="mt-3 text-balance text-3xl font-semibold leading-tight tracking-[-0.035em] text-zinc-50 sm:text-[2.6rem]">
-        {title}
-      </h2>
-      {children && <p className="mt-4 text-[15px] leading-7 text-zinc-400">{children}</p>}
-    </div>
+    <span className="grid h-6 w-6 place-items-center rounded-md bg-[#ededed] text-[#141415]">
+      <Activity className="h-4 w-4" strokeWidth={1.75} />
+    </span>
   );
 }
 
-function PrivacyCard() {
-  const items = [
-    ["01", "No tracking cookies", "Understand journeys without a cookie-based identifier."],
-    ["02", "Transient IP handling", "IP is used at the edge for geolocation, then discarded."],
-    ["03", "Respect visitor choices", "Configure consent gating and per-site DNT support."],
-    ["04", "Choose your retention", "Set retention for the data that matters to your team."],
-  ];
+export function Landing({ product = "TrackMe", links, snippet }: LandingProps) {
+  const scriptUrl = snippet?.scriptUrl ?? "https://your-app.com/t/v1/tracker.js";
+  const endpoint = snippet?.endpoint ?? "https://ingest.your-app.com/v1/batch";
+  const SNIPPET = `<script defer src="${scriptUrl}" data-site="YOUR_SITE_KEY" data-endpoint="${endpoint}"></script>`;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0e13] p-5 sm:p-7">
-      <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-blue-500/[0.09] blur-3xl" />
-      <div className="relative flex items-center justify-between border-b border-white/[0.07] pb-5">
-        <div>
-          <p className="text-sm font-semibold text-zinc-100">Privacy controls</p>
-          <p className="mt-1 text-xs text-zinc-500">Built into the collection model</p>
-        </div>
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-400/[0.08] text-blue-300">
-          <ShieldCheck className="h-5 w-5" />
-        </span>
-      </div>
-      <ul className="relative divide-y divide-white/[0.06]">
-        {items.map(([number, title, body]) => (
-          <li key={number} className="flex gap-4 py-4 first:pt-5 last:pb-1">
-            <span className="pt-0.5 font-mono text-[10px] text-blue-400/80">{number}</span>
-            <div>
-              <p className="text-[13px] font-medium text-zinc-200">{title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-500">{body}</p>
-            </div>
-            <Check className="ml-auto mt-0.5 h-4 w-4 shrink-0 text-emerald-400/80" />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+    <div className="min-h-screen bg-[#141415] text-zinc-100 antialiased [scroll-behavior:smooth]">
+      <style>{`
+        @keyframes heroTag { from { opacity: 0; transform: translate(-50%, calc(-50% + 6px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+        @keyframes heroLine { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        @keyframes stageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @keyframes stageBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        .hero-tag { opacity: 0; animation: heroTag 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        line.hero-tag { animation-name: heroLine; }
+        .rise { opacity: 0; animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .faq-item summary::-webkit-details-marker { display: none; }
+        .faq-item[open] .faq-plus { transform: rotate(45deg); }
+        .faq-item[open] { background: rgba(255,255,255,0.025); }
+        @media (prefers-reduced-motion: reduce) { .hero-tag, .rise { animation: none; opacity: 1; } .rise, line.hero-tag { transform: none; } }
+      `}</style>
 
-function EventFlow() {
-  const stages = [
-    { icon: Globe2, title: "Your site", detail: "Lightweight browser tracker", color: "text-sky-300" },
-    { icon: Radio, title: "Go edge", detail: "Validate · rate-limit · route", color: "text-blue-300" },
-    { icon: Workflow, title: "Event stream", detail: "Reliable Kafka delivery", color: "text-violet-300" },
-    { icon: Database, title: "Your insights", detail: "ClickHouse + live dashboard", color: "text-emerald-300" },
-  ] as const;
+      <Navbar product={product} links={{ docs: links.docs, signIn: links.signIn, getStarted: links.getStarted }} />
 
-  return (
-    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0d12]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-4 sm:px-6">
-        <div>
-          <p className="text-sm font-semibold text-zinc-100">From event to insight</p>
-          <p className="mt-1 text-xs text-zinc-500">A look at the TrackMe collection path</p>
-        </div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.07] px-2.5 py-1 text-[10px] font-medium text-emerald-300">
-          <span className="pulse-live h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          Built for reliable delivery
-        </span>
-      </div>
-      <ol className="grid divide-y divide-white/[0.06] sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-        {stages.map(({ icon: Icon, title, detail, color }, index) => (
-          <li key={title} className="relative flex items-start gap-3 p-5 sm:flex-col sm:gap-5 sm:p-6">
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025] ${color}`}>
-              <Icon className="h-4 w-4" />
+      {/* ------------------------------------------------------------ Hero */}
+      <section id="product" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
+        <HeroScene />
+        <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-[62%] bg-[linear-gradient(to_right,#0f0f10_0%,#0f0f10_54%,rgba(15,15,16,0)_100%)] md:block" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40" style={{ background: `linear-gradient(to bottom, rgba(15,15,16,0), ${PAGE})` }} />
+
+        <Container className="relative z-20 pb-16 pt-36 md:min-h-[640px] md:pt-44">
+          <div className="max-w-[720px]">
+            <span className="rise inline-flex h-7 items-center gap-2 rounded-lg border border-white/[0.1] px-3 text-[13px] text-zinc-300">
+              <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4cc38a]" />
+              Realtime, down to the last five minutes
             </span>
-            <div>
-              <span className="font-mono text-[10px] text-zinc-600">0{index + 1}</span>
-              <h3 className="mt-1 text-[13px] font-semibold text-zinc-100">{title}</h3>
-              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{detail}</p>
-            </div>
-            {index < stages.length - 1 && (
-              <ArrowRight className="absolute right-5 top-1/2 hidden h-3.5 w-3.5 -translate-y-1/2 text-zinc-700 sm:block" />
-            )}
-            {index < stages.length - 1 && (
-              <ArrowDownRight className="absolute bottom-3 right-5 h-3.5 w-3.5 text-zinc-700 sm:hidden" />
-            )}
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-export function Landing({ product = "TrackMe", links }: LandingProps) {
-  return (
-    <div className="min-h-screen overflow-hidden bg-background text-foreground antialiased selection:bg-blue-500/30">
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#09090b]/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
-          <SmartLink href="/" className="flex shrink-0 items-center gap-2.5" aria-label={`${product} home`}>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-white shadow-[0_4px_16px_-5px_rgba(59,130,246,0.8)]">
-              <Activity className="h-4 w-4" strokeWidth={2.4} />
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight text-zinc-50">{product}</span>
-          </SmartLink>
-
-          <nav aria-label="Primary" className="hidden items-center gap-7 text-[13px] text-zinc-400 md:flex">
-            <a href="#features" className="transition hover:text-zinc-100">Features</a>
-            <a href="#privacy" className="transition hover:text-zinc-100">Privacy</a>
-            <a href="#install" className="transition hover:text-zinc-100">Install</a>
-            <SmartLink href={links.docs} className="transition hover:text-zinc-100">Docs</SmartLink>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            {links.signIn && (
-              <SmartLink
-                href={links.signIn}
-                className="hidden h-9 items-center rounded-lg px-3 text-[13px] font-medium text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-100 sm:inline-flex"
-              >
-                Sign in
+            <h1 className="rise mt-6 text-balance text-[44px] font-medium leading-[46px] tracking-[-0.035em] text-zinc-50 [animation-delay:60ms] sm:text-[60px] sm:leading-[62px] lg:text-[68px] lg:leading-[70px]">
+              Analytics that counts visits, <span className="text-zinc-500">not people.</span>
+            </h1>
+            <p className="rise mt-6 max-w-[540px] text-[17px] leading-7 text-zinc-300 [animation-delay:120ms] sm:text-lg sm:leading-[28px]">
+              {product} gives product and engineering teams live traffic, funnels, user journeys and Web Vitals from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.
+            </p>
+            <div className="rise mt-8 flex flex-wrap gap-3 [animation-delay:180ms]">
+              <SmartLink href={links.getStarted} className={primaryButton}>
+                Create workspace <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.5} />
               </SmartLink>
-            )}
-            <SmartLink href={links.getStarted} className={`${primaryButton} h-9 px-3.5 text-[12px]`}>
-              Get started <ArrowRight className="h-3.5 w-3.5" />
-            </SmartLink>
+              <SmartLink href={links.docs} className={secondaryButton}>
+                Read the docs
+              </SmartLink>
+            </div>
+            <p className="rise mt-4 text-[13px] text-zinc-400 [animation-delay:240ms]">Works with React, Next.js, Vue, Svelte and Angular. Or one script tag.</p>
           </div>
-        </div>
-      </header>
+        </Container>
 
-      <main>
-        <section id="product" className="relative border-b border-white/[0.06]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[34rem] bg-[radial-gradient(ellipse_55%_55%_at_50%_0%,rgba(37,99,235,0.16),transparent)]" />
-          <div className="relative mx-auto max-w-7xl px-5 pb-16 pt-20 sm:px-8 sm:pb-20 sm:pt-28">
-            <div className="mx-auto max-w-4xl text-center">
-              <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/[0.06] px-3.5 py-1.5 text-[11px] font-medium text-blue-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                Privacy-first product analytics
-              </p>
-              <h1 className="mt-7 text-balance text-[2.65rem] font-semibold leading-[1.04] tracking-[-0.055em] text-zinc-50 sm:text-6xl lg:text-[4.5rem]">
-                Know what your visitors do.
-                <span className="block bg-gradient-to-r from-blue-300 via-sky-200 to-indigo-300 bg-clip-text text-transparent">
-                  Respect who they are.
-                </span>
-              </h1>
-              <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-zinc-400 sm:text-lg sm:leading-8">
-                The signals to grow your product—pageviews, funnels, realtime and Web Vitals—without building your
-                analytics around invasive tracking.
-              </p>
-              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <SmartLink href={links.getStarted} className={`${primaryButton} w-full sm:w-auto`}>
-                  Start with TrackMe <ArrowRight className="h-4 w-4" />
-                </SmartLink>
-                <SmartLink href={links.docs} className={`${outlineButton} w-full sm:w-auto`}>
-                  Explore the docs
-                </SmartLink>
+        {/* The product, live */}
+        <Container className="relative z-20 pb-24">
+          <div id={DEMO_ANCHOR} className="scroll-mt-24">
+            <div className="mb-4 px-1">
+              <TryChips />
+            </div>
+            <DemoDashboard getStarted={links.getStarted} />
+          </div>
+        </Container>
+      </section>
+
+      {/* ------------------------------------------------------------ Specs */}
+      <section className="border-y border-white/[0.08]">
+        <Container>
+          <dl className="grid grid-cols-2 lg:grid-cols-4">
+            {FACTS.map((fact, i) => (
+              <Spot key={fact.label} className={`border-white/[0.08] ${i % 2 === 1 ? "border-l" : ""} ${i >= 2 ? "border-t lg:border-t-0" : ""} ${i > 0 ? "lg:border-l" : ""}`}>
+                <div className="px-5 py-9 sm:px-7">
+                  <dt className="font-mono text-[34px] font-normal leading-10 text-zinc-50 tabular-nums">
+                    <CountUp prefix={fact.prefix ?? ""} to={fact.to} suffix={fact.suffix ?? ""} />
+                  </dt>
+                  <dd className="mt-3 max-w-[220px] text-sm leading-5 text-zinc-400">{fact.label}</dd>
+                </div>
+              </Spot>
+            ))}
+          </dl>
+        </Container>
+      </section>
+
+      {/* -------------------------------------------------------- Product */}
+      <section id="features" className="pt-28 sm:pt-36">
+        <Container>
+          <SectionHead index="01" label="What you see" title="The questions your team asks every week, each with its own view." />
+          <Reveal className="mt-14" delay={80}>
+            <FeatureStage />
+          </Reveal>
+        </Container>
+      </section>
+
+      {/* ---------------------------------------------------------- System */}
+      <section id="system" className="pt-28 sm:pt-36">
+        <Container>
+          <SectionHead index="02" label="How it works" title="From a click in a browser to a number on your dashboard." />
+          <Reveal className="mt-14" delay={80}>
+            <div className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[#19191b]">
+              <div className="relative h-48 border-b border-white/[0.08] bg-[#0f0f10] sm:h-60">
+                <GlyphField variant="stream" interactive />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between px-6 pb-4 font-mono text-xs text-zinc-500 sm:px-8">
+                  <span>events leave the browser</span>
+                  <span>and land on your dashboard</span>
+                </div>
               </div>
-            </div>
-
-            <div className="mx-auto mt-14 max-w-5xl sm:mt-16">
-              <ProductPreview />
-              <p className="mt-3 text-center text-[11px] text-zinc-600">
-                A product illustration with sample data—not a live account.
-              </p>
-            </div>
-
-            <ul className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-              {BENEFITS.map(({ icon: Icon, label }) => (
-                <li
-                  key={label}
-                  className="flex items-center justify-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.015] px-3 py-3 text-center text-[11px] font-medium text-zinc-400 sm:text-xs"
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0 text-blue-300" />
-                  {label}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section id="privacy" className="border-b border-white/[0.06] bg-[#0a0b0e]">
-          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
-            <div>
-              <SectionIntro eyebrow="Less noise. More clarity." title="Useful analytics, without the baggage.">
-                Understand what’s working without turning your product into a surveillance system. Privacy is part of
-                how TrackMe collects—not a setting you have to discover later.
-              </SectionIntro>
-              <ul className="mt-8 space-y-3">
-                {[
-                  "No analytics tracking cookies",
-                  "Transient IP processing for geolocation",
-                  "Consent controls and per-site DNT support",
-                  "Configurable data retention",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-sm text-zinc-300">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-400/10 text-blue-300">
-                      <Check className="h-3 w-3" />
-                    </span>
-                    {item}
+              <ol className="grid sm:grid-cols-2 lg:grid-cols-4">
+                {PIPELINE.map(({ icon: Icon, title, detail, spec }, i) => (
+                  <li key={title} className="border-white/[0.08] [&:not(:first-child)]:border-t lg:[&:not(:first-child)]:border-l lg:[&:not(:first-child)]:border-t-0 sm:[&:nth-child(even)]:border-l sm:[&:nth-child(n+3)]:border-t lg:[&:nth-child(n+3)]:border-t-0">
+                    <Spot className="h-full">
+                      <div className="flex h-full flex-col p-6 sm:p-7">
+                        <div className="flex items-center justify-between">
+                          <span className="grid h-9 w-9 place-items-center rounded-lg border border-white/[0.08] bg-[#232325] text-zinc-300">
+                            <Icon className="h-4 w-4" strokeWidth={1.5} />
+                          </span>
+                          <span className="font-mono text-xs text-zinc-600">{String(i + 1).padStart(2, "0")}</span>
+                        </div>
+                        <h3 className="mt-6 text-[15px] font-medium text-zinc-50">{title}</h3>
+                        <p className="mt-2 flex-1 text-sm leading-[22px] text-zinc-400">{detail}</p>
+                        <p className="mt-5 inline-flex w-fit items-center rounded-md border border-white/[0.08] px-2 py-1 font-mono text-xs text-zinc-400">{spec}</p>
+                      </div>
+                    </Spot>
                   </li>
                 ))}
-              </ul>
-              {links.privacy && (
-                <SmartLink href={links.privacy} className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-blue-300 transition hover:text-blue-200">
-                  Read the privacy overview <ArrowRight className="h-4 w-4" />
-                </SmartLink>
-              )}
+              </ol>
             </div>
-            <PrivacyCard />
-          </div>
-        </section>
+          </Reveal>
+        </Container>
+      </section>
 
-        <section id="features" className="border-b border-white/[0.06]">
-          <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28">
-            <SectionIntro eyebrow="The full picture" title="Everything you need to understand your traffic.">
-              The important signals, connected in one place—from the first pageview to the moment someone becomes a
-              customer.
-            </SectionIntro>
-            <ul className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map(({ icon: Icon, eyebrow, title, body }, index) => (
-                <li
-                  key={title}
-                  className="group relative overflow-hidden rounded-xl border border-white/[0.07] bg-[#0b0c10] p-6 transition duration-200 hover:-translate-y-0.5 hover:border-blue-400/25 hover:bg-[#0d1017]"
-                >
-                  <span className="absolute right-5 top-5 font-mono text-[10px] text-zinc-700">0{index + 1}</span>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-400/15 bg-blue-400/[0.07] text-blue-300 transition group-hover:border-blue-300/30 group-hover:bg-blue-400/[0.12]">
-                    <Icon className="h-[18px] w-[18px]" />
-                  </span>
-                  <p className="mt-6 text-[10px] font-medium uppercase tracking-[0.12em] text-blue-300/80">{eyebrow}</p>
-                  <h3 className="mt-2 text-[17px] font-semibold tracking-tight text-zinc-100">{title}</h3>
-                  <p className="mt-2 text-[13px] leading-6 text-zinc-500">{body}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
+      {/* --------------------------------------------------------- Privacy */}
+      <section id="privacy" className="pt-28 sm:pt-36">
+        <Container>
+          <SectionHead index="03" label="Privacy" title="Counts visits without keeping what could identify a person." lead="Most of the privacy work happens at the edge, where the IP address is read once and dropped." />
+          <Reveal className="mt-14" delay={80}>
+            <PrivacyLedger />
+          </Reveal>
+          {links.privacy && (
+            <SmartLink href={links.privacy} className="mt-6 inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors duration-150 hover:text-zinc-100">
+              Read the privacy overview <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
+            </SmartLink>
+          )}
+        </Container>
+      </section>
 
-        <section className="border-b border-white/[0.06] bg-[#0a0b0e]">
-          <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-24">
-            <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-              <SectionIntro eyebrow="Under the hood" title="Built for the journey from event to insight." />
-              <p className="max-w-md text-sm leading-6 text-zinc-500">
-                A lightweight browser tracker feeds a dedicated ingestion path, then a reliable event pipeline and
-                analytics store.
+      {/* ----------------------------------------------------------- Setup */}
+      <section id="install" className="pt-28 sm:pt-36">
+        <Container>
+          <SectionHead index="04" label="Setup" title="One tag, and your first pageview in minutes." />
+          <div className="mt-14 grid items-start gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-16">
+            <Reveal delay={80}>
+              <ol className="relative">
+                {[
+                  ["Create a workspace and add your site", "You get a public site key. It can only write events, never read them."],
+                  ["Add the tag to your head", "It loads deferred, follows single-page navigation by itself, and retries when the network drops."],
+                  ["Watch the first event arrive", "The dashboard confirms the tag is live, then fills in as traffic comes."],
+                ].map(([title, body], i, all) => (
+                  <li key={title} className="relative flex gap-4 pb-9 last:pb-0">
+                    {i < all.length - 1 && <span className="absolute bottom-0 left-4 top-8 w-px bg-white/[0.1]" />}
+                    <span className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/[0.16] bg-[#141415] font-mono text-[13px] text-zinc-300">{i + 1}</span>
+                    <div className="pt-1">
+                      <h3 className="text-base font-medium leading-6 text-zinc-50">{title}</h3>
+                      <p className="mt-1 text-sm leading-[22px] text-zinc-400">{body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-8 flex flex-wrap items-center gap-2">
+                {["React", "Next.js", "Vue", "Svelte", "Angular"].map((fw) => (
+                  <SmartLink key={fw} href={links.frameworks} className="inline-flex h-7 items-center rounded-lg border border-white/[0.08] px-3 text-[13px] text-zinc-400 transition-colors duration-150 hover:border-white/[0.2] hover:text-zinc-100">
+                    {fw}
+                  </SmartLink>
+                ))}
+                <SmartLink href={links.quickstart} className="ml-1 inline-flex items-center gap-1 text-[13px] text-zinc-300 transition-colors duration-150 hover:text-white">
+                  Quickstart <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
+                </SmartLink>
+              </div>
+            </Reveal>
+
+            <Reveal delay={160}>
+              <InstallConsole
+                snippet={SNIPPET}
+                lines={
+                  <code>
+                    <span className="text-zinc-500">&lt;</span>
+                    <span className="text-zinc-200">script</span>
+                    {"\n  "}
+                    <span className="text-zinc-200">defer</span>
+                    {"\n  "}
+                    <span className="text-zinc-200">src</span>=<span className="text-zinc-100">&quot;{scriptUrl}&quot;</span>
+                    {"\n  "}
+                    <span className="text-zinc-200">data-site</span>=<span className="text-zinc-100">&quot;YOUR_SITE_KEY&quot;</span>
+                    {"\n  "}
+                    <span className="text-zinc-200">data-endpoint</span>=<span className="text-zinc-100">&quot;{endpoint}&quot;</span>
+                    {"\n"}
+                    <span className="text-zinc-500">&gt;&lt;/</span>
+                    <span className="text-zinc-200">script</span>
+                    <span className="text-zinc-500">&gt;</span>
+                  </code>
+                }
+              />
+            </Reveal>
+          </div>
+        </Container>
+      </section>
+
+      {/* ------------------------------------------------------------- FAQ */}
+      <section id="faq" className="pt-28 sm:pt-36">
+        <Container>
+          <div className="grid gap-12 lg:grid-cols-[420px_1fr] lg:gap-16">
+            <div className="lg:sticky lg:top-28 lg:self-start">
+              <SectionHead index="05" label="Questions" title="Good to know before you start." />
+              <SmartLink href={links.docs} className="mt-8 inline-flex items-center gap-1 text-sm text-zinc-300 transition-colors duration-150 hover:text-white">
+                Read the docs <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
+              </SmartLink>
+            </div>
+            <Reveal delay={80}>
+              <div className="border-t border-white/[0.1]">
+                {FAQS.map(({ q, a }, i) => (
+                  <details key={q} className="faq-item border-b border-white/[0.1] transition-colors duration-200">
+                    <summary className="flex cursor-pointer list-none items-center gap-5 px-2 py-6 text-[17px] font-medium text-zinc-100">
+                      <span className="w-6 font-mono text-xs font-normal text-zinc-600">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="flex-1">{q}</span>
+                      <span className="faq-plus grid h-7 w-7 place-items-center rounded-full border border-white/[0.14] font-mono text-base text-zinc-400 transition-transform duration-300">+</span>
+                    </summary>
+                    <p className="max-w-2xl pb-7 pl-[68px] pr-8 text-[15px] leading-6 text-zinc-400">{a}</p>
+                  </details>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+        </Container>
+      </section>
+
+      {/* ------------------------------------------------------------- CTA */}
+      <section className="pt-28 sm:pt-36">
+        <Container>
+          <div className="relative overflow-hidden rounded-3xl border border-white/[0.12]" style={{ backgroundColor: INK }}>
+            {/* The traffic picture runs along the bottom edge, lit by the cursor */}
+            <div className="absolute inset-x-0 bottom-0 h-[260px] [mask-image:linear-gradient(to_bottom,transparent,black_45%)]">
+              <GlyphField variant="ridge" strength={0.9} interactive />
+            </div>
+            <div className="relative z-10 grid items-end gap-10 px-6 pb-56 pt-14 sm:px-12 sm:pt-20 lg:grid-cols-[1fr_1fr] lg:gap-14">
+              <div>
+                <p className="font-mono text-xs text-zinc-500">06 — Start</p>
+                <h2 className="mt-5 text-balance text-[36px] font-medium leading-[42px] tracking-[-0.03em] text-zinc-50 sm:text-[52px] sm:leading-[56px]">
+                  Your first pageview is one tag away.
+                </h2>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <SmartLink href={links.getStarted} className={primaryButton}>
+                    Create workspace <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.5} />
+                  </SmartLink>
+                  <SmartLink href={links.docs} className={secondaryButton}>
+                    Read the docs
+                  </SmartLink>
+                </div>
+              </div>
+              <CopySnippet
+                label="index.html"
+                text={SNIPPET}
+                lines={
+                  <code>
+                    <span className="text-zinc-500">&lt;</span>
+                    <span className="text-zinc-200">script</span> <span className="text-zinc-200">defer</span> <span className="text-zinc-200">src</span>=<span className="text-zinc-100">&quot;…/t/v1/tracker.js&quot;</span>
+                    {"\n  "}
+                    <span className="text-zinc-200">data-site</span>=<span className="text-zinc-100">&quot;YOUR_SITE_KEY&quot;</span>
+                    {"\n  "}
+                    <span className="text-zinc-200">data-endpoint</span>=<span className="text-zinc-100">&quot;…/v1/batch&quot;</span>
+                    <span className="text-zinc-500">&gt;&lt;/</span>
+                    <span className="text-zinc-200">script</span>
+                    <span className="text-zinc-500">&gt;</span>
+                  </code>
+                }
+              />
+            </div>
+          </div>
+        </Container>
+      </section>
+
+      {/* ---------------------------------------------------------- Footer */}
+      <footer className="relative mt-28 overflow-hidden border-t border-white/[0.1] sm:mt-36" style={{ backgroundColor: INK }}>
+        <Container className="relative z-10 pt-16">
+          <div className="grid gap-12 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+            <div className="max-w-sm">
+              <SmartLink href="#product" className="inline-flex items-center gap-2 text-lg font-medium leading-none text-zinc-50" aria-label={`${product} home`}>
+                <Mark />
+                {product}
+              </SmartLink>
+              <p className="mt-4 text-sm leading-[22px] text-zinc-400">Cookieless web analytics for product and engineering teams, running on your own infrastructure.</p>
+              <p className="mt-6 inline-flex items-center gap-2 text-[13px] text-zinc-500">
+                <ShieldCheck className="h-4 w-4" strokeWidth={1.5} />
+                No tracking cookies. No stored IP addresses.
               </p>
             </div>
-            <EventFlow />
-          </div>
-        </section>
 
-        <section id="install" className="border-b border-white/[0.06]">
-          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
-            <div>
-              <SectionIntro eyebrow="Up and running, simply" title="One small tag. A clearer picture.">
-                Add the deferred tracker, use your site key, and start collecting the events that help you make better
-                product decisions.
-              </SectionIntro>
-              <ul className="mt-7 space-y-3 text-[13px] text-zinc-400">
-                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />Loads deferred so it doesn’t block page rendering.</li>
-                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />Tracks single-page navigation without router glue.</li>
-                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />Batches events and retries when the network drops.</li>
-              </ul>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <SmartLink href={links.quickstart} className={primaryButton}>
-                  Read the quickstart <ArrowRight className="h-4 w-4" />
-                </SmartLink>
-                <SmartLink href={links.frameworks} className={outlineButton}>Framework guides</SmartLink>
-              </div>
-            </div>
-            <Snippet />
-          </div>
-          <div className="mx-auto max-w-7xl px-5 pb-16 sm:px-8 sm:pb-20">
-            <p className="mb-4 text-center text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">
-              Guides for the tools you already use
-            </p>
-            <ul className="flex flex-wrap items-center justify-center gap-2">
-              {STACKS.map((stack) => (
-                <li key={stack} className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-1.5 text-xs text-zinc-400">
-                  {stack}
-                </li>
-              ))}
-              <li className="rounded-lg border border-dashed border-white/[0.1] px-3 py-1.5 text-xs text-zinc-500">
-                Any site that can add a script
-              </li>
-            </ul>
-          </div>
-        </section>
+            <FooterColumn title="Product">
+              <FooterLink href="#features">What you see</FooterLink>
+              <FooterLink href="#system">How it works</FooterLink>
+              <FooterLink href="#privacy">Privacy</FooterLink>
+              <FooterLink href="#faq">FAQ</FooterLink>
+            </FooterColumn>
 
-        <section id="faq" className="border-b border-white/[0.06] bg-[#0a0b0e]">
-          <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
-            <div>
-              <SectionIntro eyebrow="Good to know" title="A few things you might be wondering.">
-                Straight answers about how TrackMe works and what you can do with it.
-              </SectionIntro>
-              <SmartLink href={links.docs} className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-blue-300 transition hover:text-blue-200">
-                Browse the documentation <ArrowRight className="h-4 w-4" />
-              </SmartLink>
-            </div>
-            <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
-              {FAQS.map(({ question, answer }) => (
-                <details key={question} className="group py-5">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-5 text-sm font-medium text-zinc-200 marker:content-none [&::-webkit-details-marker]:hidden">
-                    {question}
-                    <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500 transition group-open:rotate-180 group-open:text-blue-300" />
-                  </summary>
-                  <p className="max-w-2xl pr-8 pt-3 text-[13px] leading-6 text-zinc-500">{answer}</p>
-                </details>
-              ))}
-            </div>
-          </div>
-        </section>
+            <FooterColumn title="Developers">
+              <FooterLink href={links.docs}>Documentation</FooterLink>
+              <FooterLink href={links.quickstart}>Quickstart</FooterLink>
+              <FooterLink href={links.frameworks}>Frameworks</FooterLink>
+              {links.reference && <FooterLink href={links.reference}>Reference</FooterLink>}
+              {links.selfHosting && <FooterLink href={links.selfHosting}>Self-hosting</FooterLink>}
+            </FooterColumn>
 
-        <section className="relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_100%,rgba(37,99,235,0.16),transparent)]" />
-          <div className="relative mx-auto max-w-5xl px-5 py-20 text-center sm:px-8 sm:py-28">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-400/[0.08] text-blue-300">
-              <LockKeyhole className="h-5 w-5" />
-            </span>
-            <h2 className="mx-auto mt-6 max-w-3xl text-balance text-3xl font-semibold leading-tight tracking-[-0.04em] text-zinc-50 sm:text-5xl">
-              Make better decisions.
-              <span className="block text-blue-300">Keep your values intact.</span>
-            </h2>
-            <p className="mx-auto mt-5 max-w-xl text-[15px] leading-7 text-zinc-400">
-              Get the product signals your team needs, with a stack you can understand and privacy choices you can
-              explain.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <SmartLink href={links.getStarted} className={`${primaryButton} w-full sm:w-auto`}>
-                Get started with TrackMe <ArrowRight className="h-4 w-4" />
-              </SmartLink>
-              <SmartLink href={links.quickstart} className={`${outlineButton} w-full sm:w-auto`}>
-                Read the quickstart
-              </SmartLink>
-            </div>
+            <FooterColumn title="Account">
+              {links.signIn && <FooterLink href={links.signIn}>Sign in</FooterLink>}
+              <FooterLink href={links.getStarted}>Create workspace</FooterLink>
+              {links.privacy && <FooterLink href={links.privacy}>Privacy overview</FooterLink>}
+            </FooterColumn>
           </div>
-        </section>
-      </main>
+        </Container>
 
-      <footer className="border-t border-white/[0.07] bg-[#08090c]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-10 px-5 py-10 sm:px-8 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-xs">
-            <SmartLink href="/" className="inline-flex items-center gap-2.5" aria-label={`${product} home`}>
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 text-white">
-                <Activity className="h-3.5 w-3.5" strokeWidth={2.4} />
-              </span>
-              <span className="text-sm font-semibold text-zinc-100">{product}</span>
-            </SmartLink>
-            <p className="mt-3 text-xs leading-relaxed text-zinc-500">
-              Privacy-first web analytics for product and growth teams.
-            </p>
-            <p className="mt-5 text-[10px] text-zinc-700">© {new Date().getFullYear()} {product}</p>
-          </div>
+        {/* The name, set in the page's own glyphs. It lights up under the cursor. */}
+        <div className="relative mt-14 h-[200px] sm:h-[300px] lg:h-[360px]" aria-hidden="true">
+          <GlyphField variant="text" text={product} cell={10} interactive />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#0f0f10] to-transparent" />
+        </div>
 
-          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-12 gap-y-3 text-[13px] sm:grid-cols-3">
-            <FooterLink href={links.docs}>Documentation</FooterLink>
-            <FooterLink href={links.quickstart}>Quickstart</FooterLink>
-            <FooterLink href={links.frameworks}>Framework guides</FooterLink>
-            {links.reference && <FooterLink href={links.reference}>API reference</FooterLink>}
-            {links.selfHosting && <FooterLink href={links.selfHosting}>Self-hosting</FooterLink>}
-            {links.privacy && <FooterLink href={links.privacy}>Privacy overview</FooterLink>}
-          </nav>
+        <div className="relative z-10 border-t border-white/[0.08] bg-[#0f0f10]">
+          <Container className="flex flex-col gap-3 py-5 text-[13px] text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+            <p>© {new Date().getFullYear()} {product}</p>
+            <p className="font-mono text-xs">Go edge · Kafka · ClickHouse</p>
+            <a href="#product" className="inline-flex items-center gap-1 text-zinc-400 transition-colors duration-150 hover:text-zinc-100">
+              Back to top <ArrowUpRight className="h-4 w-4 -rotate-45" strokeWidth={1.5} />
+            </a>
+          </Container>
         </div>
       </footer>
     </div>
   );
 }
 
+function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-zinc-200">{title}</h3>
+      <ul className="mt-4 space-y-3">{children}</ul>
+    </div>
+  );
+}
+
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <SmartLink href={href} className="text-zinc-500 transition hover:text-zinc-200">
-      {children}
-    </SmartLink>
+    <li>
+      <SmartLink href={href} className="inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors duration-150 hover:text-zinc-100">
+        {children}
+      </SmartLink>
+    </li>
   );
 }

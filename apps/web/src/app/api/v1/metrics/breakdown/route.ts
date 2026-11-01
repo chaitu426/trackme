@@ -3,20 +3,24 @@ import { MetricQueryRequestSchema } from "@trackme/contracts";
 import { getBreakdown, type BreakdownDimension } from "@trackme/analytics";
 import { requireMetricsAccess } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { timedRoute } from "@/lib/metrics-registry";
+import { cached, cacheKey, normalizeRequest, ttlSecondsFor } from "@/lib/query-cache";
 
 const DIMENSIONS = new Set<BreakdownDimension>([
   "path",
   "referrer",
+  "channel",
   "campaign_source",
   "campaign_medium",
   "campaign_name",
   "country",
+  "city",
   "browser",
   "os",
   "device",
 ]);
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const rawDimension = searchParams.get("dimension") ?? "path";
@@ -36,9 +40,16 @@ export async function POST(request: NextRequest) {
     }
 
     await requireMetricsAccess(request, parsed.data.workspaceId, parsed.data.siteId);
-    const breakdown = await getBreakdown(parsed.data, dimension);
+    const query = normalizeRequest(parsed.data);
+    const breakdown = await cached(
+      cacheKey("breakdown", query, `${dimension}:v2`),
+      ttlSecondsFor(Date.parse(query.dateRange.to)),
+      () => getBreakdown(query, dimension)
+    );
     return NextResponse.json(breakdown);
   } catch (error) {
     return jsonError(error);
   }
 }
+
+export const POST = timedRoute("breakdown", handlePost);

@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "TrackMe: Web, Services & Infrastructure",
+    "output": ".archify/trackme-platform-20261020-0036/trackme-platform.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/chaitu426/trackme.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "91658b382c23fea17f05d0a8a1e2d7c3062feb90"
+    }
+  },
+  "components": [
+    {
+      "id": "dashboard-user",
+      "type": "external",
+      "label": "Dashboard user",
+      "sublabel": "Browser",
+      "pos": [40, 90],
+      "size": [155, 66]
+    },
+    {
+      "id": "web-app",
+      "type": "frontend",
+      "label": "Web control plane",
+      "sublabel": "Next.js 15 · React 19",
+      "sources": [
+        { "path": "apps/web/package.json" },
+        { "path": "apps/web/src/app/api/v1/sites/[siteId]/realtime/stream/route.ts", "line": 1, "end_line": 80, "label": "Realtime API" }
+      ],
+      "pos": [270, 80],
+      "size": [205, 82]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Users · workspaces · sites",
+      "sources": [
+        { "path": "infra/docker/docker-compose.yml", "line": 3, "end_line": 20 },
+        { "path": "packages/db/src/client.ts", "line": 1, "end_line": 14 }
+      ],
+      "pos": [560, 80],
+      "size": [200, 82]
+    },
+    {
+      "id": "visitor",
+      "type": "external",
+      "label": "Tracked visitor",
+      "sublabel": "Customer website",
+      "pos": [40, 350],
+      "size": [155, 66]
+    },
+    {
+      "id": "tracker",
+      "type": "frontend",
+      "label": "Browser tracker SDK",
+      "sublabel": "TypeScript · batched events",
+      "sources": [
+        { "path": "packages/tracker/src/index.ts", "line": 1, "end_line": 45 },
+        { "path": "packages/tracker/src/transport.ts", "line": 1, "end_line": 130 }
+      ],
+      "pos": [270, 340],
+      "size": [205, 82]
+    },
+    {
+      "id": "ingestion",
+      "type": "backend",
+      "label": "Go ingestion edge",
+      "sublabel": "HTTP · validate · enrich · admit",
+      "sources": [
+        { "path": "services/ingestion-go/internal/httpapi/server.go", "line": 166, "end_line": 345 },
+        { "path": "services/ingestion-go/internal/queue/kafka.go", "line": 13, "end_line": 65 }
+      ],
+      "pos": [530, 340],
+      "size": [225, 94]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Apache Kafka",
+      "sublabel": "growth_events · keyed by session",
+      "sources": [
+        { "path": "infra/docker/docker-compose.yml", "line": 66, "end_line": 101 },
+        { "path": "services/ingestion-go/internal/queue/kafka.go", "line": 13, "end_line": 65 }
+      ],
+      "pos": [815, 340],
+      "size": [220, 86]
+    },
+    {
+      "id": "event-worker",
+      "type": "backend",
+      "label": "TypeScript event worker",
+      "sublabel": "Kafka consumer · batch writer",
+      "sources": [
+        { "path": "services/event-worker/src/worker.ts", "line": 103, "end_line": 181 },
+        { "path": "services/event-worker/src/writers/clickhouse.ts", "line": 31, "end_line": 135 }
+      ],
+      "pos": [1100, 340],
+      "size": [230, 94]
+    },
+    {
+      "id": "clickhouse",
+      "type": "database",
+      "label": "ClickHouse",
+      "sublabel": "events_raw · analytics · rollups",
+      "sources": [
+        { "path": "infra/docker/docker-compose.yml", "line": 25, "end_line": 49 },
+        { "path": "infra/migrations/clickhouse/001_events_raw.sql", "line": 1, "end_line": 58 },
+        { "path": "packages/analytics/src/client.ts", "line": 1, "end_line": 27 }
+      ],
+      "pos": [1430, 340],
+      "size": [230, 92]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "Limits · realtime state · locks",
+      "sources": [
+        { "path": "infra/docker/docker-compose.yml", "line": 50, "end_line": 65 },
+        { "path": "services/ingestion-go/internal/ratelimit/limiter.go", "line": 32, "end_line": 51 },
+        { "path": "services/event-worker/src/state/redis-realtime.ts", "line": 1, "end_line": 43 }
+      ],
+      "pos": [800, 570],
+      "size": [225, 86]
+    },
+    {
+      "id": "scheduler",
+      "type": "backend",
+      "label": "Scheduled worker",
+      "sublabel": "Rollups · retention · metering",
+      "sources": [
+        { "path": "services/scheduled-worker/src/scheduler.ts", "line": 1, "end_line": 88 },
+        { "path": "services/scheduled-worker/src/jobs/hourly-rollups.ts", "line": 1, "end_line": 51 }
+      ],
+      "pos": [1120, 570],
+      "size": [230, 86]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Local Docker Compose infrastructure",
+      "wraps": ["postgres", "clickhouse", "redis", "kafka"],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    { "id": "user-to-web", "from": "dashboard-user", "to": "web-app", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "visitor-to-tracker", "from": "visitor", "to": "tracker" },
+    { "id": "tracker-to-ingestion", "from": "tracker", "to": "ingestion", "label": "batch", "variant": "emphasis" },
+    { "id": "ingestion-to-postgres", "from": "ingestion", "to": "postgres", "label": "resolve site / key" },
+    { "id": "ingestion-to-kafka", "from": "ingestion", "to": "kafka", "label": "publish", "variant": "emphasis" },
+    { "id": "ingestion-to-redis", "from": "ingestion", "to": "redis", "label": "limit" },
+    { "id": "kafka-to-worker", "from": "kafka", "to": "event-worker", "variant": "emphasis" },
+    { "id": "worker-to-clickhouse", "from": "event-worker", "to": "clickhouse" },
+    { "id": "worker-to-redis", "from": "event-worker", "to": "redis" },
+    { "id": "web-to-postgres", "from": "web-app", "to": "postgres", "label": "metadata" },
+    { "id": "web-to-clickhouse", "from": "web-app", "to": "clickhouse" },
+    { "id": "web-to-redis", "from": "web-app", "to": "redis" },
+    { "id": "scheduler-to-clickhouse", "from": "scheduler", "to": "clickhouse" },
+    { "id": "scheduler-to-postgres", "from": "scheduler", "to": "postgres" },
+    { "id": "scheduler-to-redis", "from": "scheduler", "to": "redis" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Main event journey",
+      "items": [
+        "Tracker batches events to the Go HTTP edge.",
+        "The edge validates, enriches and publishes to Kafka.",
+        "The TypeScript consumer writes analytical rows and updates ephemeral realtime state."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Separate data responsibilities",
+      "items": [
+        "PostgreSQL stores operational and tenant metadata.",
+        "ClickHouse serves event analytics and rollups.",
+        "Redis stores rate limits, short-lived visitor state, notifications and worker locks."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Infrastructure scope",
+      "items": [
+        "The shown Compose boundary is the local infrastructure stack, not a claim about production deployment.",
+        "The repository snapshot defines PostgreSQL, ClickHouse, Redis and Kafka containers."
+      ]
+    }
+  ]
+}

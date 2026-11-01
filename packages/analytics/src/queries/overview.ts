@@ -1,8 +1,10 @@
 import { MetricQueryRequest, OverviewMetricsResponse } from "@trackme/contracts";
-import { getClickHouseClient } from "../client.js";
+import { getDashboardClickHouseClient } from "../client.js";
+import { dispatch, readClient } from "../read-mode.js";
 import { buildDimensionFilterSql } from "./filters.js";
+import { SESSION_DURATION_SQL, SESSION_ENGAGED_SQL, SESSION_ENGAGEMENT_COLUMNS } from "./engagement-sql.js";
 
-import { splitRange, toClickHouseDateTime } from "./range-split.js";
+import { assertRawScanRange, splitRange, toClickHouseDateTime } from "./range-split.js";
 
 function toCH(iso: string): string {
   return iso.replace("T", " ").replace("Z", "");
@@ -90,12 +92,10 @@ export function buildRollupOverviewQueries(
     SELECT
       'edge' AS part,
       toUInt64(count()) AS sessions,
-      toUInt64(countIf(pageview_count = 1)) AS bounced,
-      toUInt64(sum(duration_seconds)) AS duration
+      toUInt64(countIf(NOT ${SESSION_ENGAGED_SQL})) AS bounced,
+      toUInt64(sum(${SESSION_DURATION_SQL})) AS duration
     FROM (
-      SELECT
-        countIf(type = 'pageview') AS pageview_count,
-        dateDiff('second', min(timestamp), max(timestamp)) AS duration_seconds
+      SELECT ${SESSION_ENGAGEMENT_COLUMNS}
       FROM events_raw
       WHERE ${TENANT} AND bot_status = 'human' AND ${EDGES}
       GROUP BY session_id, timestamp >= {tailStart:DateTime64}
@@ -120,10 +120,10 @@ export function buildRollupOverviewQueries(
  * sessions) plus the two partial edge days from raw events. Distinct counts are
  * merged from states, never summed across days.
  */
-export async function getOverviewMetrics(
+async function getOverviewMetricsV1(
   request: MetricQueryRequest
 ): Promise<OverviewMetricsResponse> {
-  const client = getClickHouseClient();
+  const client = getDashboardClickHouseClient();
   const filter = buildDimensionFilterSql(request.filters);
   const hours = rangeHours(request.dateRange.from, request.dateRange.to);
   const useRollups = hours > 48 && !request.filters;
@@ -198,23 +198,23 @@ export async function getOverviewMetrics(
 async function getOverviewMetricsRaw(
   request: MetricQueryRequest,
   params: Record<string, unknown>,
-  filterClause: string
+  filterClause: string,
+  variant: "v1" | "v2" = "v1"
 ): Promise<OverviewMetricsResponse> {
-  const client = getClickHouseClient();
+  const client = readClient(variant);
   const engagementSet = await client.query({
     query: `
       SELECT
         uniqExact(visitor_pseudonym) AS visitors,
         count() AS sessions,
         sum(pageview_count) AS pageviews,
-        round(countIf(pageview_count = 1) / nullIf(count(), 0) * 100, 1) AS bounce_rate_percentage,
-        round(avg(session_duration_seconds), 0) AS avg_duration_seconds
+        round(countIf(NOT ${SESSION_ENGAGED_SQL}) / nullIf(count(), 0) * 100, 1) AS bounce_rate_percentage,
+        round(avg(${SESSION_DURATION_SQL}), 0) AS avg_duration_seconds
       FROM (
         SELECT
           session_id,
           any(visitor_pseudonym) AS visitor_pseudonym,
-          countIf(type = 'pageview') AS pageview_count,
-          dateDiff('second', min(timestamp), max(timestamp)) AS session_duration_seconds
+          ${SESSION_ENGAGEMENT_COLUMNS}
         FROM events_raw
         WHERE workspace_id = {workspaceId:UUID}
           AND site_id = {siteId:UUID}
@@ -251,6 +251,135 @@ async function getOverviewMetricsRaw(
     pageviews: Number(engagement.pageviews || 0),
     bounceRatePercentage: Number(engagement.bounce_rate_percentage || 0),
     avgDurationSeconds: Number(engagement.avg_duration_seconds || 0),
+    activeVisitorsNow: 0,
+  };
+}
+
+/** The overview under ANALYTICS_READ: v1 legacy rollups, v2 aggregate tables, or both in shadow. */
+export function getOverviewMetrics(request: MetricQueryRequest): Promise<OverviewMetricsResponse> {
+  return dispatch(
+    "getOverviewMetrics",
+    (variant) => (variant === "v1" ? getOverviewMetricsV1(request) : getOverviewMetricsV2(request)),
+    { normalize: ({ siteId: _s, dateRange: _d, ...numbers }) => numbers }
+  );
+}
+
+const V2_EDGES = EDGES;
+
+/**
+ * v2 overview. Whole UTC days come from site_daily_agg (visitors, sessions, pageviews)
+ * and session_day_agg (bounce, duration); only the two partial edge days read
+ * events_v2. Short ranges and filtered requests read events_v2 directly: bounce and
+ * duration need per-session rows, which the filter aggregate does not keep.
+ *
+ * session_day_agg has one row per session per day. Grouping by session alone across the
+ * whole days rejoins a session that crossed midnight, so it counts once with its full
+ * duration. Only a session straddling the edge of the whole-day window can count twice.
+ */
+async function getOverviewMetricsV2(request: MetricQueryRequest): Promise<OverviewMetricsResponse> {
+  const client = getDashboardClickHouseClient();
+  const filter = buildDimensionFilterSql(request.filters);
+  const hours = rangeHours(request.dateRange.from, request.dateRange.to);
+  const rawParams = {
+    workspaceId: request.workspaceId,
+    siteId: request.siteId,
+    from: toCH(request.dateRange.from),
+    to: toCH(request.dateRange.to),
+    ...filter.params,
+  };
+  const raw = () => getOverviewMetricsRaw(request, rawParams, filter.clause, "v2");
+
+  if (request.filters) {
+    // Bounce and duration need per-session rows, which only raw events have, so a filtered
+    // range must stay small enough to scan.
+    assertRawScanRange(request.dateRange.from, request.dateRange.to);
+    return raw();
+  }
+  if (hours <= 48) return raw();
+  const split = splitRange(request.dateRange.from, request.dateRange.to);
+  if (!split.hasFullDays) return raw();
+
+  const params: Params = {
+    workspaceId: request.workspaceId,
+    siteId: request.siteId,
+    from: rawParams.from,
+    to: rawParams.to,
+    headEnd: toClickHouseDateTime(split.headEnd),
+    tailStart: toClickHouseDateTime(split.tailStart),
+    fullFrom: split.fullFromDate,
+    fullTo: split.fullToDate,
+  };
+  const TENANT_V2 = `workspace_id = {workspaceId:UUID} AND site_id = {siteId:UUID}`;
+  const run = async <T>(query: string) =>
+    (await client.query({ query, query_params: params, format: "JSONEachRow" })).json<T>();
+
+  let uniques: { visitors: string | number; sessions: string | number }[];
+  let pageviews: { pageviews: string | number }[];
+  let engagement: { part: string; sessions: string | number; bounced: string | number; duration: string | number }[];
+  try {
+    [uniques, pageviews, engagement] = await Promise.all([
+      run<{ visitors: string | number; sessions: string | number }>(`
+        SELECT uniqCombined64Merge(v) AS visitors, uniqCombined64Merge(s) AS sessions
+        FROM (
+          SELECT visitors AS v, sessions AS s FROM site_daily_agg
+          WHERE ${TENANT_V2} AND ${FULL_DAYS}
+          UNION ALL
+          SELECT uniqCombined64State(visitor_hash) AS v, uniqCombined64State(session_hash) AS s
+          FROM events_v2
+          WHERE ${TENANT_V2} AND bot_status = 'human' AND ${V2_EDGES}
+        )`),
+      run<{ pageviews: string | number }>(`
+        SELECT toUInt64(sum(p)) AS pageviews
+        FROM (
+          SELECT pageviews AS p FROM site_daily_agg WHERE ${TENANT_V2} AND ${FULL_DAYS}
+          UNION ALL
+          SELECT toUInt64(countIf(type = 'pageview')) AS p FROM events_v2
+          WHERE ${TENANT_V2} AND bot_status = 'human' AND ${V2_EDGES}
+        )`),
+      run<{ part: string; sessions: string | number; bounced: string | number; duration: string | number }>(`
+        SELECT 'rollup' AS part,
+          toUInt64(count()) AS sessions,
+          toUInt64(countIf(NOT (p >= 2 OR e >= 10000 OR a > 0))) AS bounced,
+          toUInt64(sum(if(e > 0, toInt64(intDiv(e, 1000)), toInt64(dateDiff('second', f, l))))) AS duration
+        FROM (
+          SELECT session_hash, min(first_ts) AS f, max(last_ts) AS l, sum(pageviews) AS p,
+                 sum(engaged_ms) AS e, sum(actions) AS a
+          FROM session_day_agg
+          WHERE site_id = {siteId:UUID} AND ${FULL_DAYS}
+          GROUP BY session_hash
+        )
+        UNION ALL
+        SELECT 'edge' AS part,
+          toUInt64(count()) AS sessions,
+          toUInt64(countIf(NOT ${SESSION_ENGAGED_SQL})) AS bounced,
+          toUInt64(sum(${SESSION_DURATION_SQL})) AS duration
+        FROM (
+          SELECT ${SESSION_ENGAGEMENT_COLUMNS}
+          FROM events_v2
+          WHERE ${TENANT_V2} AND bot_status = 'human' AND ${V2_EDGES}
+          GROUP BY session_hash, timestamp >= {tailStart:DateTime64}
+        )`),
+    ]);
+  } catch (error) {
+    console.warn("v2 overview failed on the aggregate tables, answering from events_v2:", error);
+    return raw();
+  }
+
+  // Aggregates not populated for these days (before the backfill): answer from events_v2.
+  const rollup = engagement.find((r) => r.part === "rollup");
+  if (Number(rollup?.sessions || 0) === 0) return raw();
+
+  const sum = (key: "sessions" | "bounced" | "duration") =>
+    engagement.reduce((total, r) => total + Number(r[key] || 0), 0);
+  const sessions = sum("sessions");
+  return {
+    siteId: request.siteId,
+    dateRange: request.dateRange,
+    visitors: Number(uniques[0]?.visitors || 0),
+    sessions: Number(uniques[0]?.sessions || 0),
+    pageviews: Number(pageviews[0]?.pageviews || 0),
+    bounceRatePercentage: sessions > 0 ? Math.round((sum("bounced") / sessions) * 1000) / 10 : 0,
+    avgDurationSeconds: sessions > 0 ? Math.round(sum("duration") / sessions) : 0,
     activeVisitorsNow: 0,
   };
 }

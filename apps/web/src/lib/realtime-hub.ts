@@ -8,28 +8,55 @@ type SiteHub = {
   listeners: Set<SnapshotListener>;
   lastSnapshot: RealtimeSnapshot;
   lastJson: string;
-  fallbackTimer: ReturnType<typeof setInterval> | null;
+  fallbackTimer: ReturnType<typeof setTimeout> | null;
   refreshing: boolean;
 };
+
+/** Upper bound of SSE listeners per site per node; protects the node from one hot site. */
+export const MAX_LISTENERS_PER_SITE = 200;
+const FALLBACK_INTERVAL_MS = 5_000;
+const FALLBACK_JITTER = 0.2;
+
+/** Next fallback delay: base +/- 20 % so hubs do not poll in the same tick. */
+export function jitteredDelay(baseMs: number, random: () => number = Math.random): number {
+  return Math.round(baseMs * (1 + (random() * 2 - 1) * FALLBACK_JITTER));
+}
 
 const hubs = new Map<string, SiteHub>();
 let subClient: Redis | null = null;
 const CHANNEL_PREFIX = "rt:notify:";
 
-function ensurePubSub(): void {
-  if (subClient) return;
+/**
+ * One shared subscriber connection. Channels are subscribed per site when the
+ * first listener arrives and released with the last one, so a node only receives
+ * notifications for sites someone on it is watching. ioredis re-subscribes the
+ * active channels on reconnect.
+ */
+function getSubscriber(): Redis {
+  if (subClient) return subClient;
   subClient = new Redis(getRedisURLForRole("coord"), {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
   });
-  void subClient.psubscribe(`${CHANNEL_PREFIX}*`);
-  subClient.on("pmessage", (_pattern, channel) => {
+  subClient.on("message", (channel) => {
     if (!channel.startsWith(CHANNEL_PREFIX)) return;
     const siteId = channel.slice(CHANNEL_PREFIX.length);
     if (hubs.has(siteId)) {
       void refreshSite(siteId);
     }
   });
+  subClient.on("error", () => {
+    // reconnect is automatic; the fallback poll covers the gap
+  });
+  return subClient;
+}
+
+function scheduleFallback(siteId: string): void {
+  const hub = hubs.get(siteId);
+  if (!hub) return;
+  hub.fallbackTimer = setTimeout(() => {
+    void refreshSite(siteId).finally(() => scheduleFallback(siteId));
+  }, jitteredDelay(FALLBACK_INTERVAL_MS));
 }
 
 async function refreshSite(siteId: string): Promise<void> {
@@ -49,6 +76,8 @@ async function refreshSite(siteId: string): Promise<void> {
         // listener errors shouldn't kill the hub
       }
     }
+  } catch {
+    // keep the last snapshot; the next notify or fallback tick retries
   } finally {
     hub.refreshing = false;
   }
@@ -58,14 +87,17 @@ async function refreshSite(siteId: string): Promise<void> {
  * Process-level fan-out: one Redis read (+ pub/sub wake) serves all SSE
  * clients watching the same site. Fallback poll handles TTL expiry when
  * no new events arrive.
+ *
+ * Returns null when the site already has MAX_LISTENERS_PER_SITE listeners on
+ * this node; the caller should answer 429 so the client retries elsewhere.
  */
 export function subscribeSiteRealtime(
   siteId: string,
   listener: SnapshotListener
-): () => void {
-  ensurePubSub();
-
+): (() => void) | null {
   let hub = hubs.get(siteId);
+  if (hub && hub.listeners.size >= MAX_LISTENERS_PER_SITE) return null;
+
   if (!hub) {
     hub = {
       listeners: new Set(),
@@ -75,9 +107,10 @@ export function subscribeSiteRealtime(
       refreshing: false,
     };
     hubs.set(siteId, hub);
-    hub.fallbackTimer = setInterval(() => {
-      void refreshSite(siteId);
-    }, 5_000);
+    void getSubscriber().subscribe(`${CHANNEL_PREFIX}${siteId}`).catch(() => {
+      // the jittered fallback poll keeps the stream live without pub/sub
+    });
+    scheduleFallback(siteId);
     void refreshSite(siteId);
   }
 
@@ -89,8 +122,9 @@ export function subscribeSiteRealtime(
     if (!current) return;
     current.listeners.delete(listener);
     if (current.listeners.size === 0) {
-      if (current.fallbackTimer) clearInterval(current.fallbackTimer);
+      if (current.fallbackTimer) clearTimeout(current.fallbackTimer);
       hubs.delete(siteId);
+      void subClient?.unsubscribe(`${CHANNEL_PREFIX}${siteId}`).catch(() => undefined);
     }
   };
 }

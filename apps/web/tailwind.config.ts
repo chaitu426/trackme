@@ -15,6 +15,10 @@ const config: Config = {
         mono: ["var(--font-mono)", "SF Mono", "Consolas", "monospace"],
       },
       colors: {
+        // Muted text and icons reach 4.5:1 on the page and card surfaces (zinc-500 did not).
+        zinc: { 500: "#85858b", 600: "#6e6e74" },
+        sidebar: "var(--sidebar)",
+        raised: "var(--raised)",
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: {
@@ -38,6 +42,13 @@ const config: Config = {
         warning: "var(--warning)",
         danger: "var(--danger)",
         chart: "var(--chart)",
+      },
+      fontSize: {
+        // Page title; everything below it uses Tailwind's xs / sm / base.
+        title: ["28px", { lineHeight: "36px" }],
+      },
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.22, 1, 0.36, 1)",
       },
       borderRadius: {
         DEFAULT: "var(--radius)",

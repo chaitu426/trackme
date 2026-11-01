@@ -4,6 +4,7 @@ import { AppError } from "@trackme/contracts";
 import { db, siteUserProfiles, sites, eq, and, desc, sql, ilike, or } from "@trackme/db";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { timedRoute } from "@/lib/metrics-registry";
 
 const IdentifyRequestSchema = z.object({
   distinctId: z.string().min(1).max(256),
@@ -13,7 +14,7 @@ const IdentifyRequestSchema = z.object({
   traits: z.record(z.unknown()).optional(),
 });
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   props: { params: Promise<{ siteId: string }> }
 ) {
@@ -36,12 +37,16 @@ export async function GET(
     const search = request.nextUrl.searchParams.get("query")?.trim() || "";
     const limit = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("limit") || 50)));
 
+    const offset = Math.max(0, Number(request.nextUrl.searchParams.get("offset") || 0) || 0);
+
+    // One extra row tells the client whether another page exists.
     let query = db
       .select()
       .from(siteUserProfiles)
       .where(eq(siteUserProfiles.siteId, siteId))
       .orderBy(desc(siteUserProfiles.lastSeenAt))
-      .limit(limit);
+      .limit(limit + 1)
+      .offset(offset);
 
     if (search) {
       query = db
@@ -58,10 +63,13 @@ export async function GET(
           )
         )
         .orderBy(desc(siteUserProfiles.lastSeenAt))
-        .limit(limit) as typeof query;
+        .limit(limit + 1)
+        .offset(offset) as typeof query;
     }
 
-    const profiles = await query;
+    const fetched = await query;
+    const hasMore = fetched.length > limit;
+    const profiles = hasMore ? fetched.slice(0, limit) : fetched;
 
     // Summary stats
     const [stats] = await db
@@ -74,6 +82,7 @@ export async function GET(
 
     return NextResponse.json({
       profiles,
+      hasMore,
       stats: {
         totalProfiles: stats?.totalProfiles || 0,
         activePast7Days: stats?.activePast7Days || 0,
@@ -162,3 +171,5 @@ export async function POST(
     return jsonError(error);
   }
 }
+
+export const GET = timedRoute("people", handleGet);

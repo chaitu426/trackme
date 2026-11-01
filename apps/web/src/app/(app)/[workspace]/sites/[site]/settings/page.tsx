@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui/page-header";
 import { Code2 } from "lucide-react";
 import { env } from "@trackme/config";
 import { Badge } from "@/components/ui/badge";
@@ -48,14 +49,9 @@ export default async function SiteSettingsPage({
 
   return (
     <div className="space-y-8 max-w-4xl">
-      {/* ── Page Header ── */}
-      <div>
-        <h1 className="text-lg font-semibold tracking-[-0.02em] text-zinc-50">Settings</h1>
-        <p className="mt-0.5 text-xs text-zinc-500">
-          Snippet, privacy, API keys, and audit logs for{" "}
-          <span className="font-mono text-zinc-400">{site.domain}</span>
-        </p>
-      </div>
+      <PageHeader title="Site Settings" art="gauge">
+        Snippet, privacy, API keys and audit logs for <span className="font-mono text-zinc-300">{site.domain}</span>
+      </PageHeader>
 
       {/* ── Usage & Quota ── */}
       <section id="usage" className="space-y-3">
@@ -68,7 +64,7 @@ export default async function SiteSettingsPage({
           <div>
             <div className="flex items-center space-x-2">
               <Code2 className="w-4 h-4 text-zinc-200" />
-              <h3 className="text-sm font-bold text-zinc-50">Tracking Snippet</h3>
+              <h3 className="text-sm font-medium text-zinc-50">Tracking Snippet</h3>
             </div>
             <p className="text-xs text-zinc-500 mt-0.5">
               Embed inside <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-zinc-300">&lt;head&gt;</code>{" "}
@@ -79,13 +75,13 @@ export default async function SiteSettingsPage({
         </div>
 
         <div className="relative overflow-x-auto rounded-lg border border-white/10 bg-black/40 p-4 font-mono text-xs text-zinc-300">
-          <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{snippet}</pre>
+          <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">{snippet}</pre>
         </div>
 
         <div className="flex flex-col gap-2 pt-1 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-2">
             <span>Public Write Key:</span>
-            <code className="rounded bg-white/[0.06] px-2 py-0.5 font-mono font-semibold text-zinc-200">
+            <code className="rounded bg-white/[0.06] px-2 py-0.5 font-mono font-medium text-zinc-200">
               {site.publicKey}
             </code>
             <CopyButton text={site.publicKey} variant="ghost" />

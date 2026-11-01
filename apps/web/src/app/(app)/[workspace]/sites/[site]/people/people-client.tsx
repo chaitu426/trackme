@@ -1,18 +1,29 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
 import {
-  Users,
   Search,
-  Activity,
   Code,
   X,
   Loader2,
-  Tag,
   ChevronRight,
   Check,
+  Copy,
+  MapPin,
+  Monitor,
+  Zap,
+  Play,
+  Plus,
+  Trash2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { StatsCard } from "@/components/ui/stats-card";
+import { MatrixArt } from "@/components/ui/matrix-art";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SessionReplay } from "@/components/session-replay";
+import { SegmentBuilder, type SavedSegment } from "./segment-builder";
+import { describeBehavior, describeCondition } from "@/lib/segment-schema";
 import { formatRelativeTime } from "@/lib/format";
 import type { UserTimelineEvent } from "@trackme/analytics";
 
@@ -35,364 +46,902 @@ interface PeopleClientProps {
   stats: { total: number; active7d: number };
 }
 
+const IDENTIFY_SNIPPET = `// In your frontend code once the user logs in:
+window.trackme.identify("user_123", {
+  name: "Alex Smith",
+  email: "alex@company.com",
+  plan: "pro"
+});`;
+
+function displayNameOf(user: Pick<UserProfileItem, "name" | "email" | "distinctId">): string {
+  return user.name || user.email || user.distinctId;
+}
+
+function initialsOf(label: string): string {
+  const parts = label.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
+  const letters = parts.length > 1 ? `${parts[0]![0]}${parts[1]![0]}` : label.slice(0, 2);
+  return letters.toUpperCase();
+}
+
+/** Green when seen in the last 5 minutes, blue within a day, grey otherwise. */
+function activityOf(lastSeenAt: string): { label: string; dot: string } {
+  const age = Date.now() - new Date(lastSeenAt).getTime();
+  if (age < 5 * 60_000) return { label: "Active now", dot: "bg-[#4cc38a]" };
+  if (age < 24 * 3_600_000) return { label: "Active today", dot: "bg-zinc-300" };
+  return { label: "Inactive", dot: "bg-zinc-600" };
+}
+
+function Avatar({ label, size = "md" }: { label: string; size?: "md" | "lg" }) {
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.05] font-medium text-zinc-200 ${
+        size === "lg" ? "h-11 w-11 text-sm" : "h-9 w-9 text-xs"
+      }`}
+    >
+      {initialsOf(label)}
+    </div>
+  );
+}
+
 export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps) {
   const [profiles, setProfiles] = React.useState<UserProfileItem[]>(initialProfiles);
   const [search, setSearch] = React.useState("");
   const [isSearching, setIsSearching] = React.useState(false);
+  const PAGE_SIZE = 50;
+  const [hasMore, setHasMore] = React.useState(initialProfiles.length >= PAGE_SIZE && stats.total > initialProfiles.length);
+  const [loadingMore, setLoadingMore] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState<UserProfileItem | null>(null);
   const [timeline, setTimeline] = React.useState<UserTimelineEvent[]>([]);
   const [loadingTimeline, setLoadingTimeline] = React.useState(false);
+  const [timelineError, setTimelineError] = React.useState(false);
   const [copiedSnippet, setCopiedSnippet] = React.useState(false);
 
-  // Search filter
-  async function handleSearch(term: string) {
+  // Search: debounced, and each new term aborts the request still in flight so a slow
+  // answer for "al" can never overwrite the results for "alex".
+  const searchAbort = React.useRef<AbortController | null>(null);
+  const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(
+    () => () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+      searchAbort.current?.abort();
+    },
+    []
+  );
+
+  function handleSearch(term: string) {
+    if (activeSegment) {
+      segmentAbort.current?.abort();
+      setActiveSegment(null);
+      setSegmentCount(null);
+      setSegmentLoading(false);
+    }
     setSearch(term);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => void runSearch(term), 250);
+  }
+
+  async function runSearch(term: string) {
+    searchAbort.current?.abort();
+    const controller = new AbortController();
+    searchAbort.current = controller;
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/v1/sites/${site.id}/people?query=${encodeURIComponent(term)}`);
+      const res = await fetch(`/api/v1/sites/${site.id}/people?query=${encodeURIComponent(term)}`, {
+        signal: controller.signal,
+      });
       if (res.ok) {
         const data = await res.json();
-        setProfiles(data.profiles.map((p: any) => ({
-          ...p,
-          firstSeenAt: typeof p.firstSeenAt === "string" ? p.firstSeenAt : new Date(p.firstSeenAt).toISOString(),
-          lastSeenAt: typeof p.lastSeenAt === "string" ? p.lastSeenAt : new Date(p.lastSeenAt).toISOString(),
-        })));
+        setHasMore(Boolean(data.hasMore));
+        setProfiles(
+          data.profiles.map((p: UserProfileItem) => ({
+            ...p,
+            firstSeenAt: typeof p.firstSeenAt === "string" ? p.firstSeenAt : new Date(p.firstSeenAt).toISOString(),
+            lastSeenAt: typeof p.lastSeenAt === "string" ? p.lastSeenAt : new Date(p.lastSeenAt).toISOString(),
+          }))
+        );
       }
     } catch {
-      // ignore
+      // aborted by a newer search, or offline: keep what is on screen
     } finally {
-      setIsSearching(false);
+      if (searchAbort.current === controller) setIsSearching(false);
     }
   }
 
-  // Load timeline for selected user
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/v1/sites/${site.id}/people?query=${encodeURIComponent(search.trim())}&limit=${PAGE_SIZE}&offset=${profiles.length}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const more: UserProfileItem[] = data.profiles.map((p: UserProfileItem) => ({
+          ...p,
+          firstSeenAt: typeof p.firstSeenAt === "string" ? p.firstSeenAt : new Date(p.firstSeenAt).toISOString(),
+          lastSeenAt: typeof p.lastSeenAt === "string" ? p.lastSeenAt : new Date(p.lastSeenAt).toISOString(),
+        }));
+        setProfiles((cur) => {
+          const seen = new Set(cur.map((p) => p.id));
+          return [...cur, ...more.filter((p) => !seen.has(p.id))];
+        });
+        setHasMore(Boolean(data.hasMore));
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  // Saved segments
+  const everyone = React.useRef(initialProfiles);
+  const [segments, setSegments] = React.useState<SavedSegment[]>([]);
+  const [segmentsStatus, setSegmentsStatus] = React.useState<"loading" | "ready" | "unavailable">("loading");
+  const [activeSegment, setActiveSegment] = React.useState<SavedSegment | null>(null);
+  const [segmentCount, setSegmentCount] = React.useState<{ total: number; capped: boolean } | null>(null);
+  const [segmentLoading, setSegmentLoading] = React.useState(false);
+  const [builderOpen, setBuilderOpen] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const segmentAbort = React.useRef<AbortController | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/v1/sites/${site.id}/segments`)
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          setSegmentsStatus("unavailable");
+          return;
+        }
+        const body = await res.json();
+        setSegments(body.segments ?? []);
+        setSegmentsStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setSegmentsStatus("unavailable");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [site.id]);
+
+  const traitKeys = React.useMemo(
+    () => [...new Set(everyone.current.flatMap((u) => Object.keys(u.traits || {})))].sort(),
+    []
+  );
+
+  async function selectSegment(segment: SavedSegment | null) {
+    segmentAbort.current?.abort();
+    setConfirmDelete(false);
+    setSearch("");
+    setActiveSegment(segment);
+    if (!segment) {
+      setProfiles(everyone.current);
+      setHasMore(everyone.current.length >= PAGE_SIZE && stats.total > everyone.current.length);
+      setSegmentCount(null);
+      setSegmentLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    segmentAbort.current = controller;
+    setSegmentLoading(true);
+    try {
+      const res = await fetch(`/api/v1/sites/${site.id}/segments/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ definition: segment.definition }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfiles(data.profiles);
+        setSegmentCount({ total: data.total, capped: data.capped });
+      }
+    } catch {
+      // aborted by another selection, or offline: keep what is on screen
+    } finally {
+      if (segmentAbort.current === controller) setSegmentLoading(false);
+    }
+  }
+
+  async function deleteSegment(segment: SavedSegment) {
+    try {
+      const res = await fetch(`/api/v1/sites/${site.id}/segments/${segment.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setSegments((prev) => prev.filter((s) => s.id !== segment.id));
+        void selectSegment(null);
+      }
+    } catch {
+      // leave it in place; the user can try again
+    }
+  }
+
+  // Timelines already opened this session, so reopening a profile is instant.
+  const timelineCache = React.useRef(new Map<string, UserTimelineEvent[]>());
+
   async function openUserDrawer(user: UserProfileItem) {
     setSelectedUser(user);
+    setTimelineError(false);
+    const cachedTimeline = timelineCache.current.get(user.distinctId);
+    if (cachedTimeline) {
+      setTimeline(cachedTimeline);
+      setLoadingTimeline(false);
+      return;
+    }
     setLoadingTimeline(true);
     setTimeline([]);
     try {
       const res = await fetch(`/api/v1/sites/${site.id}/people/${encodeURIComponent(user.distinctId)}`);
       if (res.ok) {
         const data = await res.json();
-        setTimeline(data.timeline || []);
+        const events: UserTimelineEvent[] = data.timeline || [];
+        timelineCache.current.set(user.distinctId, events);
+        setTimeline(events);
+      } else {
+        setTimelineError(true);
       }
     } catch {
-      // ignore
+      setTimelineError(true);
     } finally {
       setLoadingTimeline(false);
     }
   }
 
   function copyIdentifySnippet() {
-    navigator.clipboard.writeText(`// In your frontend code once user logs in:\nwindow.trackme.identify("user_123", {\n  name: "Alex Smith",\n  email: "alex@company.com",\n  plan: "pro"\n});`);
+    void navigator.clipboard.writeText(IDENTIFY_SNIPPET);
     setCopiedSnippet(true);
     setTimeout(() => setCopiedSnippet(false), 2000);
   }
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
-              <Users className="h-4 w-4" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-100">User Profiles & Journeys</h1>
-          </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            Track identified users, inspect customer traits, and watch chronological activity streams.
-          </p>
-        </div>
+  const avgEvents =
+    profiles.length > 0 ? Math.round(profiles.reduce((acc, p) => acc + (p.totalEvents || 1), 0) / profiles.length) : 0;
+  const searching = search.trim().length > 0;
 
-        {/* Code snippet trigger */}
-        <button
+  return (
+    <div className="w-full space-y-5 text-left">
+      <PageHeader title="User Profiles" art="stream" actions={<button
           type="button"
           onClick={copyIdentifySnippet}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.03] text-xs font-mono text-zinc-300 hover:bg-white/[0.06] transition shrink-0"
-          title="Click to copy trackme.identify() code snippet"
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/[0.1] bg-[#232325]/80 px-3 font-mono text-xs text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-white/[0.2]"
+          title="Copy the identify() snippet"
         >
-          {copiedSnippet ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Code className="w-3.5 h-3.5 text-indigo-400" />}
-          <span>{copiedSnippet ? "Snippet Copied!" : "trackme.identify()"}</span>
-        </button>
-      </div>
+          {copiedSnippet ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Code className="h-4 w-4 text-zinc-400" />}
+          {copiedSnippet ? "Copied" : "trackme.identify()"}
+        </button>}>
+        Who your customers are, and the path each one took through <span className="font-mono text-zinc-300">{site.domain}</span>
+      </PageHeader>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl border border-white/[0.08] bg-zinc-950/80">
-          <span className="text-[11px] font-medium text-zinc-400">Total Identified Users</span>
-          <div className="text-2xl font-bold text-zinc-100 mt-1">{stats.total.toLocaleString()}</div>
-          <span className="text-[10px] text-zinc-500 mt-0.5 block">Unique users tracked with distinct IDs</span>
-        </div>
-        <div className="p-4 rounded-2xl border border-white/[0.08] bg-zinc-950/80">
-          <span className="text-[11px] font-medium text-zinc-400">Active Past 7 Days</span>
-          <div className="text-2xl font-bold text-emerald-400 mt-1">{stats.active7d.toLocaleString()}</div>
-          <span className="text-[10px] text-zinc-500 mt-0.5 block">Users with recent activity</span>
-        </div>
-        <div className="p-4 rounded-2xl border border-white/[0.08] bg-zinc-950/80">
-          <span className="text-[11px] font-medium text-zinc-400">Profile Engagement</span>
-          <div className="text-2xl font-bold text-indigo-400 mt-1">
-            {stats.total > 0
-              ? `${Math.round(
-                  profiles.reduce((acc, p) => acc + (p.totalEvents || 1), 0) / Math.max(1, profiles.length)
-                )} ev/user`
-              : "—"}
-          </div>
-          <span className="text-[10px] text-zinc-500 mt-0.5 block">Average lifetime events per profile</span>
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search by email, name, or distinct ID..."
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 pl-10 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
+      {/* Stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatsCard title="Identified users" value={stats.total.toLocaleString()} subtitle="Unique people with a distinct ID" />
+        <StatsCard
+          title="Active, last 7 days"
+          value={stats.active7d.toLocaleString()}
+          subtitle={
+            stats.total > 0
+              ? `${Math.round((stats.active7d / stats.total) * 100)}% of identified users`
+              : "Users seen in the past week"
+          }
         />
-        <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        {isSearching && <Loader2 className="w-3.5 h-3.5 text-zinc-400 animate-spin absolute right-3.5 top-1/2 -translate-y-1/2" />}
+        <StatsCard
+          title="Avg events per user"
+          value={stats.total > 0 ? avgEvents.toLocaleString() : "–"}
+          subtitle="Lifetime events per profile"
+        />
       </div>
 
-      {/* Profiles Table */}
-      <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 overflow-hidden">
-        {profiles.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] text-zinc-500 mx-auto">
-              <Users className="h-6 w-6" />
-            </div>
-            <h3 className="text-sm font-semibold text-zinc-200">No Identified Users Yet</h3>
-            <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-              Call <code className="px-1.5 py-0.5 rounded bg-white/[0.06] text-indigo-300 font-mono">trackme.identify("user_id", &#123; name: "...", email: "..." &#125;)</code> in your web app to link visitors with rich profiles and timelines.
-            </p>
+      {/* Segments */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            role="tablist"
+            aria-label="Segments"
+            className="flex h-8 max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-white/[0.08] p-0.5"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!activeSegment}
+              onClick={() => void selectSegment(null)}
+              className={`inline-flex h-full shrink-0 items-center rounded-md px-3 text-xs transition-colors ${
+                !activeSegment ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "text-zinc-400 hover:text-zinc-100"
+              }`}
+            >
+              Everyone
+            </button>
+            {segments.map((segment) => (
+              <button
+                key={segment.id}
+                type="button"
+                role="tab"
+                aria-selected={activeSegment?.id === segment.id}
+                onClick={() => void selectSegment(segment)}
+                className={`inline-flex h-full shrink-0 items-center rounded-md px-3 text-xs transition-colors ${
+                  activeSegment?.id === segment.id
+                    ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                    : "text-zinc-400 hover:text-zinc-100"
+                }`}
+              >
+                {segment.name}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="divide-y divide-white/[0.06]">
-            {profiles.map((user) => {
-              const displayName = user.name || user.email || user.distinctId;
-              const initials = displayName
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase();
+          <button
+            type="button"
+            onClick={() => setBuilderOpen(true)}
+            disabled={segmentsStatus === "unavailable"}
+            title={segmentsStatus === "unavailable" ? "Saved segments need a one-time database update" : undefined}
+            className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.08] px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" />
+            New segment
+          </button>
+        </div>
 
-              const traitsEntries = Object.entries(user.traits || {}).slice(0, 3);
+        {segmentsStatus === "unavailable" && (
+          <p className="text-xs text-zinc-600">
+            Saved segments are not set up for this database yet. Run{" "}
+            <code className="font-mono text-zinc-400">node packages/db/apply-segments.mjs</code> once.
+          </p>
+        )}
 
-              return (
-                <div
-                  key={user.id}
-                  onClick={() => openUserDrawer(user)}
-                  className="flex items-center justify-between p-4 hover:bg-white/[0.02] cursor-pointer transition text-xs group"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold shrink-0">
-                      {initials}
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-zinc-100 truncate group-hover:text-indigo-400 transition">
-                          {displayName}
-                        </span>
-                        {user.email && user.name && (
-                          <span className="text-[11px] text-zinc-400 truncate">{user.email}</span>
-                        )}
-                        <span className="font-mono text-[10px] text-zinc-500 bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/5">
-                          ID: {user.distinctId}
-                        </span>
-                      </div>
-
-                      {/* Traits Preview */}
-                      {traitsEntries.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {traitsEntries.map(([k, v]) => (
-                            <span
-                              key={k}
-                              className="text-[10px] text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06]"
-                            >
-                              <strong className="text-zinc-500">{k}:</strong> {String(v)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-6 shrink-0 ml-4">
-                    <div className="text-right hidden sm:block">
-                      <div className="text-zinc-200 font-medium">{user.totalSessions} sessions</div>
-                      <div className="text-[11px] text-zinc-500">{user.totalEvents} events</div>
-                    </div>
-
-                    <div className="text-right hidden md:block">
-                      <div className="text-zinc-300">{formatRelativeTime(user.lastSeenAt)}</div>
-                      <div className="text-[10px] text-zinc-500">Last active</div>
-                    </div>
-
-                    <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300 transition" />
-                  </div>
-                </div>
-              );
-            })}
+        {activeSegment && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {activeSegment.definition.conditions.map((c, i) => (
+                <span key={i} className="rounded border border-white/[0.07] bg-white/[0.03] px-2 py-px text-[10.5px] text-zinc-300">
+                  {describeCondition(c)}
+                </span>
+              ))}
+              {activeSegment.definition.behavior.map((b, i) => (
+                <span key={`b${i}`} className="rounded border border-white/[0.14] bg-white/[0.07] px-2 py-px text-[10.5px] text-zinc-100">
+                  {describeBehavior(b)}
+                </span>
+              ))}
+              {activeSegment.definition.conditions.length > 1 && (
+                <span className="text-xs text-zinc-600">match {activeSegment.definition.match}</span>
+              )}
+            </div>
+            {confirmDelete ? (
+              <span className="flex items-center gap-1 rounded-md border border-[#e5484d]/25 bg-[#e5484d]/10 pl-2 text-xs text-[#e5484d]">
+                Delete segment?
+                <button type="button" onClick={() => void deleteSegment(activeSegment)} className="px-2 py-1 font-medium hover:text-white">
+                  Yes
+                </button>
+                <button type="button" onClick={() => setConfirmDelete(false)} className="px-2 py-1 text-zinc-400 hover:text-zinc-100">
+                  No
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                aria-label="Delete segment"
+                title="Delete segment"
+                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* User Timeline Drawer / Modal */}
-      {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-sm p-0 animate-in fade-in duration-200">
-          <div
-            className="w-full max-w-xl h-full bg-zinc-950 border-l border-white/10 p-6 overflow-y-auto space-y-6 flex flex-col justify-between shadow-2xl animate-in slide-in-from-right duration-300"
-          >
-            <div className="space-y-6">
-              {/* Drawer Header */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 text-sm font-bold">
-                    {(selectedUser.name || selectedUser.distinctId).slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-zinc-100">
-                      {selectedUser.name || selectedUser.email || selectedUser.distinctId}
-                    </h2>
-                    <span className="font-mono text-xs text-zinc-400">
-                      distinct_id: {selectedUser.distinctId}
-                    </span>
-                  </div>
-                </div>
+      {/* Directory */}
+      <Card className="overflow-hidden p-0">
+        <CardHeader className="gap-3 border-b border-white/[0.08] p-5 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+          <div>
+            <CardTitle>People</CardTitle>
+            <CardDescription>
+              {activeSegment
+                ? segmentLoading
+                  ? "Finding matching people…"
+                  : `${(segmentCount?.total ?? profiles.length).toLocaleString()}${segmentCount?.capped ? "+" : ""} in “${activeSegment.name}”${
+                      segmentCount && segmentCount.total > profiles.length ? `, showing the ${profiles.length} most recently active` : ""
+                    }`
+                : searching
+                ? `${profiles.length} ${profiles.length === 1 ? "match" : "matches"} for “${search.trim()}”`
+                : `${profiles.length.toLocaleString()} most recently active`}
+            </CardDescription>
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              aria-label="Search people"
+              placeholder="Search email, name or ID"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="h-9 w-full rounded-lg border border-white/[0.1] bg-sidebar pl-9 pr-8 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-white/[0.3]"
+            />
+            {isSearching ? (
+              <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-zinc-400" />
+            ) : (
+              searching && (
                 <button
                   type="button"
-                  onClick={() => setSelectedUser(null)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition"
+                  aria-label="Clear search"
+                  onClick={() => handleSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-500 hover:text-zinc-200"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="h-4 w-4" />
                 </button>
-              </div>
-
-              {/* User Overview Badges */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                  <span className="text-zinc-500 block text-[10px]">First Seen</span>
-                  <span className="font-medium text-zinc-200">
-                    {formatRelativeTime(selectedUser.firstSeenAt)}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                  <span className="text-zinc-500 block text-[10px]">Last Seen</span>
-                  <span className="font-medium text-zinc-200">
-                    {formatRelativeTime(selectedUser.lastSeenAt)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Custom Traits Box */}
-              {Object.keys(selectedUser.traits || {}).length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-indigo-400" />
-                    Customer Traits
-                  </span>
-                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] flex flex-wrap gap-2">
-                    {Object.entries(selectedUser.traits).map(([key, val]) => (
-                      <div
-                        key={key}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-zinc-300 flex items-center gap-1.5"
-                      >
-                        <span className="text-zinc-500 font-mono text-[11px]">{key}:</span>
-                        <strong className="text-zinc-200">{String(val)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Chronological Activity Timeline */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
-                    Activity Stream ({timeline.length} events)
-                  </span>
-                  {loadingTimeline && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />}
-                </div>
-
-                {loadingTimeline ? (
-                  <div className="p-8 text-center text-xs text-zinc-500">Loading user events…</div>
-                ) : timeline.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-zinc-500 rounded-xl border border-dashed border-white/10">
-                    No recent ClickHouse events found for this distinct ID.
-                  </div>
-                ) : (
-                  <div className="relative pl-4 space-y-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/10">
-                    {timeline.map((event) => {
-                      const isPageview = event.type === "pageview";
-                      const isIdentify = event.type === "identify";
-                      const isGoal = event.properties?.eventName === "goal_completed" || !!event.properties?.goal;
-
-                      return (
-                        <div key={event.eventId} className="relative text-xs space-y-1">
-                          {/* Dot */}
-                          <div
-                            className={`absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 ${
-                              isGoal
-                                ? "bg-amber-400"
-                                : isIdentify
-                                ? "bg-purple-400"
-                                : isPageview
-                                ? "bg-indigo-400"
-                                : "bg-emerald-400"
-                            }`}
-                          />
-
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-zinc-200 flex items-center gap-1.5">
-                              <span
-                                className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded ${
-                                  isGoal
-                                    ? "bg-amber-500/10 text-amber-400"
-                                    : isIdentify
-                                    ? "bg-purple-500/10 text-purple-400"
-                                    : isPageview
-                                    ? "bg-indigo-500/10 text-indigo-400"
-                                    : "bg-emerald-500/10 text-emerald-400"
-                                }`}
-                              >
-                                {isGoal ? "Goal" : event.type}
-                              </span>
-                              <span className="truncate max-w-[260px] font-mono text-[11px]">
-                                {event.path || event.eventName}
-                              </span>
-                            </span>
-                            <span className="text-[10px] text-zinc-500">
-                              {formatRelativeTime(event.timestamp)}
-                            </span>
-                          </div>
-
-                          {/* Event Metadata (Browser, City, Device) */}
-                          <div className="flex items-center gap-3 text-[10px] text-zinc-500">
-                            {event.browser && <span>{event.browser} / {event.os}</span>}
-                            {event.city && <span>📍 {event.city}, {event.country}</span>}
-                            {event.title && <span className="truncate max-w-[150px]">"{event.title}"</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={() => setSelectedUser(null)}
-              className="w-full mt-4 text-xs font-semibold"
-            >
-              Close
-            </Button>
+              )
+            )}
           </div>
-        </div>
+        </CardHeader>
+
+        {profiles.length === 0 ? (
+          <EmptyState searching={searching} onCopy={copyIdentifySnippet} copied={copiedSnippet} />
+        ) : (
+          <ul className="divide-y divide-white/[0.05]">
+            {profiles.map((user) => {
+              const label = displayNameOf(user);
+              const activity = activityOf(user.lastSeenAt);
+              const traits = Object.entries(user.traits || {});
+              return (
+                <li key={user.id}>
+                  <button
+                    type="button"
+                    onClick={() => void openUserDrawer(user)}
+                    className="group flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-white/[0.03] focus-visible:bg-white/[0.04] focus-visible:outline-none"
+                  >
+                    <div className="relative">
+                      <Avatar label={label} />
+                      <span
+                        title={activity.label}
+                        className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${activity.dot}`}
+                      />
+                    </div>
+
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="truncate text-[13px] font-medium text-zinc-100">{label}</span>
+                        {user.name && user.email && <span className="truncate text-xs text-zinc-500">{user.email}</span>}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded border border-white/[0.06] bg-white/[0.025] px-2 py-px font-mono text-xs text-zinc-500">
+                          {user.distinctId}
+                        </span>
+                        {traits.slice(0, 3).map(([k, v]) => (
+                          <span
+                            key={k}
+                            className="rounded border border-white/[0.06] bg-white/[0.025] px-2 py-px text-xs text-zinc-400"
+                          >
+                            <span className="text-zinc-500">{k}</span> {String(v)}
+                          </span>
+                        ))}
+                        {traits.length > 3 && <span className="text-xs text-zinc-600">+{traits.length - 3}</span>}
+                      </div>
+                    </div>
+
+                    <div className="hidden w-24 shrink-0 text-right sm:block">
+                      <p className="text-xs font-medium tabular-nums text-zinc-200">{user.totalSessions.toLocaleString()}</p>
+                      <p className="text-xs text-zinc-500">sessions</p>
+                    </div>
+                    <div className="hidden w-24 shrink-0 text-right md:block">
+                      <p className="text-xs font-medium tabular-nums text-zinc-200">{user.totalEvents.toLocaleString()}</p>
+                      <p className="text-xs text-zinc-500">events</p>
+                    </div>
+                    <div className="hidden w-24 shrink-0 text-right md:block">
+                      <p className="text-xs text-zinc-300" suppressHydrationWarning>
+                        {formatRelativeTime(user.lastSeenAt)}
+                      </p>
+                      <p className="text-xs text-zinc-500">last active</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-zinc-700 transition-colors group-hover:translate-x-0.5 group-hover:text-zinc-300" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {hasMore && !activeSegment && profiles.length > 0 && (
+          <div className="flex justify-center border-t border-white/[0.05] pt-3">
+            <button
+              type="button"
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              className="inline-flex h-8 items-center rounded-lg border border-white/[0.08] px-3 text-xs font-medium text-zinc-300 transition-colors hover:bg-white/[0.05] disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : "Load more people"}
+            </button>
+          </div>
+        )}
+      </Card>
+
+      {builderOpen && (
+        <SegmentBuilder
+          siteId={site.id}
+          traitKeys={traitKeys}
+          onClose={() => setBuilderOpen(false)}
+          onSaved={(segment) => {
+            setSegments((prev) => [segment, ...prev]);
+            setBuilderOpen(false);
+            void selectSegment(segment);
+          }}
+        />
+      )}
+
+      {selectedUser && (
+        <ProfileDrawer
+          user={selectedUser}
+          timeline={timeline}
+          loading={loadingTimeline}
+          error={timelineError}
+          onRetry={() => {
+            timelineCache.current.delete(selectedUser.distinctId);
+            void openUserDrawer(selectedUser);
+          }}
+          onClose={() => setSelectedUser(null)}
+        />
       )}
     </div>
+  );
+}
+
+function EmptyState({ searching, onCopy, copied }: { searching: boolean; onCopy: () => void; copied: boolean }) {
+  if (searching) {
+    return (
+      <div className="px-6 py-14 text-center">
+        <p className="text-sm font-medium text-zinc-300">No one matches that search</p>
+        <p className="mt-1 text-xs text-zinc-500">Try an email address, a name, or the exact distinct ID.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="px-6 py-12">
+      <div className="mx-auto max-w-md space-y-4 text-center">
+        <MatrixArt variant="stream" className="h-28" />
+        <div className="space-y-1">
+          <h3 className="text-sm font-medium text-zinc-200">No identified users yet</h3>
+          <p className="text-xs leading-relaxed text-zinc-400">
+            Visitors stay anonymous until you call <code className="font-mono text-zinc-200">identify()</code>. Do it after
+            login and each person gets a profile, traits and a full journey.
+          </p>
+        </div>
+        <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-black/40 text-left">
+          <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-zinc-300">{IDENTIFY_SNIPPET}</pre>
+          <button
+            type="button"
+            onClick={onCopy}
+            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/[0.1] bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-300 hover:text-white"
+          >
+            {copied ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────── Profile drawer ───────────────────────────── */
+
+interface SessionGroup {
+  id: string;
+  events: UserTimelineEvent[]; // oldest first
+  start: Date;
+  end: Date;
+}
+
+function groupBySession(timeline: UserTimelineEvent[]): SessionGroup[] {
+  const groups = new Map<string, UserTimelineEvent[]>();
+  for (const event of timeline) {
+    const key = event.sessionId || `solo-${event.eventId}`;
+    const list = groups.get(key);
+    if (list) list.push(event);
+    else groups.set(key, [event]);
+  }
+  return [...groups.entries()]
+    .map(([id, events]) => {
+      const sorted = [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      return {
+        id,
+        events: sorted,
+        start: new Date(sorted[0]!.timestamp),
+        end: new Date(sorted[sorted.length - 1]!.timestamp),
+      };
+    })
+    .sort((a, b) => b.start.getTime() - a.start.getTime());
+}
+
+function formatSpan(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 1) return "under a second";
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  return m < 60 ? `${m}m ${String(s % 60).padStart(2, "0")}s` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+const dateTime = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const timeOnly = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", second: "2-digit" });
+
+function isGoalEvent(event: UserTimelineEvent): boolean {
+  return event.properties?.eventName === "goal_completed" || Boolean(event.properties?.goal);
+}
+
+function ProfileDrawer({
+  user,
+  timeline,
+  loading,
+  error,
+  onRetry,
+  onClose,
+}: {
+  user: UserProfileItem;
+  timeline: UserTimelineEvent[];
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  const closeRef = React.useRef<HTMLButtonElement>(null);
+  const [copiedId, setCopiedId] = React.useState(false);
+  const label = displayNameOf(user);
+  const traits = Object.entries(user.traits || {});
+  const sessions = React.useMemo(() => groupBySession(timeline), [timeline]);
+  const pageviews = timeline.filter((e) => e.type === "pageview").length;
+
+  // The parent passes a fresh onClose every render; hold it in a ref so the effect (which
+  // grabs focus and locks scroll) runs once per open, not on every timeline update.
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  React.useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={onClose}>
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Profile for ${label}`}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex h-full w-full max-w-xl flex-col border-l border-white/[0.08] bg-card shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] p-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar label={label} size="lg" />
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-medium text-zinc-50">{label}</h2>
+              {user.email && user.name && <p className="truncate text-xs text-zinc-400">{user.email}</p>}
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(user.distinctId);
+                  setCopiedId(true);
+                  setTimeout(() => setCopiedId(false), 1500);
+                }}
+                className="mt-0.5 inline-flex items-center gap-1 font-mono text-xs text-zinc-500 transition-colors hover:text-zinc-200"
+                title="Copy distinct ID"
+              >
+                {user.distinctId}
+                {copiedId ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close profile"
+            className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-6 overflow-y-auto p-5">
+          {/* Lifetime */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              ["Sessions", user.totalSessions.toLocaleString()],
+              ["Events", user.totalEvents.toLocaleString()],
+              ["First seen", dateTime.format(new Date(user.firstSeenAt))],
+              ["Last seen", dateTime.format(new Date(user.lastSeenAt))],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
+                <p className="text-xs font-medium text-zinc-500">{k}</p>
+                <p className="mt-1 text-[13px] font-medium tabular-nums text-zinc-100">{v}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Traits */}
+          {traits.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-xs font-medium text-zinc-400">Traits</h3>
+              <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.06] sm:grid-cols-2">
+                {traits.map(([key, val]) => (
+                  <div key={key} className="flex items-baseline justify-between gap-3 bg-card px-3 py-2">
+                    <dt className="font-mono text-xs text-zinc-500">{key}</dt>
+                    <dd className="truncate text-xs font-medium text-zinc-200">{String(val)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          {/* Journey */}
+          <section className="space-y-3">
+            <div className="flex items-end justify-between">
+              <h3 className="text-xs font-medium text-zinc-400">Journey</h3>
+              {!loading && timeline.length > 0 && (
+                <span className="text-xs text-zinc-500">
+                  {sessions.length} {sessions.length === 1 ? "session" : "sessions"} · {pageviews} pageviews · {timeline.length} events
+                </span>
+              )}
+            </div>
+
+            {loading ? (
+              <div role="status" aria-busy="true" className="space-y-3">
+                <span className="sr-only">Loading journey</span>
+                {[0, 1].map((i) => (
+                  <div key={i} className="space-y-3 rounded-xl border border-white/[0.07] p-4">
+                    <Skeleton className="h-3 w-40" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <div className="rounded-xl border border-dashed border-[#e5484d]/30 bg-[#e5484d]/5 p-6 text-center">
+                <p className="text-xs text-[#e5484d]">The activity stream could not be loaded.</p>
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="mt-2 rounded-md border border-white/[0.1] px-3 py-1 text-xs text-zinc-200 hover:bg-white/[0.05]"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-500">
+                No events recorded for this person yet.
+              </div>
+            ) : (
+              <ol className="space-y-3">
+                {sessions.map((session, i) => (
+                  <SessionCard key={session.id} session={session} defaultOpen={i === 0} />
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function SessionCard({ session, defaultOpen }: { session: SessionGroup; defaultOpen: boolean }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  const [replaying, setReplaying] = React.useState(false);
+  const first = session.events[0]!;
+  const pages = session.events.filter((e) => e.type === "pageview");
+  // Collapse refreshes: the route is the sequence of distinct consecutive pages.
+  const route = pages.map((e) => e.path || e.url).filter((p, i, arr) => i === 0 || p !== arr[i - 1]);
+  const actions = session.events.filter((e) => e.type !== "pageview");
+  const where = [first.city, first.country?.trim()].filter(Boolean).join(", ");
+  const tech = [first.browser, first.os].filter(Boolean).join(" · ");
+
+  return (
+    <li className="rounded-xl border border-white/[0.07] bg-white/[0.015]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-zinc-100">{dateTime.format(session.start)}</p>
+          <p className="mt-0.5 truncate text-xs text-zinc-500">
+            {session.events.length} {session.events.length === 1 ? "event" : "events"} · {formatSpan(session.end.getTime() - session.start.getTime())}
+            {actions.length > 0 && ` · ${actions.length} ${actions.length === 1 ? "action" : "actions"}`}
+          </p>
+        </div>
+        <ChevronRight className={`h-4 w-4 shrink-0 text-zinc-600 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+
+      {/* Route rail: always visible, it is the story of the visit */}
+      {route.length > 0 && (
+        <div className="flex flex-wrap items-center gap-y-2 px-4 pb-3">
+          {route.map((path, i) => (
+            <React.Fragment key={`${path}-${i}`}>
+              <span
+                title={path}
+                className={`max-w-[150px] truncate rounded-md border px-2 py-0.5 font-mono text-xs ${
+                  i === 0 ? "border-white/[0.14] bg-white/[0.07] text-zinc-100" : "border-white/[0.08] bg-white/[0.025] text-zinc-300"
+                }`}
+              >
+                {path}
+              </span>
+              {i < route.length - 1 && (
+                <span aria-hidden className="mx-1 text-xs text-zinc-600">
+                  ›
+                </span>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="space-y-3 border-t border-white/[0.06] px-4 py-3">
+          {session.events.length > 1 &&
+            (replaying ? (
+              <SessionReplay events={session.events} />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setReplaying(true)}
+                className="inline-flex items-center gap-2 rounded-md border border-white/[0.1] bg-white/[0.03] px-3 py-1 text-xs font-medium text-zinc-300 transition-colors hover:border-white/[0.18] hover:text-white"
+              >
+                <Play className="h-4 w-4" />
+                Replay this session
+              </button>
+            ))}
+          {(where || tech) && (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+              {where && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="h-4 w-4" /> {where}
+                </span>
+              )}
+              {tech && (
+                <span className="inline-flex items-center gap-1">
+                  <Monitor className="h-4 w-4" /> {tech}
+                </span>
+              )}
+            </p>
+          )}
+          <ol className="relative space-y-3 pl-4 before:absolute before:bottom-1 before:left-[3px] before:top-1 before:w-px before:bg-white/10">
+            {session.events.map((event) => {
+              const goal = isGoalEvent(event);
+              const action = event.type !== "pageview";
+              return (
+                <li key={event.eventId} className="relative">
+                  <span
+                    className={`absolute -left-[17px] top-1.5 h-[7px] w-[7px] rounded-full ring-2 ring-[#19191b] ${
+                      goal ? "bg-white/[0.06]" : action ? "bg-[#4cc38a]" : "bg-zinc-500"
+                    }`}
+                  />
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="flex min-w-0 items-center gap-2 text-xs">
+                      {action && (
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-px text-xs font-medium ${
+                            goal ? "bg-white/[0.06] text-zinc-300" : "bg-[#4cc38a]/10 text-[#4cc38a]"
+                          }`}
+                        >
+                          {goal && <Zap className="h-4 w-4" />}
+                          {goal ? "Goal" : event.type}
+                        </span>
+                      )}
+                      <span className="truncate font-mono text-xs text-zinc-300">
+                        {action && event.eventName && event.eventName !== event.type ? event.eventName : event.path || event.url}
+                      </span>
+                    </p>
+                    <time className="shrink-0 font-mono text-xs tabular-nums text-zinc-600" dateTime={event.timestamp}>
+                      {timeOnly.format(new Date(event.timestamp))}
+                    </time>
+                  </div>
+                  {event.title && <p className="mt-0.5 truncate text-xs text-zinc-600">{event.title}</p>}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
+    </li>
   );
 }

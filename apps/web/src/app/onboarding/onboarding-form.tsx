@@ -2,17 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  Building2,
-  Globe,
-  Code2,
-  Radio,
-  Users,
   Check,
   Copy,
   ArrowRight,
   ArrowLeft,
-  Sparkles,
   Zap,
   Loader2,
   UserPlus,
@@ -24,7 +19,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { GlyphField } from "@trackme/landing";
 import { FirstEventVerifier } from "@/components/first-event-verifier";
 import { useInviteManager } from "@/hooks/use-invite-manager";
 
@@ -46,26 +41,22 @@ interface InviteStatus {
 }
 
 const STEPS = [
-  { id: 1, label: "Organization", icon: Building2, desc: "Profile & Region" },
-  { id: 2, label: "Website", icon: Globe, desc: "Connect domain" },
-  { id: 3, label: "Tracking Code", icon: Code2, desc: "Install snippet" },
-  { id: 4, label: "Verify Telemetry", icon: Radio, desc: "Live event check" },
-  { id: 5, label: "Invite Team", icon: Users, desc: "Collaborate (optional)" },
+  { id: 1, label: "Workspace", desc: "Name it" },
+  { id: 2, label: "Website", desc: "Add your domain" },
+  { id: 3, label: "Tag", desc: "Install the script" },
+  { id: 4, label: "First event", desc: "Check it arrives" },
+  { id: 5, label: "Team", desc: "Invite people, optional" },
 ] as const;
 
-export function OnboardingForm() {
+export function OnboardingForm({ existing }: { existing: { id: string; name: string; slug: string }[] }) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Step 1: Org Data
   const [orgName, setOrgName] = useState("");
-  const [timezone, setTimezone] = useState("UTC");
-  const [dataResidency, setDataResidency] = useState("eu-central");
 
   // Step 2: Site Data
   const [domain, setDomain] = useState("");
-  const [siteLabel, setSiteLabel] = useState("");
-  const [currency, setCurrency] = useState("USD");
 
   // Creation State
   const [pending, setPending] = useState(false);
@@ -78,6 +69,7 @@ export function OnboardingForm() {
 
   // Step 4: Verification
   const [testEventSent, setTestEventSent] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const [sendingTestEvent, setSendingTestEvent] = useState(false);
 
   // Step 5: Team Invites (using shared hook)
@@ -156,7 +148,7 @@ export function OnboardingForm() {
         return `<!-- Custom HTML Tag in Google Tag Manager -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>\n<!-- Trigger: All Pages (Page View) -->`;
       case "html":
       default:
-        return `<!-- TrackMe Cookieless Telemetry (~5 KB gzipped, zero cookies) -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
+        return `<!-- TrackMe Cookieless Telemetry (under 10 KB gzipped, no tracking cookies) -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
     }
   }
 
@@ -268,506 +260,346 @@ export function OnboardingForm() {
 
   // Complete Onboarding
   async function handleComplete() {
-    if (!created) return;
+    if (!created || launching) return;
+    // The dashboard renders server-side and can take a while on first load; show progress
+    // and ignore repeat clicks instead of leaving the button looking dead.
+    setLaunching(true);
     router.push(`/${created.workspace.slug}/overview`);
     router.refresh();
   }
 
 
+  const input =
+    "h-10 w-full rounded-lg border border-white/[0.1] bg-card px-3 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors duration-150 hover:border-white/[0.18] focus:border-white/[0.35]";
+  const primary =
+    "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#ededed] px-5 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60";
+  const ghost =
+    "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/[0.1] px-4 text-sm text-zinc-300 transition-colors duration-150 hover:border-white/[0.2] hover:text-zinc-50";
+  const current = STEPS[currentStep - 1]!;
+
+  const StepHead = ({ title, children }: { title: string; children?: React.ReactNode }) => (
+    <div className="mb-8">
+      <p className="font-mono text-xs text-zinc-500">
+        Step {currentStep} of {STEPS.length}
+      </p>
+      <h2 className="mt-3 text-[28px] font-medium leading-9 tracking-[-0.02em] text-zinc-50">{title}</h2>
+      {children && <p className="mt-2 max-w-md text-sm leading-5 text-zinc-400">{children}</p>}
+    </div>
+  );
+
+  const ErrorNote = () =>
+    error ? (
+      <p role="alert" className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+        {error}
+      </p>
+    ) : null;
+
   return (
-    <div className="w-full max-w-2xl mx-auto rounded-3xl border border-white/[0.08] bg-zinc-950/90 p-7 sm:p-9 shadow-2xl backdrop-blur-xl">
-      {/* Stepper Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          {STEPS.map((s, idx) => {
-            const isDone = currentStep > s.id;
-            const isCurrent = currentStep === s.id;
-            const Icon = s.icon;
-
-            return (
-              <div key={s.id} className="flex items-center flex-1 last:flex-none">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold transition-all ${
-                      isDone
-                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-xs"
-                        : isCurrent
-                        ? "bg-zinc-100 text-zinc-950 font-bold shadow-md"
-                        : "bg-white/[0.04] text-zinc-500 border border-white/[0.06]"
-                    }`}
-                  >
-                    {isDone ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
-                  </div>
+    <div className="grid flex-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+      {/* The steps, always in view */}
+      <aside className="relative hidden overflow-hidden border-r border-white/[0.08] bg-sidebar lg:block">
+        <div className="relative z-10 p-8">
+          <p className="font-mono text-xs text-zinc-500">Set up your workspace</p>
+          <ol className="mt-6 space-y-1">
+            {STEPS.map((s) => {
+              const done = currentStep > s.id;
+              const active = currentStep === s.id;
+              return (
+                <li
+                  key={s.id}
+                  aria-current={active ? "step" : undefined}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-3 transition-colors duration-150 ${
+                    active ? "bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : ""
+                  }`}
+                >
                   <span
-                    className={`text-[10px] mt-1.5 hidden sm:block tracking-tight font-medium ${
-                      isCurrent ? "text-zinc-200" : isDone ? "text-zinc-400" : "text-zinc-600"
+                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border font-mono text-xs ${
+                      done ? "border-white/[0.2] bg-white/[0.06] text-zinc-100" : active ? "border-white/[0.3] text-zinc-50" : "border-white/[0.1] text-zinc-500"
                     }`}
                   >
-                    {s.label}
+                    {done ? <Check className="h-4 w-4" /> : String(s.id).padStart(2, "0")}
                   </span>
+                  <span className="min-w-0">
+                    <span className={`block text-sm ${active ? "font-medium text-zinc-50" : done ? "text-zinc-300" : "text-zinc-500"}`}>{s.label}</span>
+                    <span className="block text-xs text-zinc-500">{s.desc}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 h-64" aria-hidden="true">
+          <GlyphField variant="stream" cell={9} strength={0.7} />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#0f0f10] to-transparent" />
+        </div>
+      </aside>
+
+      <main className="min-w-0 px-4 py-10 sm:px-8 lg:py-16">
+        <div className="mx-auto w-full max-w-[520px]">
+          {/* Small screens: the rail collapses to a progress line */}
+          <div className="mb-8 lg:hidden" aria-hidden="true">
+            <div className="flex gap-1">
+              {STEPS.map((s) => (
+                <span key={s.id} className={`h-0.5 flex-1 rounded-full ${currentStep >= s.id ? "bg-zinc-200" : "bg-white/[0.12]"}`} />
+              ))}
+            </div>
+            <p className="mt-3 font-mono text-xs text-zinc-500">{current.label}</p>
+          </div>
+
+          {existing.length > 0 && currentStep === 1 && (
+            <div className="mb-8 rounded-lg border border-white/[0.08] bg-card px-4 py-3 text-sm text-zinc-400">
+              You already have {existing.length === 1 ? "a workspace" : "workspaces"}:{" "}
+              {existing.map((workspace, index) => (
+                <span key={workspace.id}>
+                  {index > 0 ? ", " : ""}
+                  <Link className="text-zinc-100 underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white" href={`/${workspace.slug}/overview`}>
+                    {workspace.name}
+                  </Link>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* STEP 1: ORGANIZATION */}
+          {currentStep === 1 && (
+            <div>
+              <StepHead title="Name your workspace">A workspace holds your sites, your data and your team.</StepHead>
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="org-name" className="mb-2 block text-sm text-zinc-300">
+                    Organization name
+                  </label>
+                  <input id="org-name" type="text" required autoFocus placeholder="Acme Corporation" value={orgName} onChange={(e) => setOrgName(e.target.value)} className={input} />
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Your address: <span className="font-mono text-zinc-400">/{computedSlug}</span>
+                  </p>
                 </div>
-                {idx < STEPS.length - 1 && (
-                  <div
-                    className={`h-[1px] flex-1 mx-2 transition-all ${
-                      currentStep > s.id ? "bg-emerald-500/30" : "bg-white/[0.06]"
-                    }`}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* STEP 1: ORGANIZATION */}
-      {currentStep === 1 && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-              Create your organization
-            </h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Organizations isolate telemetry, permissions, domains, and team members.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                Organization / Company Name <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Acme Corporation or Growth Studio"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
-              />
-              <p className="text-[11px] text-zinc-500 mt-1">
-                Workspace URL:{" "}
-                <span className="font-mono text-zinc-400">trackme.app/{computedSlug}</span>
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Reporting Timezone
-                </label>
-                <select
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none"
-                >
-                  <option value="UTC">UTC (Coordinated Universal Time)</option>
-                  <option value="America/New_York">America/New_York (EST/EDT)</option>
-                  <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
-                  <option value="Europe/London">Europe/London (GMT/BST)</option>
-                  <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
-                  <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                  <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Data Residency & Privacy
-                </label>
-                <select
-                  value={dataResidency}
-                  onChange={(e) => setDataResidency(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none"
-                >
-                  <option value="eu-central">EU Central (100% GDPR Compliant)</option>
-                  <option value="us-east">US East (Standard Privacy)</option>
-                  <option value="ap-southeast">APAC Regional (Privacy-Safe)</option>
-                </select>
+                <ErrorNote />
+                <div className="flex justify-end">
+                  <button type="button" onClick={handleNextFromOrg} className={primary}>
+                    Continue <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-
-          {error && (
-            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">
-              {error}
-            </p>
           )}
 
-          <div className="pt-2 flex justify-end">
-            <Button
-              onClick={handleNextFromOrg}
-              className="h-10 text-xs font-semibold px-6 gap-2"
-            >
-              Continue to Website Setup
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 2: WEBSITE SETUP */}
-      {currentStep === 2 && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-              Add your primary website
-            </h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Enter your main web domain. You can add unlimited websites later from organization settings.
-            </p>
-          </div>
-
-          <div className="space-y-4">
+          {/* STEP 2: WEBSITE SETUP */}
+          {currentStep === 2 && (
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                Domain / Hostname <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="acmesaas.com or mycompany.io"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
-              />
-              <p className="text-[11px] text-zinc-500 mt-1">Enter domain without https:// or paths.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Display Label (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Marketing Site"
-                  value={siteLabel}
-                  onChange={(e) => setSiteLabel(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Currency for Goals & Revenue
-                </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none"
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="INR">INR (₹)</option>
-                  <option value="CAD">CAD ($)</option>
-                  <option value="AUD">AUD ($)</option>
-                </select>
+              <StepHead title="Add your website">Enter your main domain. You can add more sites later in settings.</StepHead>
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="site-domain" className="mb-2 block text-sm text-zinc-300">
+                    Domain
+                  </label>
+                  <input id="site-domain" type="text" required autoFocus placeholder="example.com" value={domain} onChange={(e) => setDomain(e.target.value)} className={`${input} font-mono`} />
+                  <p className="mt-2 text-xs text-zinc-500">Without https:// or a path. Subdomains and the www version are included.</p>
+                </div>
+                <ErrorNote />
+                <div className="flex items-center justify-between">
+                  <button type="button" onClick={() => setCurrentStep(1)} className={ghost}>
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </button>
+                  <button type="button" onClick={handleCreateWorkspaceAndSite} disabled={pending || !domain.trim()} className={primary}>
+                    {pending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Creating…
+                      </>
+                    ) : (
+                      <>
+                        Create workspace <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-
-          {error && (
-            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">
-              {error}
-            </p>
           )}
 
-          <div className="pt-2 flex justify-between items-center">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentStep(1)}
-              className="h-10 text-xs border-white/10 text-zinc-400 hover:text-zinc-200"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
-            </Button>
-            <Button
-              onClick={handleCreateWorkspaceAndSite}
-              disabled={pending || !domain.trim()}
-              className="h-10 text-xs font-semibold px-6 gap-2"
-            >
-              {pending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Provisioning…
-                </>
-              ) : (
-                <>
-                  Create & Get Tracking Code
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
+          {/* STEP 3: SNIPPET INSTALLATION */}
+          {currentStep === 3 && created && (
+            <div>
+              <StepHead title="Install the tag">One script tag in your page head. It loads deferred and tracks single-page navigation by itself.</StepHead>
+              <div className="space-y-5">
+                <div role="tablist" aria-label="Where to add the tag" className="flex gap-0.5 overflow-x-auto rounded-lg border border-white/[0.1] p-0.5">
+                  {[
+                    { id: "html", label: "HTML" },
+                    { id: "nextjs", label: "Next.js" },
+                    { id: "react", label: "React / Vite" },
+                    { id: "vue", label: "Vue / Nuxt" },
+                    { id: "gtm", label: "Tag Manager" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={snippetTab === tab.id}
+                      onClick={() => setSnippetTab(tab.id as typeof snippetTab)}
+                      className={`inline-flex h-8 shrink-0 items-center rounded-md px-3 text-sm transition-colors duration-150 ${
+                        snippetTab === tab.id ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "text-zinc-400 hover:text-zinc-100"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-      {/* STEP 3: SNIPPET INSTALLATION */}
-      {currentStep === 3 && created && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-              Install the tracking snippet
-            </h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Add this lightweight tag (&lt;2KB) to start capturing cookieless pageviews and sessions.
-            </p>
-          </div>
-
-          {/* Framework tabs */}
-          <div className="flex flex-wrap gap-1.5 border-b border-white/[0.08] pb-2">
-            {[
-              { id: "html", label: "HTML / Vanilla" },
-              { id: "nextjs", label: "Next.js" },
-              { id: "react", label: "React / Vite" },
-              { id: "vue", label: "Vue / Nuxt" },
-              { id: "gtm", label: "Google Tag Manager" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setSnippetTab(tab.id as typeof snippetTab)}
-                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition ${
-                  snippetTab === tab.id
-                    ? "bg-white/[0.1] text-zinc-100 font-semibold"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Code display */}
-          <div className="relative rounded-2xl border border-white/10 bg-zinc-900/90 p-4">
-            <pre className="font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all pr-14 leading-relaxed">
-              {getSnippetContent(snippetTab)}
-            </pre>
-            <button
-              onClick={handleCopySnippet}
-              className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-white/20 transition"
-            >
-              {copiedSnippet ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Key characteristics */}
-          <div className="grid grid-cols-3 gap-2 text-center text-[11px] text-zinc-400 pt-1">
-            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-              <span className="block font-semibold text-zinc-200">1.8 KB</span>
-              <span>Zero bloat</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-              <span className="block font-semibold text-zinc-200">0 Cookies</span>
-              <span>No GDPR banner</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-              <span className="block font-semibold text-zinc-200">Async</span>
-              <span>Zero render-blocking</span>
-            </div>
-          </div>
-
-          <div className="pt-2 flex justify-between items-center">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentStep(2)}
-              className="h-10 text-xs border-white/10 text-zinc-400 hover:text-zinc-200"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
-            </Button>
-            <Button
-              onClick={() => setCurrentStep(4)}
-              className="h-10 text-xs font-semibold px-6 gap-2"
-            >
-              Verify Snippet Live
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4: VERIFY TELEMETRY */}
-      {currentStep === 4 && created && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-              Live ingestion verification
-            </h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Checking telemetry stream for <span className="font-mono text-zinc-200">{created.site.domain}</span>.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 space-y-5">
-            <FirstEventVerifier siteId={created.site.id} />
-
-            <div className="pt-3 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-              <span className="text-zinc-400">Want to test without deploying yet?</span>
-              <button
-                type="button"
-                onClick={handleSendTestEvent}
-                disabled={sendingTestEvent}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 font-medium transition"
-              >
-                {sendingTestEvent ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Zap className="w-3.5 h-3.5" />
-                )}
-                {testEventSent ? "Test Event Dispatched ✓" : "Send Test Ping"}
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-2 flex justify-between items-center">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentStep(3)}
-              className="h-10 text-xs border-white/10 text-zinc-400 hover:text-zinc-200"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Snippet
-            </Button>
-            <Button
-              onClick={() => setCurrentStep(5)}
-              className="h-10 text-xs font-semibold px-6 gap-2"
-            >
-              Next: Invite Team (Optional)
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 5: TEAM INVITES */}
-      {currentStep === 5 && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-              Invite your collaborators
-            </h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Paste one or multiple emails (comma or space separated). Invites are sent instantly — teammates get a magic link valid for 7 days.
-            </p>
-          </div>
-
-          {/* Role selector */}
-          <div className="grid grid-cols-3 gap-2 text-[11px]">
-            {[
-              { role: "admin", label: "Admin", color: "text-amber-400 border-amber-500/20 bg-amber-500/[0.06]", desc: "Full control" },
-              { role: "member", label: "Member", color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/[0.06]", desc: "Read & edit" },
-              { role: "viewer", label: "Viewer", color: "text-sky-400 border-sky-500/20 bg-sky-500/[0.06]", desc: "Read only" },
-            ].map((r) => (
-              <button
-                key={r.role}
-                type="button"
-                onClick={() => setInviteRole(r.role as typeof inviteRole)}
-                className={`rounded-xl border px-3 py-2 text-left transition ${r.color} ${inviteRole === r.role ? "ring-1 ring-white/20" : "opacity-50 hover:opacity-80"}`}
-              >
-                <div className="font-semibold">{r.label}</div>
-                <div className="text-zinc-500 mt-0.5">{r.desc}</div>
-              </button>
-            ))}
-          </div>
-
-          {/* Email input — supports bulk paste */}
-          <form onSubmit={handleAddAndSendInvites} className="space-y-2">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="alice@acme.com, bob@acme.com…"
-                value={inviteInput}
-                onChange={(e) => setInviteInput(e.target.value)}
-                className="flex-1 rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
-              />
-              <Button type="submit" disabled={!inviteInput.trim() || !created} className="h-10 text-xs font-semibold px-5 gap-2 shrink-0">
-                <Send className="w-3.5 h-3.5" />
-                Send
-              </Button>
-            </div>
-            <p className="text-[11px] text-zinc-600">
-              Tip: paste multiple emails at once. Role applied:{" "}
-              <span className="text-zinc-400 font-medium capitalize">{inviteRole}</span>
-            </p>
-          </form>
-
-          {/* Live invite status list */}
-          {inviteStatuses.length > 0 ? (
-            <div className="rounded-2xl border border-white/[0.08] bg-zinc-900/50 divide-y divide-white/[0.05] overflow-hidden">
-              {inviteStatuses.map((s) => {
-                const expiry = s.expiresAt ? inviteManager.getExpiryMeta(s.expiresAt) : null;
-                return (
-                  <div key={s.email} className="flex items-center justify-between px-4 py-3 text-xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {s.state === "sending" && <Loader2 className="w-3.5 h-3.5 text-zinc-400 animate-spin shrink-0" />}
-                      {s.state === "sent" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                      {s.state === "error" && <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
-                      <div className="min-w-0">
-                        <span className="font-medium text-zinc-200 truncate block">{s.email}</span>
-                        {s.state === "error" && <span className="text-rose-400">{s.error}</span>}
-                        {s.state === "sent" && expiry && (
-                          <span className={`flex items-center gap-1 mt-0.5 ${expiry.urgent ? "text-amber-400" : "text-zinc-500"}`}>
-                            <Clock className="w-2.5 h-2.5" />{expiry.label}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
-                        s.role === "admin" ? "bg-amber-500/10 text-amber-400" :
-                        s.role === "viewer" ? "bg-sky-500/10 text-sky-400" :
-                        "bg-indigo-500/10 text-indigo-400"
-                      }`}>{s.role}</span>
-                      {s.state === "error" && (
-                        <button type="button" onClick={() => handleResend(s)} className="text-zinc-500 hover:text-indigo-400 p-1 transition" title="Retry">
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {s.state === "sent" && (s.token || s.inviteId) && (
-                        <button
-                          type="button"
-                          onClick={() => inviteManager.copyInviteLink(s.token || s.inviteId!, s.inviteId || s.email)}
-                          className="text-zinc-500 hover:text-zinc-300 p-1 transition"
-                          title="Copy invite link"
-                        >
-                          {inviteManager.copiedToken === (s.inviteId || s.email)
-                            ? <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            : <Link2 className="w-3.5 h-3.5" />}
-                        </button>
-                      )}
-                      <button type="button" onClick={() => handleRemoveInviteStatus(s.email)} className="text-zinc-600 hover:text-rose-400 p-1 transition" title="Remove">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                <div className="overflow-hidden rounded-xl border border-white/[0.1] bg-sidebar">
+                  <div className="flex h-11 items-center justify-between border-b border-white/[0.08] pl-4 pr-2">
+                    <span className="font-mono text-xs text-zinc-500">{created.site.domain}</span>
+                    <button type="button" onClick={handleCopySnippet} className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs text-zinc-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-zinc-50">
+                      {copiedSnippet ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+                      <span aria-live="polite">{copiedSnippet ? "Copied" : "Copy"}</span>
+                    </button>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="p-5 rounded-2xl border border-dashed border-white/10 text-center text-xs text-zinc-500">
-              <UserPlus className="w-5 h-5 mx-auto mb-2 opacity-40" />
-              No invites sent yet — add emails above or skip and invite from settings later.
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-all p-4 font-mono text-[13px] leading-[22px] text-zinc-300">{getSnippetContent(snippetTab)}</pre>
+                </div>
+
+                <dl className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs text-zinc-500">
+                  <div className="flex gap-2"><dt>size</dt><dd className="text-zinc-300">&lt; 10 KB gzipped</dd></div>
+                  <div className="flex gap-2"><dt>cookies</dt><dd className="text-zinc-300">none</dd></div>
+                  <div className="flex gap-2"><dt>loading</dt><dd className="text-zinc-300">deferred</dd></div>
+                </dl>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button type="button" onClick={() => setCurrentStep(2)} className={ghost}>
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </button>
+                  <button type="button" onClick={() => setCurrentStep(4)} className={primary}>
+                    I added it <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="pt-2 flex justify-between items-center">
-            <Button variant="outline" onClick={() => setCurrentStep(4)} className="h-10 text-xs border-white/10 text-zinc-400 hover:text-zinc-200">
-              <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
-            </Button>
-            <Button onClick={handleComplete} className="h-10 text-xs font-semibold px-6 gap-2 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-90 text-white">
-              <Sparkles className="w-4 h-4" /> Launch Analytics Dashboard →
-            </Button>
-          </div>
+          {/* STEP 4: VERIFY TELEMETRY */}
+          {currentStep === 4 && created && (
+            <div>
+              <StepHead title="Watch the first event arrive">
+                Waiting for <span className="font-mono text-zinc-200">{created.site.domain}</span> to send its first pageview.
+              </StepHead>
+              <div className="space-y-5">
+                <div className="rounded-xl border border-white/[0.1] bg-card p-5">
+                  <FirstEventVerifier siteId={created.site.id} />
+                  <div className="mt-5 flex flex-col items-start justify-between gap-3 border-t border-white/[0.08] pt-4 text-sm sm:flex-row sm:items-center">
+                    <span className="text-zinc-400">Not deployed yet?</span>
+                    <button type="button" onClick={handleSendTestEvent} disabled={sendingTestEvent} className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.12] bg-raised px-3 text-xs text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors duration-150 hover:border-white/[0.24] disabled:opacity-60">
+                      {sendingTestEvent ? <Loader2 className="h-4 w-4 animate-spin" /> : testEventSent ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Zap className="h-4 w-4" />}
+                      {testEventSent ? "Test event sent" : "Send a test event"}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                  <button type="button" onClick={() => setCurrentStep(3)} className={ghost}>
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </button>
+                  <button type="button" onClick={() => setCurrentStep(5)} className={primary}>
+                    Continue <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: TEAM INVITES */}
+          {currentStep === 5 && (
+            <div>
+              <StepHead title="Invite your team">Optional. Paste emails separated by commas or spaces. Each person gets a link that works for 7 days.</StepHead>
+              <div className="space-y-5">
+                <div role="radiogroup" aria-label="Role" className="grid grid-cols-3 gap-2">
+                  {[
+                    { role: "admin", label: "Admin", desc: "Full control" },
+                    { role: "member", label: "Member", desc: "Read and edit" },
+                    { role: "viewer", label: "Viewer", desc: "Read only" },
+                  ].map((r) => (
+                    <button
+                      key={r.role}
+                      type="button"
+                      role="radio"
+                      aria-checked={inviteRole === r.role}
+                      onClick={() => setInviteRole(r.role as typeof inviteRole)}
+                      className={`rounded-lg border px-3 py-2.5 text-left transition-colors duration-150 ${
+                        inviteRole === r.role ? "border-white/[0.3] bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "border-white/[0.1] hover:border-white/[0.2]"
+                      }`}
+                    >
+                      <span className={`block text-sm ${inviteRole === r.role ? "font-medium text-zinc-50" : "text-zinc-300"}`}>{r.label}</span>
+                      <span className="mt-0.5 block text-xs text-zinc-500">{r.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <form onSubmit={handleAddAndSendInvites} className="flex gap-2">
+                  <input type="text" aria-label="Email addresses" placeholder="alice@acme.com, bob@acme.com" value={inviteInput} onChange={(e) => setInviteInput(e.target.value)} className={`${input} flex-1`} />
+                  <button type="submit" disabled={!inviteInput.trim() || !created} className={`${primary} shrink-0`}>
+                    <Send className="h-4 w-4" /> Send
+                  </button>
+                </form>
+
+                {inviteStatuses.length > 0 ? (
+                  <ul className="divide-y divide-white/[0.07] overflow-hidden rounded-xl border border-white/[0.1] bg-card">
+                    {inviteStatuses.map((s) => {
+                      const expiry = s.expiresAt ? inviteManager.getExpiryMeta(s.expiresAt) : null;
+                      return (
+                        <li key={s.email} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                          <div className="flex min-w-0 items-center gap-3">
+                            {s.state === "sending" && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />}
+                            {s.state === "sent" && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#4cc38a]" />}
+                            {s.state === "error" && <XCircle className="h-4 w-4 shrink-0 text-[#e5484d]" />}
+                            <div className="min-w-0">
+                              <span className="block truncate text-zinc-100">{s.email}</span>
+                              {s.state === "error" && <span className="text-xs text-[#e5484d]">{s.error}</span>}
+                              {s.state === "sent" && expiry && (
+                                <span className={`mt-0.5 flex items-center gap-1 text-xs ${expiry.urgent ? "text-zinc-200" : "text-zinc-500"}`}>
+                                  <Clock className="h-3 w-3" />
+                                  {expiry.label}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className="rounded-md border border-white/[0.1] px-2 py-0.5 font-mono text-xs text-zinc-400">{s.role}</span>
+                            {s.state === "error" && (
+                              <button type="button" onClick={() => handleResend(s)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-100" title="Retry" aria-label="Retry">
+                                <RefreshCw className="h-4 w-4" />
+                              </button>
+                            )}
+                            {s.state === "sent" && (s.token || s.inviteId) && (
+                              <button type="button" onClick={() => inviteManager.copyInviteLink(s.token || s.inviteId!, s.inviteId || s.email)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-100" title="Copy invite link" aria-label="Copy invite link">
+                                {inviteManager.copiedToken === (s.inviteId || s.email) ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Link2 className="h-4 w-4" />}
+                              </button>
+                            )}
+                            <button type="button" onClick={() => handleRemoveInviteStatus(s.email)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-[#e5484d]" title="Remove" aria-label="Remove">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-xl border border-dashed border-white/[0.14] px-4 py-4 text-sm text-zinc-500">
+                    <UserPlus className="h-4 w-4 shrink-0" />
+                    No invites yet. Add emails above, or skip and invite from settings later.
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2">
+                  <button type="button" onClick={() => setCurrentStep(4)} className={ghost}>
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </button>
+                  <button type="button" onClick={handleComplete} disabled={launching} className={primary}>
+                    {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {launching ? "Opening dashboard…" : "Open dashboard"}
+                    {!launching && <ArrowRight className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </main>
     </div>
   );
 }
-

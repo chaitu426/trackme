@@ -42,7 +42,9 @@ INSERT INTO growth_analytics.web_vitals_v2
 SELECT workspace_id, site_id, timestamp, path, metric_name, metric_value, rating, navigation_type
 FROM growth_analytics.web_vitals;
 
--- Atomic swap: readers see either the old table or the new one, never neither.
-RENAME TABLE
-    growth_analytics.web_vitals TO growth_analytics.web_vitals_old,
-    growth_analytics.web_vitals_v2 TO growth_analytics.web_vitals;
+-- Swap in two renames. A single multi-table RENAME is atomic on an Atomic database but
+-- is rejected by Replicated databases (managed ClickHouse); a read landing between the
+-- two statements would briefly miss the table, so run this off-peak on a live system.
+RENAME TABLE growth_analytics.web_vitals TO growth_analytics.web_vitals_old;
+
+RENAME TABLE growth_analytics.web_vitals_v2 TO growth_analytics.web_vitals;

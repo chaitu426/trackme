@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
 import { db, workspaceMembers, eq, and } from "@trackme/db";
+import { invalidateMembership } from "@/lib/authz-cache";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { recordAuditLog } from "@/lib/audit";
@@ -81,6 +82,11 @@ export async function PATCH(
         )
         .returning();
 
+      await Promise.all([
+        invalidateMembership(memberId, workspaceId),
+        ctx.userId ? invalidateMembership(ctx.userId, workspaceId) : Promise.resolve(),
+      ]);
+
       await recordAuditLog({
         workspaceId,
         actorId: ctx.userId ?? null,
@@ -115,6 +121,8 @@ export async function PATCH(
         )
       )
       .returning();
+
+    await invalidateMembership(memberId, workspaceId);
 
     await recordAuditLog({
       workspaceId,
@@ -174,6 +182,8 @@ export async function DELETE(
           eq(workspaceMembers.userId, memberId)
         )
       );
+
+    await invalidateMembership(memberId, workspaceId);
 
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??

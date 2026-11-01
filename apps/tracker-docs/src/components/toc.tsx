@@ -45,9 +45,9 @@ export function OnThisPage() {
   if (headings.length < 2) return null;
 
   return (
-    <nav aria-label="On this page" className="text-[12.5px]">
-      <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">On this page</p>
-      <ul className="space-y-0.5 border-l border-white/[0.06]">
+    <nav aria-label="On this page" className="text-[13px]">
+      <p className="mb-3 font-mono text-xs text-zinc-500">On this page</p>
+      <ul className="space-y-0.5 border-l border-white/[0.1]">
         {headings.map((heading) => (
           <li key={heading.id}>
             <a
@@ -56,7 +56,7 @@ export function OnThisPage() {
                 "no-underline-link -ml-px block border-l py-1 leading-snug transition",
                 heading.level === 3 ? "pl-6" : "pl-3",
                 active === heading.id
-                  ? "border-blue-400 text-zinc-50"
+                  ? "border-zinc-100 text-zinc-50"
                   : "border-transparent text-zinc-500 hover:border-white/20 hover:text-zinc-200"
               )}
             >

@@ -34,12 +34,12 @@ export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="flex h-8 w-full max-w-[18rem] items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-2.5 text-xs text-zinc-500 transition hover:border-white/20 hover:text-zinc-300"
+      className="flex h-9 w-full max-w-[20rem] items-center gap-2 rounded-lg border border-white/[0.1] bg-[#19191b] px-3 text-[13px] text-zinc-500 transition-colors hover:border-white/[0.2] hover:text-zinc-300"
       aria-label="Search the documentation"
     >
-      <Search className="h-3.5 w-3.5 shrink-0" />
+      <Search className="h-4 w-4 shrink-0" />
       <span className="flex-1 truncate text-left">Search docs…</span>
-      <kbd className="hidden rounded border border-white/10 bg-white/[0.04] px-1.5 font-mono text-[10px] text-zinc-500 sm:inline">
+      <kbd className="hidden rounded-md border border-white/[0.12] bg-[#232325] px-1.5 py-0.5 font-mono text-xs text-zinc-400 sm:inline">
         ⌘K
       </kbd>
     </button>
@@ -102,8 +102,8 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Search the documentation" className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]">
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="animate-slide-down relative w-full max-w-xl overflow-hidden rounded-xl border border-white/10 bg-zinc-950 shadow-float">
+      <div className="fixed inset-0 bg-black/70" onClick={onClose} />
+      <div className="animate-slide-down relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/[0.12] bg-card shadow-float">
         <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-3.5">
           <Search className="h-4 w-4 shrink-0 text-zinc-500" />
           <input
@@ -117,7 +117,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             aria-label="Search"
             className="h-12 flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
           />
-          <kbd className="rounded border border-white/10 px-1.5 font-mono text-[10px] text-zinc-500">esc</kbd>
+          <kbd className="rounded-md border border-white/[0.12] bg-[#232325] px-1.5 py-0.5 font-mono text-xs text-zinc-400">esc</kbd>
         </div>
 
         <ul ref={listRef} role="listbox" className="max-h-[50vh] overflow-y-auto p-1.5">
@@ -134,16 +134,16 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                 onClick={() => go(page)}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition",
-                  index === active ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"
+                  index === active ? "bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "hover:bg-white/[0.04]"
                 )}
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] text-zinc-400">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-[#232325] text-zinc-400">
                   <NavIcon name={page.icon} className="h-3.5 w-3.5" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[13px] font-medium text-zinc-100">{page.title}</span>
-                    <span className="shrink-0 text-[10px] uppercase tracking-wider text-zinc-600">{groupOf(page.href)}</span>
+                    <span className="shrink-0 font-mono text-xs text-zinc-600">{groupOf(page.href)}</span>
                   </span>
                   <span className="mt-0.5 block truncate text-xs text-zinc-500">{page.description}</span>
                 </span>

@@ -1,90 +1,55 @@
-import { Sparkline } from "./sparkline";
+import { AnimatedNumber, type NumberFormat } from "./animated-number";
 import { Card } from "./card";
 import { cn } from "@/lib/utils";
 
 export interface StatsCardProps {
   title: string;
   value: string | number;
+  /** Signed change, like "+12%". Shown with what it is compared to. */
   change?: string | undefined;
   isPositive?: boolean;
+  /** What the change is measured against. */
+  compareTo?: string;
   subtitle?: string;
-  badge?: string;
-  sparkline?: number[];
-  sparklineColor?: string;
-  sparklineVariant?: "bar" | "line";
+  /** The figure as a number: when given, it eases from its previous value on change. */
+  numericValue?: number;
+  valueFormat?: NumberFormat;
   className?: string;
 }
 
+/** A label, a figure and its change. Nothing else, so the figure is what the eye lands on. */
 export function StatsCard({
   title,
   value,
   change,
   isPositive,
+  compareTo = "vs previous period",
   subtitle,
-  badge,
-  sparkline,
-  sparklineColor,
-  sparklineVariant = "bar",
+  numericValue,
+  valueFormat,
   className,
 }: StatsCardProps) {
   return (
-    <Card
-      className={cn(
-        "group relative flex min-h-[142px] flex-col justify-between gap-3 p-4 sm:p-4.5 transition-all duration-200 hover:border-white/[0.16] hover:bg-[#0e0f16]/95 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]",
-        className
-      )}
-    >
-      {/* Top row: Left-anchored title & Right-anchored badge/delta */}
-      <div className="flex items-start justify-between gap-2 w-full text-left">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 select-none font-sans">
-          {title}
-        </span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {badge && (
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
-              {badge}
-            </span>
-          )}
-          {change && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums border",
-                isPositive
-                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
-                  : "border-rose-500/25 bg-rose-500/10 text-rose-400"
-              )}
-            >
-              <span>{isPositive ? "↑" : "↓"}</span>
-              <span>{change.replace(/^[+-]/, "")}</span>
-            </span>
-          )}
-        </div>
-      </div>
+    <Card className={cn("flex flex-col gap-4 p-5", className)}>
+      <span className="text-sm text-zinc-400">{title}</span>
 
-      {/* Main Metric Value */}
-      <div className="min-w-0 text-left">
-        <p className="text-[26px] sm:text-[28px] font-bold leading-none tracking-[-0.03em] text-zinc-50 tabular-nums">
-          {value}
-        </p>
-        {subtitle && (
-          <p className="mt-1.5 text-[11px] text-zinc-400 font-normal leading-normal">
-            {subtitle}
-          </p>
+      <p className="text-[28px] font-medium leading-8 text-zinc-50 tabular-nums">
+        {numericValue !== undefined ? (
+          <AnimatedNumber id={title} value={numericValue} {...(valueFormat ? { kind: valueFormat } : {})} />
+        ) : (
+          value
         )}
-      </div>
+      </p>
 
-      {/* Bottom Sparkline visualization */}
-      {sparkline && sparkline.length > 1 ? (
-        <div className="mt-auto pt-1">
-          <Sparkline
-            values={sparkline}
-            color={sparklineColor ?? "var(--sparkline)"}
-            className="w-full"
-            variant={sparklineVariant}
-          />
-        </div>
-      ) : (
-        <div className="h-7" />
+      {(change || subtitle) && (
+        <p className="flex flex-wrap items-baseline gap-x-2 text-xs leading-4 text-zinc-500">
+          {change && (
+            <span className={cn("font-mono tabular-nums", isPositive ? "text-[#4cc38a]" : "text-[#e5484d]")}>
+              {change}
+            </span>
+          )}
+          {change ? <span>{compareTo}</span> : <span>{subtitle}</span>}
+        </p>
       )}
     </Card>
   );

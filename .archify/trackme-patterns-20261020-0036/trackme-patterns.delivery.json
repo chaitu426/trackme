@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "e0631e2b-39a9-4e8f-9582-0d9bc2da6cd2",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\candidate.json",
+  "output": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+  "specification": {
+    "sha256": "e838f6e4895f05da5dbdab003ad827c4a753a894d6005dd65e07150210f6abc5",
+    "bytes": 7658
+  },
+  "artifact": {
+    "sha256": "65fbe31d5edf7e9194368241cb47e8c7a98a70aceb0fefcdeceba6d38bb87394",
+    "bytes": 770819
+  }
+}

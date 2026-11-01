@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createClickHouseWriter, insertSettings, type InsertClient } from "./clickhouse.js";
+import { createClickHouseWriter, insertSettings, v2InsertSettings, type InsertClient } from "./clickhouse.js";
 import { DataError } from "../errors.js";
 
 type Insert = Parameters<InsertClient["insert"]>[0];
@@ -103,4 +103,46 @@ test("an unrepresentable timestamp is a data error, not an infrastructure error"
   const { client } = fakeClient();
   const write = createClickHouseWriter(options(client));
   await assert.rejects(write([event({ occurredAt: "garbage" })]), DataError);
+});
+
+test("off mode never touches events_ingest", async () => {
+  const { client, inserts } = fakeClient();
+  await createClickHouseWriter({ ...options(client), writeMode: "off" })([event()]);
+  assert.deepEqual(inserts.map((i) => i.table), ["events_raw"]);
+});
+
+test("shadow mode writes legacy first, then events_ingest synchronously with a dedup token", async () => {
+  const { client, inserts } = fakeClient();
+  await createClickHouseWriter({ ...options(client), writeMode: "shadow" })([event(), vital("11111111-2222-4333-8444-555555555555")]);
+  assert.deepEqual(inserts.map((i) => i.table), ["events_raw", "web_vitals", "events_ingest"]);
+  const v2 = inserts[2]!;
+  assert.equal(v2.clickhouse_settings?.async_insert, undefined);
+  assert.equal(v2.clickhouse_settings?.deduplicate_blocks_in_dependent_materialized_views, 1);
+  assert.match(String(v2.clickhouse_settings?.insert_deduplication_token), /^[0-9a-f]{40}$/);
+  const rows = v2.values as Array<Record<string, unknown>>;
+  assert.equal(rows[1]!.vital_name, "LCP");
+  assert.equal(rows[0]!.country, "");
+});
+
+test("the dedup token is stable for the same batch and differs for another", async () => {
+  const a = [event({ eventId: "aaaaaaaa-1111-4222-8333-444444444444" })];
+  const b = [event({ eventId: "bbbbbbbb-1111-4222-8333-444444444444" })];
+  assert.equal(v2InsertSettings(a).insert_deduplication_token, v2InsertSettings(a).insert_deduplication_token);
+  assert.notEqual(v2InsertSettings(a).insert_deduplication_token, v2InsertSettings(b).insert_deduplication_token);
+});
+
+test("a shadow-write failure is reported but does not fail the batch", async () => {
+  const { client } = fakeClient("events_ingest");
+  const errors: unknown[] = [];
+  await createClickHouseWriter({ ...options(client), writeMode: "shadow", onV2Error: (e) => errors.push(e) })([event()]);
+  assert.equal(errors.length, 1);
+});
+
+test("only mode writes events_ingest alone and fails the batch when it fails", async () => {
+  const ok = fakeClient();
+  await createClickHouseWriter({ ...options(ok.client), writeMode: "only" })([event(), vital("22222222-2222-4333-8444-555555555555")]);
+  assert.deepEqual(ok.inserts.map((i) => i.table), ["events_ingest"]);
+
+  const bad = fakeClient("events_ingest");
+  await assert.rejects(createClickHouseWriter({ ...options(bad.client), writeMode: "only" })([event()]), /unavailable/);
 });

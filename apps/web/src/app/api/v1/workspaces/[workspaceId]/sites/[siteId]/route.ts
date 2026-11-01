@@ -4,6 +4,7 @@ import { AppError } from "@trackme/contracts";
 import { db, sites, eq, and } from "@trackme/db";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { invalidateSite } from "@/lib/authz-cache";
 
 const UpdateSiteSchema = z.object({
   displayName: z.string().trim().min(1).max(100).optional(),
@@ -35,6 +36,8 @@ export async function DELETE(
     if (!deleted[0]) {
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found in this workspace.");
     }
+
+    await invalidateSite(siteId);
 
     return NextResponse.json({ success: true, deletedId: siteId });
   } catch (error) {

@@ -15,6 +15,9 @@ test("public API endpoints are explicitly allowlisted", () => {
   assert.equal(isPublicPath("/api/auth/login"), true);
   assert.equal(isPublicPath("/api/auth/signup"), true);
   assert.equal(isPublicPath("/api/auth/session"), true);
+  assert.equal(isPublicPath("/api/auth/otp/send"), true);
+  assert.equal(isPublicPath("/api/auth/otp/verify"), true);
+  assert.equal(isPublicPath("/api/internal/metrics"), true);
   assert.equal(isPublicPath("/api/v1/invites/accept"), true);
   assert.equal(isPublicPath("/api/v1/invites/accept/preview"), true);
 });

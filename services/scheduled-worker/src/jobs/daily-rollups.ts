@@ -1,4 +1,9 @@
-import { getClickHouseClient } from "@trackme/analytics";
+import {
+  getClickHouseClient,
+  SESSION_DURATION_SQL,
+  SESSION_ENGAGED_SQL,
+  SESSION_ENGAGEMENT_COLUMNS,
+} from "@trackme/analytics";
 import { env } from "@trackme/config";
 import { planDays, type WindowInput } from "./window.js";
 
@@ -87,8 +92,8 @@ export const ENGAGEMENT_SQL = `
     site_id,
     toDate(session_start) AS date,
     count() AS sessions,
-    countIf(pageview_count = 1) AS bounced_sessions,
-    sum(duration_seconds) AS total_duration_seconds,
+    countIf(NOT ${SESSION_ENGAGED_SQL}) AS bounced_sessions,
+    sum(${SESSION_DURATION_SQL}) AS total_duration_seconds,
     sum(pageview_count) AS pageviews
   FROM (
     SELECT
@@ -96,8 +101,7 @@ export const ENGAGEMENT_SQL = `
       site_id,
       session_id,
       min(timestamp) AS session_start,
-      dateDiff('second', min(timestamp), max(timestamp)) AS duration_seconds,
-      countIf(type = 'pageview') AS pageview_count
+      ${SESSION_ENGAGEMENT_COLUMNS}
     FROM events_raw
     WHERE timestamp >= toDateTime64({day:Date}, 3, 'UTC') - INTERVAL 1 DAY
       AND timestamp <  toDateTime64({day:Date}, 3, 'UTC') + INTERVAL 2 DAY

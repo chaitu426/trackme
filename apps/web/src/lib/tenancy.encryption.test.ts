@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { decryptSiteSigningSecret, encryptSiteSigningSecret } from "./tenancy";
+import { decryptSiteSigningSecret, encryptSiteSigningSecret } from "./tenancy-secrets";
 
 test("encrypts site signing secrets before they are persisted", () => {
   process.env.SITE_SIGNING_SECRET_KEY = "0123456789abcdef0123456789abcdef";

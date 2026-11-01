@@ -1,4 +1,8 @@
 export * from "./client.js";
+export * from "./read-mode.js";
+export * from "./backfill.js";
+export * from "./errors.js";
+export * from "./queries/engagement-sql.js";
 export * from "./queries/overview.js";
 export * from "./queries/breakdowns.js";
 export * from "./queries/web-vitals.js";
@@ -10,3 +14,6 @@ export * from "./queries/time-series.js";
 export * from "./queries/journeys.js";
 export * from "./queries/user-timeline.js";
 export * from "./queries/funnel-analysis.js";
+export * from "./queries/journey-flow.js";
+export * from "./queries/funnel-insights.js";
+export * from "./queries/segment-behavior.js";

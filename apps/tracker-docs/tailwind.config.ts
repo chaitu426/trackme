@@ -11,6 +11,10 @@ const config: Config = {
         mono: ["var(--font-mono)", "SF Mono", "Consolas", "monospace"],
       },
       colors: {
+        // Muted text and icons reach 4.5:1 on the page and card surfaces.
+        zinc: { 500: "#85858b", 600: "#6e6e74" },
+        sidebar: "var(--sidebar)",
+        raised: "var(--raised)",
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: {
@@ -33,6 +37,9 @@ const config: Config = {
         success: "var(--success)",
         warning: "var(--warning)",
         danger: "var(--danger)",
+      },
+      fontSize: {
+        title: ["40px", { lineHeight: "44px" }],
       },
       borderRadius: {
         DEFAULT: "var(--radius)",

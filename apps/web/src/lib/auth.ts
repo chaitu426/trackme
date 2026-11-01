@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
@@ -10,6 +11,7 @@ import {
   validateRegisteredSession,
   revokeRegisteredSession,
   sessionCookieOptions,
+  SessionStoreUnavailableError,
 } from "./session-store";
 import { SESSION_COOKIE, type SessionPayload } from "./session";
 
@@ -33,7 +35,9 @@ export async function getSession(): Promise<SessionPayload | null> {
   return getSessionFromCookie(jar.get(SESSION_COOKIE)?.value);
 }
 
-export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+// Memoized per server render, so the layout and the page below it share one session
+// check and one user lookup instead of each paying for their own.
+export const getCurrentUser = cache(async (): Promise<AuthenticatedUser | null> => {
   const session = await getSession();
   if (!session) {
     return null;
@@ -51,19 +55,34 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
 
   const user = rows[0];
   return user ?? null;
-}
+});
 
 export async function requireUser(): Promise<AuthenticatedUser> {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      redirect("/login");
+    }
+    return user;
+  } catch (error) {
+    if (error instanceof SessionStoreUnavailableError) {
+      redirect("/login");
+    }
+    throw error;
   }
-  return user;
 }
 
 export async function requireApiUser(request: NextRequest): Promise<AuthenticatedUser> {
   const cookieVal = request.cookies.get(SESSION_COOKIE)?.value;
-  const session = await getSessionFromCookie(cookieVal);
+  let session: SessionPayload | null;
+  try {
+    session = await getSessionFromCookie(cookieVal);
+  } catch (error) {
+    if (error instanceof SessionStoreUnavailableError) {
+      throw new AppError(503, "SESSION_STORE_UNAVAILABLE", "Authentication is temporarily unavailable");
+    }
+    throw error;
+  }
   if (!session) {
     throw new AppError(401, "UNAUTHENTICATED", "Authentication is required or session has expired");
   }

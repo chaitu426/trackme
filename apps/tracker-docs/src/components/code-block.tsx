@@ -16,10 +16,10 @@ export async function CodeBlock({ lang, code, filename }: Omit<Snippet, "label">
   return (
     <figure
       data-code-root
-      className="not-prose my-5 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0c0c0e]"
+      className="not-prose my-6 overflow-hidden rounded-xl border border-white/[0.1] bg-[#0f0f10]"
     >
-      <div className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.02] py-1.5 pl-3.5 pr-1.5">
-        <span className="font-mono text-[11px] text-zinc-500">{filename ?? languageLabel(lang)}</span>
+      <div className="flex h-11 items-center justify-between border-b border-white/[0.08] bg-[#141415] pl-4 pr-2">
+        <span className="font-mono text-xs text-zinc-500">{filename ?? languageLabel(lang)}</span>
         <CopyButton />
       </div>
       <div data-code-panel className="code-body" dangerouslySetInnerHTML={{ __html: html }} />

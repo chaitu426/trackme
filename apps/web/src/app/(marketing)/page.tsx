@@ -1,4 +1,6 @@
 import { Landing } from "@trackme/landing";
+import { env } from "@trackme/config";
+import { resolveTrackerScriptUrl } from "@/lib/tracker-url";
 
 /**
  * The public landing page. It is the same component the docs site renders, so the
@@ -14,9 +16,16 @@ if (process.env.NODE_ENV === "production" && !configuredDocsOrigin) {
 
 const docsOrigin = (configuredDocsOrigin ?? "http://localhost:3002").replace(/\/+$/, "");
 
+// The install snippet shows the real addresses. Anything pointing at this machine is left
+// out, so a misconfigured build shows placeholders instead of "localhost" to visitors.
+const scriptUrl = resolveTrackerScriptUrl();
+const endpoint = `${env.INGESTION_URL.replace(/\/+$/, "")}/v1/batch`;
+const isLocal = (url: string) => /localhost|127\.0\.0\.1/.test(url);
+
 export default function MarketingPage() {
   return (
     <Landing
+      {...(isLocal(scriptUrl) || isLocal(endpoint) ? {} : { snippet: { scriptUrl, endpoint } })}
       links={{
         docs: `${docsOrigin}/docs`,
         quickstart: `${docsOrigin}/docs/quickstart`,

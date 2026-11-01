@@ -22,11 +22,12 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",
-    "test": "node --import tsx --test src/*.test.ts",
+    "test": "node --import tsx --test",
     "check:size": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
-    "@trackme/contracts": "workspace:*"
+    "@trackme/contracts": "workspace:*",
+    "web-vitals": "^6.2.3"
   },
   "devDependencies": {
     "tsup": "^8.4.0",

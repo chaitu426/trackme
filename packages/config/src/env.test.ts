@@ -67,3 +67,10 @@ test("the problems list names each offending variable", () => {
 test("a malformed provided value still fails fast in any environment", () => {
   assert.throws(() => quiet(() => loadEnvironment({ NODE_ENV: "development", APP_URL: "not a url" })), /Invalid environment/);
 });
+
+test("role Redis URLs follow REDIS_URL unless set explicitly", () => {
+  const e = loadEnvironment({ REDIS_URL: "rediss://h:1", REDIS_CACHE_URL: "redis://cache:2" } as NodeJS.ProcessEnv);
+  assert.equal(e.REDIS_STATE_URL, "rediss://h:1");
+  assert.equal(e.REDIS_COORD_URL, "rediss://h:1");
+  assert.equal(e.REDIS_CACHE_URL, "redis://cache:2");
+});

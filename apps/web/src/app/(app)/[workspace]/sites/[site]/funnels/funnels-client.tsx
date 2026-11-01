@@ -1,19 +1,26 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
 import {
-  Filter,
   Plus,
   Trash2,
   TrendingDown,
-  ArrowRight,
-  CheckCircle2,
   Loader2,
   AlertCircle,
   X,
+  ArrowUp,
+  ArrowDown,
+  Check,
+  FileText,
+  Zap,
+  Filter,
+  RefreshCw,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import type { FunnelAnalysisResult, FunnelStepDefinition } from "@trackme/analytics";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FunnelInsightsPanel } from "./funnel-insights";
+import type { FunnelAnalysisResult, FunnelStepDefinition, FunnelStepResult } from "@trackme/analytics";
 
 export interface FunnelItem {
   id: string;
@@ -23,464 +30,838 @@ export interface FunnelItem {
   createdAt: string;
 }
 
+export interface FunnelSuggestions {
+  paths: string[];
+  events: string[];
+}
+
 interface FunnelsClientProps {
   site: { id: string; domain: string };
   initialFunnels: FunnelItem[];
   initialActiveFunnel: FunnelItem | null;
   initialAnalysis: FunnelAnalysisResult | null;
+  initialAnalysisError?: string | null;
+  /** Pages and custom events already seen on the site, for autocompleting step targets. */
+  suggestions?: Promise<FunnelSuggestions>;
 }
+
+const MAX_STEPS = 8;
+const NAME_MAX = 100;
+
+type StepDraft = Omit<FunnelStepDefinition, "order">;
+
+const TEMPLATES: { id: string; label: string; hint: string; name: string; steps: StepDraft[] }[] = [
+  {
+    id: "signup",
+    label: "Signup",
+    hint: "Landing to account created",
+    name: "Signup funnel",
+    steps: [
+      { name: "Landing page", type: "pageview", target: "/" },
+      { name: "Pricing", type: "pageview", target: "/pricing" },
+      { name: "Signup", type: "pageview", target: "/signup" },
+      { name: "Account created", type: "custom_event", target: "account_created" },
+    ],
+  },
+  {
+    id: "checkout",
+    label: "Checkout",
+    hint: "Browse to purchase",
+    name: "Checkout funnel",
+    steps: [
+      { name: "Product", type: "pageview", target: "/products" },
+      { name: "Cart", type: "pageview", target: "/cart" },
+      { name: "Checkout", type: "pageview", target: "/checkout" },
+      { name: "Purchase", type: "custom_event", target: "purchase_completed" },
+    ],
+  },
+  {
+    id: "blank",
+    label: "Blank",
+    hint: "Start from scratch",
+    name: "",
+    steps: [
+      { name: "", type: "pageview", target: "" },
+      { name: "", type: "pageview", target: "" },
+    ],
+  },
+];
 
 export function FunnelsClient({
   site,
   initialFunnels,
   initialActiveFunnel,
   initialAnalysis,
+  initialAnalysisError = null,
+  suggestions,
 }: FunnelsClientProps) {
   const [funnels, setFunnels] = React.useState<FunnelItem[]>(initialFunnels);
   const [activeFunnel, setActiveFunnel] = React.useState<FunnelItem | null>(initialActiveFunnel);
   const [analysis, setAnalysis] = React.useState<FunnelAnalysisResult | null>(initialAnalysis);
+  const [analysisError, setAnalysisError] = React.useState<string | null>(initialAnalysisError);
   const [loadingAnalysis, setLoadingAnalysis] = React.useState(false);
-
-  // Create modal state
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [funnelName, setFunnelName] = React.useState("");
-  const [funnelDesc, setFunnelDesc] = React.useState("");
-  const [steps, setSteps] = React.useState<FunnelStepDefinition[]>([
-    { order: 1, name: "Landing Page", type: "pageview", target: "/" },
-    { order: 2, name: "Pricing Page", type: "pageview", target: "/pricing" },
-    { order: 3, name: "Signup Attempt", type: "pageview", target: "/signup" },
-    { order: 4, name: "Account Created", type: "custom_event", target: "account_created" },
-  ]);
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [saveError, setSaveError] = React.useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
-  async function loadFunnel(funnel: FunnelItem) {
+  // Analyses fetched this session, keyed by funnel, so flipping between funnels is instant.
+  // Refresh bypasses it (force); deleting a funnel drops its entry.
+  const analysisCache = React.useRef(new Map<string, FunnelAnalysisResult>());
+  React.useEffect(() => {
+    if (initialActiveFunnel && initialAnalysis) analysisCache.current.set(initialActiveFunnel.id, initialAnalysis);
+  }, [initialActiveFunnel, initialAnalysis]);
+
+  async function loadFunnel(funnel: FunnelItem, force = false) {
     setActiveFunnel(funnel);
+    setConfirmDelete(false);
+    setAnalysisError(null);
+    const hit = force ? undefined : analysisCache.current.get(funnel.id);
+    if (hit) {
+      setAnalysis(hit);
+      setLoadingAnalysis(false);
+      return;
+    }
     setLoadingAnalysis(true);
     try {
       const res = await fetch(`/api/v1/sites/${site.id}/funnels/${funnel.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAnalysis(data.analysis);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAnalysis(null);
+        setAnalysisError(data.detail || data.message || "Analytics is temporarily unavailable. Retry in a moment.");
+        return;
       }
+      analysisCache.current.set(funnel.id, data.analysis);
+      setAnalysis(data.analysis);
     } catch {
-      // ignore
+      setAnalysis(null);
+      setAnalysisError("Analytics is temporarily unavailable. Retry in a moment.");
     } finally {
       setLoadingAnalysis(false);
     }
   }
 
-  function addStep() {
-    setSteps((prev) => [
-      ...prev,
-      {
-        order: prev.length + 1,
-        name: `Step ${prev.length + 1}`,
-        type: "pageview",
-        target: "/",
-      },
-    ]);
-  }
-
-  function removeStep(index: number) {
-    if (steps.length <= 2) return;
-    setSteps((prev) =>
-      prev
-        .filter((_, idx) => idx !== index)
-        .map((s, idx) => ({ ...s, order: idx + 1 }))
-    );
-  }
-
-  function updateStep(index: number, patch: Partial<FunnelStepDefinition>) {
-    setSteps((prev) =>
-      prev.map((s, idx) => (idx === index ? { ...s, ...patch } : s))
-    );
-  }
-
-  async function handleCreateFunnel(e: React.FormEvent) {
-    e.preventDefault();
-    if (!funnelName.trim()) return;
-    setIsSaving(true);
-    setSaveError(null);
-
-    try {
-      const res = await fetch(`/api/v1/sites/${site.id}/funnels`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: funnelName.trim(),
-          description: funnelDesc.trim() || undefined,
-          steps,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setSaveError(data.detail || data.message || "Failed to create funnel.");
-        return;
-      }
-
-      const created: FunnelItem = data.funnel;
-      setFunnels((prev) => [created, ...prev]);
-      setModalOpen(false);
-      setFunnelName("");
-      setFunnelDesc("");
-      loadFunnel(created);
-    } catch {
-      setSaveError("Network error. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
   async function handleDeleteFunnel(id: string) {
-    if (!confirm("Are you sure you want to delete this funnel?")) return;
     try {
-      const res = await fetch(`/api/v1/sites/${site.id}/funnels/${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/v1/sites/${site.id}/funnels/${id}`, { method: "DELETE" });
       if (res.ok) {
+        analysisCache.current.delete(id);
         const remaining = funnels.filter((f) => f.id !== id);
         setFunnels(remaining);
+        setConfirmDelete(false);
         if (activeFunnel?.id === id) {
           const next = remaining[0] || null;
           setActiveFunnel(next);
-          if (next) loadFunnel(next);
+          if (next) void loadFunnel(next);
           else setAnalysis(null);
         }
       }
     } catch {
-      // ignore
+      // leave the funnel in place; the user can try again
     }
   }
 
+  function handleCreated(created: FunnelItem) {
+    setFunnels((prev) => [created, ...prev]);
+    setModalOpen(false);
+    void loadFunnel(created);
+  }
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
-              <Filter className="h-4 w-4" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-100">
-              Conversion Funnels & Drop-offs
-            </h1>
-          </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            Measure step-by-step customer progression, discover friction points, and boost conversion rates.
-          </p>
-        </div>
-
-        <Button
+    <div className="w-full space-y-5 text-left">
+      <PageHeader title="Funnels" art="steps" actions={<button
+          type="button"
           onClick={() => setModalOpen(true)}
-          className="text-xs font-semibold gap-1.5 h-9 shrink-0"
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-colors hover:bg-white"
         >
-          <Plus className="w-3.5 h-3.5" />
-          Create Funnel
-        </Button>
-      </div>
+          <Plus className="h-4 w-4" />
+          New funnel
+        </button>}>
+        See where visitors to <span className="font-mono text-zinc-300">{site.domain}</span> leave on the way to a goal
+      </PageHeader>
 
-      {/* Funnel Selector Tabs */}
-      {funnels.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-white/[0.08]">
+      {/* Funnel selector */}
+      {funnels.length > 1 && (
+        <div
+          role="tablist"
+          aria-label="Funnels"
+          className="flex w-full max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 sm:w-fit"
+        >
           {funnels.map((f) => (
             <button
               key={f.id}
-              onClick={() => loadFunnel(f)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition shrink-0 flex items-center gap-2 ${
+              role="tab"
+              aria-selected={activeFunnel?.id === f.id}
+              type="button"
+              onClick={() => void loadFunnel(f)}
+              className={`flex shrink-0 items-center gap-2 rounded-[5px] px-3 py-2 text-xs font-medium transition-colors ${
                 activeFunnel?.id === f.id
-                  ? "bg-white/10 text-zinc-100 border border-white/20"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"
+                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                  : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
               }`}
             >
-              <span>{f.name}</span>
-              <span className="text-[10px] text-zinc-500 bg-white/5 px-1.5 py-0.5 rounded">
-                {f.steps.length} steps
-              </span>
+              {f.name}
+              <span className="font-mono text-xs text-zinc-500">{f.steps.length}</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* Active Funnel View */}
       {activeFunnel ? (
-        <div className="space-y-6">
-          {/* Funnel Header Card */}
-          <div className="p-5 rounded-2xl border border-white/[0.08] bg-zinc-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-zinc-100">{activeFunnel.name}</h2>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteFunnel(activeFunnel.id)}
-                  className="text-zinc-500 hover:text-rose-400 p-1 transition"
-                  title="Delete Funnel"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              {activeFunnel.description && (
-                <p className="text-xs text-zinc-400 mt-0.5">{activeFunnel.description}</p>
-              )}
-            </div>
-
-            {analysis && (
-              <div className="flex items-center gap-6 shrink-0">
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-zinc-500 block">Total Started</span>
-                  <span className="text-lg font-bold text-zinc-200">
-                    {analysis.totalStarted.toLocaleString()}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-zinc-500 block">Completed</span>
-                  <span className="text-lg font-bold text-emerald-400">
-                    {analysis.totalCompleted.toLocaleString()}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-zinc-500 block">Overall Conversion</span>
-                  <span className="text-lg font-bold text-indigo-400">
-                    {analysis.overallConversionRate}%
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {loadingAnalysis ? (
-            <div className="p-12 text-center text-xs text-zinc-400 flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-              Calculating step conversions from ClickHouse…
-            </div>
-          ) : analysis && analysis.steps.length > 0 ? (
-            <div className="space-y-4">
-              {analysis.steps.map((step, idx) => {
-                const isLast = idx === analysis.steps.length - 1;
-                const nextStep = !isLast ? analysis.steps[idx + 1] : null;
-
-                return (
-                  <div key={step.order} className="space-y-3">
-                    {/* Step Card */}
-                    <div className="p-4 rounded-2xl border border-white/[0.08] bg-zinc-950/80 hover:border-white/15 transition space-y-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 text-[11px] font-bold">
-                            {step.order}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-zinc-100">{step.name}</span>
-                            <span className="font-mono text-[10px] text-zinc-500 ml-2">
-                              {step.type === "pageview" ? "Page: " : "Event: "}
-                              {step.target}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          <span className="font-medium text-zinc-200">
-                            {step.conversions.toLocaleString()} visitors
-                          </span>
-                          <span className="font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded text-[11px]">
-                            {step.conversionRateFromFirst}% of start
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Visual Progress Bar */}
-                      <div className="w-full bg-white/[0.04] h-2 rounded-full overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500"
-                          style={{ width: `${Math.max(2, Math.min(100, step.conversionRateFromFirst))}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Drop-off connector */}
-                    {nextStep && (
-                      <div className="flex items-center justify-between px-6 py-1 text-xs">
-                        <div className="flex items-center gap-2 text-zinc-500 text-[11px]">
-                          <ArrowRight className="w-3.5 h-3.5" />
-                          <span>Transition to Step {nextStep.order}</span>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-[11px]">
-                          <span className="text-emerald-400 font-medium">
-                            {nextStep.conversionRateFromPrevious}% converted
-                          </span>
-                          {nextStep.dropOffCount > 0 && (
-                            <span className="text-rose-400 font-medium flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded">
-                              <TrendingDown className="w-3 h-3" />
-                              -{nextStep.dropOffCount.toLocaleString()} ({nextStep.dropOffRate}% drop-off)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-zinc-500 rounded-2xl border border-dashed border-white/10">
-              No conversion data available for this date range yet.
-            </div>
-          )}
-        </div>
+        <FunnelView
+          siteId={site.id}
+          funnel={activeFunnel}
+          analysis={analysis}
+          loading={loadingAnalysis}
+          error={analysisError}
+          confirmDelete={confirmDelete}
+          onAskDelete={() => setConfirmDelete(true)}
+          onCancelDelete={() => setConfirmDelete(false)}
+          onDelete={() => void handleDeleteFunnel(activeFunnel.id)}
+          onRefresh={() => void loadFunnel(activeFunnel, true)}
+        />
       ) : (
-        <div className="p-12 text-center space-y-3 rounded-2xl border border-white/[0.08] bg-zinc-950/80">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] text-zinc-500 mx-auto">
-            <Filter className="h-6 w-6" />
+        <Card className="px-6 py-12">
+          <div className="mx-auto max-w-md space-y-4 text-center">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-zinc-500">
+              <Filter className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium text-zinc-200">No funnels yet</h3>
+              <p className="text-xs leading-relaxed text-zinc-400">
+                A funnel is an ordered list of pages or events. You will see how many visitors make it through each step, and exactly
+                where the rest leave.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="inline-flex h-8 items-center gap-2 rounded-lg bg-zinc-100 px-3 text-xs font-medium text-zinc-950 hover:bg-white"
+            >
+              <Plus className="h-4 w-4" />
+              Create your first funnel
+            </button>
           </div>
-          <h3 className="text-sm font-semibold text-zinc-200">No Funnels Created Yet</h3>
-          <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-            Create multi-step funnels to map out user drop-off points between landing pages, onboarding steps, and checkout milestones.
-          </p>
-          <Button onClick={() => setModalOpen(true)} className="text-xs font-semibold gap-1.5">
-            <Plus className="w-3.5 h-3.5" />
-            Create First Funnel
-          </Button>
-        </div>
+        </Card>
       )}
 
-      {/* Create Funnel Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-zinc-100">Create Conversion Funnel</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Define an ordered sequence of page views or custom events.
-                </p>
+        <CreateFunnelDialog
+          siteId={site.id}
+          suggestions={suggestions}
+          onClose={() => setModalOpen(false)}
+          onCreated={handleCreated}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────── Funnel view ───────────────────────────── */
+
+function SummaryTile({ label, value, hint, accent }: { label: string; value: string; hint: string; accent?: string | undefined }) {
+  return (
+    <Card className="flex min-h-[104px] flex-col justify-between gap-2 p-4">
+      <span className="text-xs font-medium text-zinc-400">{label}</span>
+      <div>
+        <p className={`text-[26px] font-medium leading-none tabular-nums ${accent ?? "text-zinc-50"}`}>{value}</p>
+        <p className="mt-2 truncate text-xs text-zinc-500">{hint}</p>
+      </div>
+    </Card>
+  );
+}
+
+function FunnelView({
+  siteId,
+  funnel,
+  analysis,
+  loading,
+  error,
+  confirmDelete,
+  onAskDelete,
+  onCancelDelete,
+  onDelete,
+  onRefresh,
+}: {
+  siteId: string;
+  funnel: FunnelItem;
+  analysis: FunnelAnalysisResult | null;
+  loading: boolean;
+  error: string | null;
+  confirmDelete: boolean;
+  onAskDelete: () => void;
+  onCancelDelete: () => void;
+  onDelete: () => void;
+  onRefresh: () => void;
+}) {
+  const steps = analysis?.steps ?? [];
+  const worst = steps.reduce<FunnelStepResult | null>(
+    (acc, step, i) => (i > 0 && step.dropOffCount > 0 && (!acc || step.dropOffCount > acc.dropOffCount) ? step : acc),
+    null
+  );
+  const worstPrev = worst ? steps.find((s) => s.order === worst.order - 1) : undefined;
+  const hasTraffic = (analysis?.totalStarted ?? 0) > 0;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-1 lg:grid-cols-4">
+        <SummaryTile
+          label="Entered"
+          value={analysis ? analysis.totalStarted.toLocaleString() : "–"}
+          hint={steps[0] ? `Reached “${steps[0].name}”` : "Visitors reaching step 1"}
+        />
+        <SummaryTile
+          label="Completed"
+          value={analysis ? analysis.totalCompleted.toLocaleString() : "–"}
+          hint={steps.length ? `Reached “${steps[steps.length - 1]!.name}”` : "Visitors finishing every step"}
+          accent="text-[#4cc38a]"
+        />
+        <SummaryTile
+          label="Conversion"
+          value={analysis && hasTraffic ? `${analysis.overallConversionRate}%` : "–"}
+          hint="Entered to completed"
+          accent="text-zinc-200"
+        />
+        <SummaryTile
+          label="Biggest drop-off"
+          value={worst ? `${worst.dropOffRate}%` : "–"}
+          hint={worst && worstPrev ? `${worstPrev.name} → ${worst.name}` : hasTraffic ? "No visitors lost" : "Needs traffic"}
+          accent={worst ? "text-[#e5484d]" : undefined}
+        />
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-start justify-between gap-4 border-b border-white/[0.06] pb-3">
+          <div className="min-w-0">
+            <CardTitle className="truncate">{funnel.name}</CardTitle>
+            <CardDescription>
+              {funnel.description || `${funnel.steps.length} steps, in order, per visitor`}
+            </CardDescription>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              aria-label="Recalculate funnel"
+              title="Recalculate"
+              className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200 disabled:opacity-40"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            {confirmDelete ? (
+              <div className="flex items-center gap-1 rounded-md border border-[#e5484d]/25 bg-[#e5484d]/10 pl-2 text-xs text-[#e5484d]">
+                Delete?
+                <button type="button" onClick={onDelete} className="px-2 py-1 font-medium hover:text-white">
+                  Yes
+                </button>
+                <button type="button" onClick={onCancelDelete} className="px-2 py-1 text-zinc-400 hover:text-zinc-100">
+                  No
+                </button>
               </div>
+            ) : (
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
-                className="text-zinc-500 hover:text-zinc-300 p-1 rounded-lg"
+                onClick={onAskDelete}
+                aria-label="Delete funnel"
+                title="Delete funnel"
+                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
               >
-                <X className="w-4 h-4" />
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </CardHeader>
+
+        {loading ? (
+          <div role="status" aria-busy="true" className="space-y-4 pt-4">
+            <span className="sr-only">Calculating step conversions</span>
+            {[100, 72, 48, 31].map((w) => (
+              <div key={w} className="flex items-center gap-4">
+                <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+                <Skeleton className="h-9 rounded-lg" style={{ width: `${w}%` }} />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="mt-4 space-y-3 rounded-xl border border-dashed border-[#e5484d]/30 bg-[#e5484d]/5 p-8 text-center">
+            <p className="text-xs text-[#e5484d]">{error}</p>
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="rounded-md border border-white/[0.1] px-3 py-1 text-xs text-zinc-200 hover:bg-white/[0.05]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : steps.length > 0 ? (
+          <ol className="pt-4">
+            {steps.map((step, idx) => {
+              const next = steps[idx + 1];
+              const isWorst = next !== undefined && worst?.order === next.order;
+              return (
+                <li key={step.order}>
+                  <StepRow step={step} first={idx === 0} last={idx === steps.length - 1} />
+                  {next && <Transition next={next} highlight={isWorst} />}
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <p className="py-10 text-center text-xs text-zinc-500">No data for this period yet.</p>
+        )}
+
+        {!loading && !error && analysis && !hasTraffic && (
+          <p className="mt-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs leading-relaxed text-zinc-500">
+            No visitor has reached step 1 in the last 30 days. Counts appear here as soon as someone does.
+          </p>
+        )}
+      </Card>
+
+      {!loading && !error && analysis && hasTraffic && steps.length >= 2 && (
+        <FunnelInsightsPanel key={funnel.id} siteId={siteId} funnelId={funnel.id} analysis={analysis} />
+      )}
+    </div>
+  );
+}
+
+function StepRow({ step, first, last }: { step: FunnelStepResult; first: boolean; last: boolean }) {
+  const pct = Math.max(0, Math.min(100, step.conversionRateFromFirst));
+  const isEvent = step.type !== "pageview";
+  return (
+    <div className="group flex items-center gap-4">
+      <div
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums ${
+          last
+            ? "border-[#4cc38a]/30 bg-[#4cc38a]/10 text-[#4cc38a]"
+            : "border-white/[0.1] bg-white/[0.04] text-zinc-300"
+        }`}
+      >
+        {step.order}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <p className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-zinc-100">{step.name}</span>
+            <span className="inline-flex shrink-0 items-center gap-1 truncate font-mono text-xs text-zinc-500">
+              {isEvent ? <Zap className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+              {step.target}
+            </span>
+          </p>
+          <p className="shrink-0 font-mono text-xs tabular-nums">
+            <span className="font-medium text-zinc-100">{step.conversions.toLocaleString()}</span>
+            <span className="ml-2 text-zinc-500">{first ? "entered" : `${step.conversionRateFromFirst}% of start`}</span>
+          </p>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.05]">
+          <div
+            className={`h-full rounded-full ${last ? "bg-[#4cc38a]/70" : "bg-white/[0.07]"}`}
+            style={{ width: `${step.conversions > 0 ? Math.max(pct, 1.5) : 0}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Transition({ next, highlight }: { next: FunnelStepResult; highlight: boolean }) {
+  return (
+    <div className="flex items-center gap-4 py-2">
+      <div className="flex w-8 shrink-0 justify-center" aria-hidden>
+        <span className={`h-6 w-px ${highlight ? "bg-[#e5484d]/40" : "bg-white/[0.1]"}`} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span className="font-medium text-zinc-400">{next.conversionRateFromPrevious}% continue</span>
+        {next.dropOffCount > 0 ? (
+          <span
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium ${
+              highlight ? "bg-[#e5484d]/15 text-[#e5484d] ring-1 ring-[#e5484d]/30" : "bg-white/[0.04] text-zinc-400"
+            }`}
+          >
+            <TrendingDown className="h-4 w-4" />
+            {next.dropOffCount.toLocaleString()} left ({next.dropOffRate}%)
+          </span>
+        ) : (
+          <span className="text-zinc-600">no one left here</span>
+        )}
+        {highlight && <span className="text-xs font-medium text-[#e5484d]">Biggest leak</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────── Create dialog ───────────────────────────── */
+
+function SuggestionLists({ promise }: { promise: Promise<FunnelSuggestions> }) {
+  const { paths, events } = React.use(promise);
+  return (
+    <>
+      <datalist id="funnel-paths">
+        {paths.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
+      <datalist id="funnel-events">
+        {events.map((e) => (
+          <option key={e} value={e} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
+function normalizeTarget(type: StepDraft["type"], value: string): string {
+  const trimmed = value.trim();
+  if (type === "pageview" && trimmed && !trimmed.startsWith("/")) return `/${trimmed}`;
+  return trimmed;
+}
+
+function CreateFunnelDialog({
+  siteId,
+  suggestions,
+  onClose,
+  onCreated,
+}: {
+  siteId: string;
+  suggestions: Promise<FunnelSuggestions> | undefined;
+  onClose: () => void;
+  onCreated: (funnel: FunnelItem) => void;
+}) {
+  const [template, setTemplate] = React.useState("signup");
+  const [name, setName] = React.useState(TEMPLATES[0]!.name);
+  const [description, setDescription] = React.useState("");
+  const [steps, setSteps] = React.useState<StepDraft[]>(TEMPLATES[0]!.steps);
+  const [touched, setTouched] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+  const nameRef = React.useRef<HTMLInputElement>(null);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+
+  React.useEffect(() => {
+    nameRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  function applyTemplate(id: string) {
+    const t = TEMPLATES.find((x) => x.id === id);
+    if (!t) return;
+    setTemplate(id);
+    setName(t.name);
+    setSteps(t.steps.map((s) => ({ ...s })));
+    setTouched(false);
+  }
+
+  const update = (i: number, patch: Partial<StepDraft>) =>
+    setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  const remove = (i: number) => setSteps((prev) => (prev.length <= 2 ? prev : prev.filter((_, idx) => idx !== i)));
+  const add = () => setSteps((prev) => (prev.length >= MAX_STEPS ? prev : [...prev, { name: "", type: "pageview", target: "" }]));
+  const move = (i: number, dir: -1 | 1) =>
+    setSteps((prev) => {
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[i], copy[j]] = [copy[j]!, copy[i]!];
+      return copy;
+    });
+
+  const nameError = !name.trim() ? "Give the funnel a name" : null;
+  const stepErrors = steps.map((s, i) => {
+    if (!s.name.trim()) return "Name this step";
+    if (!s.target.trim()) return s.type === "pageview" ? "Enter a page path, like /pricing" : "Enter an event name";
+    const prev = steps[i - 1];
+    if (prev && prev.type === s.type && normalizeTarget(prev.type, prev.target) === normalizeTarget(s.type, s.target)) {
+      return "Same as the previous step";
+    }
+    return null;
+  });
+  const valid = !nameError && stepErrors.every((e) => e === null);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setTouched(true);
+    if (!valid || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/v1/sites/${siteId}/funnels`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || undefined,
+          steps: steps.map((s, i) => ({
+            order: i + 1,
+            name: s.name.trim(),
+            type: s.type,
+            target: normalizeTarget(s.type, s.target),
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(data.detail || data.message || "Could not create the funnel.");
+        return;
+      }
+      onCreated(data.funnel as FunnelItem);
+    } catch {
+      setSaveError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const input =
+    "w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-white/[0.25] focus:bg-white/[0.04]";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in"
+      onMouseDown={onClose}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="funnel-dialog-title"
+        onSubmit={submit}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-white/[0.1] bg-card shadow-2xl animate-slide-down"
+      >
+        {suggestions && (
+          <React.Suspense fallback={null}>
+            <SuggestionLists promise={suggestions} />
+          </React.Suspense>
+        )}
+
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] p-5">
+          <div>
+            <h2 id="funnel-dialog-title" className="text-sm font-medium text-zinc-50">
+              New funnel
+            </h2>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              Visitors move through the steps in order. Pick a starting point, then adjust.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-200"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-5 overflow-y-auto p-5">
+          {/* Templates */}
+          <div className="grid grid-cols-3 gap-2">
+            {TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => applyTemplate(t.id)}
+                aria-pressed={template === t.id}
+                className={`rounded-xl border p-3 text-left transition-colors ${
+                  template === t.id
+                    ? "border-white/[0.25] bg-white/[0.07]"
+                    : "border-white/[0.08] bg-white/[0.02] hover:border-white/[0.16]"
+                }`}
+              >
+                <p className="text-xs font-medium text-zinc-100">{t.label}</p>
+                <p className="mt-0.5 text-xs text-zinc-500">{t.hint}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="funnel-name" className="text-xs font-medium text-zinc-400">
+                Name
+              </label>
+              <input
+                id="funnel-name"
+                ref={nameRef}
+                value={name}
+                maxLength={NAME_MAX}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Onboarding and activation"
+                className={input}
+                aria-invalid={touched && !!nameError}
+              />
+              {touched && nameError && <p className="text-xs text-[#e5484d]">{nameError}</p>}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="funnel-desc" className="text-xs font-medium text-zinc-400">
+                Description <span className="font-normal normal-case tracking-normal text-zinc-600">optional</span>
+              </label>
+              <input
+                id="funnel-desc"
+                value={description}
+                maxLength={256}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="From landing to first project"
+                className={input}
+              />
+            </div>
+          </div>
+
+          {/* Steps */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-zinc-400">
+                Steps <span className="font-normal normal-case tracking-normal text-zinc-600">{steps.length} of {MAX_STEPS}</span>
+              </span>
+              <button
+                type="button"
+                onClick={add}
+                disabled={steps.length >= MAX_STEPS}
+                className="inline-flex items-center gap-1 text-xs font-medium text-zinc-200 transition-colors hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Plus className="h-4 w-4" /> Add step
               </button>
             </div>
 
-            <form onSubmit={handleCreateFunnel} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-300">Funnel Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Onboarding & Activation Funnel"
-                  value={funnelName}
-                  onChange={(e) => setFunnelName(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-300">Description (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Tracks landing visitors through first created project"
-                  value={funnelDesc}
-                  onChange={(e) => setFunnelDesc(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Steps Builder */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-zinc-300">Funnel Steps (Min 2)</label>
-                  <button
-                    type="button"
-                    onClick={addStep}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Step
-                  </button>
-                </div>
-
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {steps.map((s, idx) => (
+            <ol className="relative space-y-2 before:absolute before:bottom-6 before:left-[15px] before:top-6 before:w-px before:bg-white/[0.08]">
+              {steps.map((s, i) => {
+                const error = touched ? stepErrors[i] : null;
+                return (
+                  <li key={i} className="relative flex gap-3">
+                    <span className="z-10 mt-3 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-white/[0.1] bg-card text-xs font-medium tabular-nums text-zinc-300">
+                      {i + 1}
+                    </span>
                     <div
-                      key={idx}
-                      className="p-3 rounded-xl border border-white/[0.08] bg-white/[0.02] flex items-center gap-2 text-xs"
+                      className={`flex-1 space-y-2 rounded-xl border p-3 ${
+                        error ? "border-[#e5484d]/30 bg-[#e5484d]/[0.04]" : "border-white/[0.07] bg-white/[0.015]"
+                      }`}
                     >
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-500/20 text-indigo-300 text-[10px] font-bold shrink-0">
-                        {idx + 1}
-                      </span>
-
-                      <input
-                        type="text"
-                        required
-                        placeholder="Step Name"
-                        value={s.name}
-                        onChange={(e) => updateStep(idx, { name: e.target.value })}
-                        className="w-1/3 rounded-lg border border-white/10 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100"
-                      />
-
-                      <select
-                        value={s.type}
-                        onChange={(e) => updateStep(idx, { type: e.target.value as "pageview" | "custom_event" })}
-                        className="rounded-lg border border-white/10 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 cursor-pointer"
-                      >
-                        <option value="pageview">Page Path</option>
-                        <option value="custom_event">Custom Event</option>
-                      </select>
-
-                      <input
-                        type="text"
-                        required
-                        placeholder={s.type === "pageview" ? "/pricing" : "signup_completed"}
-                        value={s.target}
-                        onChange={(e) => updateStep(idx, { target: e.target.value })}
-                        className="flex-1 rounded-lg border border-white/10 bg-zinc-900 px-2 py-1.5 text-xs font-mono text-zinc-100"
-                      />
-
-                      {steps.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => removeStep(idx)}
-                          className="text-zinc-500 hover:text-rose-400 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <input
+                          aria-label={`Step ${i + 1} name`}
+                          value={s.name}
+                          maxLength={NAME_MAX}
+                          onChange={(e) => update(i, { name: e.target.value })}
+                          placeholder="Step name"
+                          className={`${input} flex-1`}
+                        />
+                        <div className="flex shrink-0" role="group" aria-label={`Step ${i + 1} type`}>
+                          {(["pageview", "custom_event"] as const).map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              aria-pressed={s.type === type}
+                              onClick={() => update(i, { type })}
+                              className={`px-3 py-2 text-xs font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
+                                s.type === type
+                                  ? "bg-zinc-800 text-zinc-100"
+                                  : "border border-white/[0.08] text-zinc-500 hover:text-zinc-300"
+                              }`}
+                            >
+                              {type === "pageview" ? "Page" : "Event"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          aria-label={`Step ${i + 1} ${s.type === "pageview" ? "page path" : "event name"}`}
+                          list={s.type === "pageview" ? "funnel-paths" : "funnel-events"}
+                          value={s.target}
+                          maxLength={256}
+                          onChange={(e) => update(i, { target: e.target.value })}
+                          onBlur={() => update(i, { target: normalizeTarget(s.type, s.target) })}
+                          placeholder={s.type === "pageview" ? "/pricing" : "signup_completed"}
+                          className={`${input} flex-1 font-mono`}
+                        />
+                        <div className="flex shrink-0 items-center">
+                          <button
+                            type="button"
+                            onClick={() => move(i, -1)}
+                            disabled={i === 0}
+                            aria-label={`Move step ${i + 1} up`}
+                            className="rounded p-2 text-zinc-500 hover:text-zinc-200 disabled:opacity-25"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => move(i, 1)}
+                            disabled={i === steps.length - 1}
+                            aria-label={`Move step ${i + 1} down`}
+                            className="rounded p-2 text-zinc-500 hover:text-zinc-200 disabled:opacity-25"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => remove(i)}
+                            disabled={steps.length <= 2}
+                            aria-label={`Remove step ${i + 1}`}
+                            className="rounded p-2 text-zinc-500 hover:text-[#e5484d] disabled:opacity-25"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      {error && <p className="text-xs text-[#e5484d]">{error}</p>}
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {saveError && (
-                <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2 flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  {saveError}
-                </p>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setModalOpen(false)}
-                  className="text-xs font-semibold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSaving}
-                  className="text-xs font-semibold gap-1.5"
-                >
-                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  {isSaving ? "Creating…" : "Save Funnel"}
-                </Button>
-              </div>
-            </form>
+                  </li>
+                );
+              })}
+            </ol>
           </div>
+
+          {/* Plain-language summary */}
+          <p className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-xs leading-relaxed text-zinc-500">
+            Counts visitors who{" "}
+            {steps
+              .filter((s) => s.target.trim())
+              .map((s, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && " then "}
+                  <span className="font-mono text-zinc-300">
+                    {s.type === "pageview" ? "view " : "trigger "}
+                    {normalizeTarget(s.type, s.target)}
+                  </span>
+                </React.Fragment>
+              ))}
+            {steps.every((s) => !s.target.trim()) && <span className="text-zinc-600">…add your steps above</span>}
+            , in that order.
+          </p>
+
+          {saveError && (
+            <p className="flex items-center gap-2 rounded-lg border border-[#e5484d]/20 bg-[#e5484d]/10 px-3 py-2 text-xs text-[#e5484d]">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {saveError}
+            </p>
+          )}
         </div>
-      )}
+
+        <div className="flex items-center justify-end gap-2 border-t border-white/[0.06] p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 rounded-lg px-3 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || (touched && !valid)}
+            className="inline-flex h-8 items-center gap-2 rounded-lg bg-zinc-100 px-4 text-xs font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {saving ? "Creating…" : "Create funnel"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

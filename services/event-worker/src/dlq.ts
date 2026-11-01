@@ -1,5 +1,6 @@
 import { Kafka, logLevel } from "kafkajs";
 import { env } from "@trackme/config";
+import { kafkaConnection } from "./kafka-config.js";
 
 let producerPromise: Promise<ReturnType<Kafka["producer"]>> | null = null;
 
@@ -8,7 +9,7 @@ async function getProducer() {
     producerPromise = (async () => {
       const kafka = new Kafka({
         clientId: "event-worker-dlq",
-        brokers: env.KAFKA_BROKERS.split(",").map((b) => b.trim()).filter(Boolean),
+        ...kafkaConnection(env),
         logLevel: logLevel.ERROR,
       });
       const producer = kafka.producer({ allowAutoTopicCreation: true });

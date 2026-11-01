@@ -97,18 +97,18 @@ export function ApiKeysManager({
       <div className="space-y-4">
         {/* Just Created Token Banner */}
         {justCreated && (
-          <div className="p-4 rounded-xl bg-emerald-500/10/80 border border-emerald-200 text-xs space-y-2 animate-in fade-in-0 duration-200">
+          <div className="p-4 rounded-xl bg-[#4cc38a]/10/80 border border-[#4cc38a] text-xs space-y-2 animate-in fade-in-0 duration-200">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-1.5 text-emerald-800 font-semibold">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <div className="flex items-center space-x-2 text-[#4cc38a] font-medium">
+                <CheckCircle2 className="w-4 h-4 text-[#4cc38a]" />
                 <span>API Key Generated — Copy it now</span>
               </div>
               <CopyButton text={justCreated} label="Copy Token" />
             </div>
-            <p className="text-[11px] text-emerald-400">
+            <p className="text-xs text-[#4cc38a]">
               For security reasons, this token will never be displayed again.
             </p>
-            <div className="p-2.5 rounded-lg bg-white/[0.02] border border-emerald-200 font-mono text-[11px] text-zinc-50 break-all select-all">
+            <div className="p-3 rounded-lg bg-white/[0.02] border border-[#4cc38a] font-mono text-xs text-zinc-50 break-all select-all">
               {justCreated}
             </div>
           </div>
@@ -118,27 +118,27 @@ export function ApiKeysManager({
         {keys.length === 0 ? (
           <div className="text-center py-8 px-4 rounded-xl border border-dashed border-white/10 bg-white/[0.03]/50">
             <KeyRound className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-zinc-300">No API keys created</p>
-            <p className="text-[11px] text-zinc-400 mt-0.5">
+            <p className="text-xs font-medium text-zinc-300">No API keys created</p>
+            <p className="text-xs text-zinc-400 mt-0.5">
               Generate a key to query ClickHouse analytics via the REST API.
             </p>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {keys.map((key) => (
               <div
                 key={key.id}
-                className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-white/[0.03]/80"
+                className="p-4 rounded-xl bg-white/[0.03] border border-white/10 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-white/[0.03]/80"
               >
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-zinc-50">{key.name}</span>
+                    <span className="font-medium text-zinc-50">{key.name}</span>
                     <Badge variant="outline">{key.scopes.join(", ")}</Badge>
                   </div>
-                  <div className="flex items-center space-x-2 text-zinc-500 font-mono text-[11px]">
+                  <div className="flex items-center space-x-2 text-zinc-500 font-mono text-xs">
                     <span>{key.prefix}••••••••••••••••</span>
                     <span className="text-zinc-300">·</span>
-                    <span className="text-zinc-400 font-sans text-[11px]">
+                    <span className="text-zinc-400 font-sans text-xs">
                       Created {new Date(key.createdAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -147,11 +147,11 @@ export function ApiKeysManager({
                 {/* Revoke confirmation / action */}
                 {revokingId === key.id ? (
                   <div className="flex items-center space-x-2 animate-in fade-in-0 duration-150">
-                    <span className="text-[11px] text-rose-600 font-medium">Revoke key?</span>
+                    <span className="text-xs text-[#e5484d] font-medium">Revoke key?</span>
                     <Button
                       variant="danger"
                       size="sm"
-                      className="h-7 text-xs px-2.5"
+                      className="h-7 text-xs px-3"
                       disabled={pending}
                       onClick={() => void confirmRevokeKey(key.id)}
                     >
@@ -171,7 +171,7 @@ export function ApiKeysManager({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-zinc-400 hover:text-rose-600 hover:bg-rose-500/10 text-xs h-7 px-2.5 transition shrink-0 self-start sm:self-center"
+                    className="text-zinc-400 hover:text-[#e5484d] hover:bg-[#e5484d]/10 text-xs h-7 px-3 transition shrink-0 self-start sm:self-center"
                     disabled={pending}
                     onClick={() => setRevokingId(key.id)}
                   >
@@ -185,7 +185,7 @@ export function ApiKeysManager({
         )}
 
         {error && (
-          <div className="flex items-center space-x-1.5 text-xs text-rose-400 bg-rose-500/10 border border-rose-200 rounded-xl p-3">
+          <div className="flex items-center space-x-2 text-xs text-[#e5484d] bg-[#e5484d]/10 border border-[#e5484d] rounded-xl p-3">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -194,7 +194,7 @@ export function ApiKeysManager({
         <Button
           variant="outline"
           size="sm"
-          className="w-full flex items-center justify-center space-x-1.5"
+          className="w-full flex items-center justify-center space-x-2"
           disabled={pending}
           onClick={() => void generateKey()}
         >

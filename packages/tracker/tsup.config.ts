@@ -9,13 +9,13 @@ export default defineConfig([
   // Standalone script bundle for <script src="...">
   {
     entry: {
-      tracker: "src/index.ts",
+      tracker: "src/browser.ts",
     },
     format: ["iife"],
+    noExternal: ["web-vitals"],
     outDir: "dist",
     minify: true,
     target: "es2020",
-    globalName: "GrowthIntelligence",
     clean: false,
     define: {
       __TRACKER_VERSION__: JSON.stringify(packageJson.version),

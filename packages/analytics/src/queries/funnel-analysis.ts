@@ -1,4 +1,5 @@
-import { getClickHouseClient } from "../client.js";
+import { dispatch, readClient, type ReadVariant } from "../read-mode.js";
+import { AnalyticsQueryError, AnalyticsRangeTooWideError } from "../errors.js";
 
 export interface FunnelStepDefinition {
   order: number;
@@ -13,10 +14,10 @@ export interface FunnelStepResult {
   type: string;
   target: string;
   conversions: number;
-  conversionRateFromFirst: number; // e.g. 100%, 45%, 22%
-  conversionRateFromPrevious: number; // e.g. 100%, 45%, 48%
+  conversionRateFromFirst: number;
+  conversionRateFromPrevious: number;
   dropOffCount: number;
-  dropOffRate: number; // e.g. 0%, 55%, 52%
+  dropOffRate: number;
 }
 
 export interface FunnelAnalysisResult {
@@ -36,51 +37,38 @@ export interface FunnelAnalysisRequest {
   };
 }
 
+/** Funnels still scan event-level rows; keep the raw window bounded. */
+export const FUNNEL_MAX_RANGE_DAYS = 31;
+
 function toCH(iso: string): string {
   return iso.replace("T", " ").replace("Z", "");
 }
 
-/**
- * Computes multi-step conversion funnels using ClickHouse windowFunnel.
- */
-export async function analyzeFunnel(
-  request: FunnelAnalysisRequest,
-  steps: FunnelStepDefinition[],
-  windowSeconds = 86400
-): Promise<FunnelAnalysisResult> {
-  if (steps.length === 0) {
-    return {
-      totalStarted: 0,
-      totalCompleted: 0,
-      overallConversionRate: 0,
-      steps: [],
-    };
+export function stepCondition(idx: number, type: FunnelStepDefinition["type"]): string {
+  if (type === "pageview") {
+    return `(type = 'pageview' AND startsWith(path, {step_${idx}_target:String}))`;
   }
+  return `(type = 'custom' AND (event_name = {step_${idx}_target:String} OR JSONExtractString(properties_json, 'goal') = {step_${idx}_target:String}))`;
+}
 
-  // Construct conditions for each step
-  const conditions = steps.map((s, idx) => {
-    if (s.type === "pageview") {
-      return `(type = 'pageview' AND (path = {step_${idx}_target:String} OR path LIKE concat({step_${idx}_target:String}, '%')))`;
-    }
-    return `(type = 'custom' AND (event_name = {step_${idx}_target:String} OR JSONExtractString(properties_json, 'goal') = {step_${idx}_target:String}))`;
-  });
+export function assertFunnelRange(fromIso: string, toIso: string, maxDays = FUNNEL_MAX_RANGE_DAYS): void {
+  const fromMs = Date.parse(fromIso);
+  const toMs = Date.parse(toIso);
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs < fromMs) {
+    throw new AnalyticsQueryError("Funnel date range is invalid");
+  }
+  const days = (toMs - fromMs) / 86_400_000;
+  if (days > maxDays) {
+    throw new AnalyticsRangeTooWideError(maxDays);
+  }
+}
 
-  const queryParams: Record<string, unknown> = {
-    workspaceId: request.workspaceId,
-    siteId: request.siteId,
-    from: toCH(request.dateRange.from),
-    to: toCH(request.dateRange.to),
-    windowSeconds,
-  };
-
-  steps.forEach((s, idx) => {
-    queryParams[`step_${idx}_target`] = s.target;
-  });
-
-  try {
-    const client = getClickHouseClient();
-
-    const query = `
+export function buildFunnelAnalysisQuery(
+  steps: FunnelStepDefinition[],
+  windowSeconds: number
+): { query: string; params: Record<string, unknown> } {
+  const conditions = steps.map((s, idx) => stepCondition(idx, s.type));
+  const query = `
       SELECT
         level,
         count() AS count
@@ -88,7 +76,7 @@ export async function analyzeFunnel(
         SELECT
           session_id,
           windowFunnel({windowSeconds:UInt32})(
-            timestamp,
+            toDateTime(timestamp),
             ${conditions.join(",\n            ")}
           ) AS level
         FROM events_raw
@@ -97,14 +85,67 @@ export async function analyzeFunnel(
           AND timestamp >= {from:DateTime64}
           AND timestamp <= {to:DateTime64}
           AND bot_status = 'human'
+          AND (${conditions.join(" OR ")})
         GROUP BY session_id
       )
       GROUP BY level
       ORDER BY level ASC
+      SETTINGS optimize_aggregation_in_order = 1
     `;
 
+  const params: Record<string, unknown> = { windowSeconds };
+  steps.forEach((s, idx) => {
+    params[`step_${idx}_target`] = s.target;
+  });
+  return { query, params };
+}
+
+function emptyResult(): FunnelAnalysisResult {
+  return {
+    totalStarted: 0,
+    totalCompleted: 0,
+    overallConversionRate: 0,
+    steps: [],
+  };
+}
+
+/**
+ * Computes multi-step conversion funnels using ClickHouse windowFunnel.
+ * Failures throw; callers must not treat an outage as zero conversions.
+ */
+export function analyzeFunnel(
+  request: FunnelAnalysisRequest,
+  steps: FunnelStepDefinition[],
+  windowSeconds = 86400
+): Promise<FunnelAnalysisResult> {
+  return dispatch("analyzeFunnel", (variant) => analyzeFunnelImpl(request, steps, windowSeconds, variant));
+}
+
+async function analyzeFunnelImpl(
+  request: FunnelAnalysisRequest,
+  steps: FunnelStepDefinition[],
+  windowSeconds: number,
+  variant: ReadVariant
+): Promise<FunnelAnalysisResult> {
+  if (steps.length === 0) {
+    return emptyResult();
+  }
+
+  assertFunnelRange(request.dateRange.from, request.dateRange.to);
+
+  const built = buildFunnelAnalysisQuery(steps, windowSeconds);
+  const queryParams: Record<string, unknown> = {
+    ...built.params,
+    workspaceId: request.workspaceId,
+    siteId: request.siteId,
+    from: toCH(request.dateRange.from),
+    to: toCH(request.dateRange.to),
+  };
+
+  try {
+    const client = readClient(variant);
     const resultSet = await client.query({
-      query,
+      query: built.query,
       query_params: queryParams,
       format: "JSONEachRow",
     });
@@ -115,8 +156,6 @@ export async function analyzeFunnel(
       levelCounts[Number(r.level)] = Number(r.count || 0);
     }
 
-    // A session that reached level K reached all steps 1..K
-    // So conversions for step i (1-indexed) = sum of counts for level >= i
     const stepConversions: number[] = [];
     for (let i = 1; i <= steps.length; i++) {
       let sum = 0;
@@ -156,29 +195,13 @@ export async function analyzeFunnel(
       totalStarted: firstStepCount,
       totalCompleted: finalStepCount,
       overallConversionRate:
-        firstStepCount > 0
-          ? Math.round((finalStepCount / firstStepCount) * 1000) / 10
-          : 0,
+        firstStepCount > 0 ? Math.round((finalStepCount / firstStepCount) * 1000) / 10 : 0,
       steps: stepResults,
     };
   } catch (err) {
-    console.error("⚠️ [FunnelAnalysis] ClickHouse query failed:", err);
-    // Graceful fallback with empty / zeroed steps
-    return {
-      totalStarted: 0,
-      totalCompleted: 0,
-      overallConversionRate: 0,
-      steps: steps.map((s) => ({
-        order: s.order,
-        name: s.name,
-        type: s.type,
-        target: s.target,
-        conversions: 0,
-        conversionRateFromFirst: 0,
-        conversionRateFromPrevious: 0,
-        dropOffCount: 0,
-        dropOffRate: 0,
-      })),
-    };
+    if (err instanceof AnalyticsQueryError || err instanceof AnalyticsRangeTooWideError) {
+      throw err;
+    }
+    throw new AnalyticsQueryError("ClickHouse funnel query failed", { cause: err });
   }
 }

@@ -51,16 +51,18 @@ type fakeQuota struct {
 	err      error
 	deny     bool
 	reserved []int
+	quotas   []int
 	released []map[string]int
 }
 
-func (f *fakeQuota) TryReserve(_ context.Context, _ string, _, delta int) (bool, error) {
+func (f *fakeQuota) TryReserve(_ context.Context, _ string, quota, delta int) (bool, error) {
 	if f.err != nil {
 		return false, f.err
 	}
 	if f.deny {
 		return false, nil
 	}
+	f.quotas = append(f.quotas, quota)
 	f.reserved = append(f.reserved, delta)
 	return true, nil
 }
@@ -72,14 +74,64 @@ func (f *fakeQuota) Release(_ context.Context, reserved map[string]int) error {
 
 type fakePublisher struct {
 	err       error
+	indices   []int
 	published [][]enrich.EnrichedEvent
 }
 
-func (f *fakePublisher) Publish(_ context.Context, events []enrich.EnrichedEvent) error {
+func (f *fakePublisher) Publish(_ context.Context, events []enrich.EnrichedEvent) ([]int, error) {
 	if f.err != nil {
-		return f.err
+		return f.indices, f.err
 	}
 	f.published = append(f.published, events)
+	indices := make([]int, len(events))
+	for i := range events {
+		indices[i] = i
+	}
+	return indices, nil
+}
+
+type fakeDeduper struct {
+	claimed   map[string]bool
+	claimErr  error
+	confirmed [][]string
+	released  [][]string
+}
+
+func (f *fakeDeduper) Claim(_ context.Context, eventIDs []string) ([]bool, error) {
+	if f.claimErr != nil {
+		return nil, f.claimErr
+	}
+	if f.claimed == nil {
+		f.claimed = make(map[string]bool)
+	}
+	result := make([]bool, len(eventIDs))
+	for i, id := range eventIDs {
+		if !f.claimed[id] {
+			f.claimed[id] = true
+			result[i] = true
+		}
+	}
+	return result, nil
+}
+
+func (f *fakeDeduper) Confirm(_ context.Context, eventIDs []string) error {
+	if f.claimed == nil {
+		f.claimed = make(map[string]bool)
+	}
+	ids := append([]string(nil), eventIDs...)
+	f.confirmed = append(f.confirmed, ids)
+	for _, id := range ids {
+		f.claimed[id] = true
+	}
+	return nil
+}
+
+func (f *fakeDeduper) Release(_ context.Context, eventIDs []string) error {
+	ids := append([]string(nil), eventIDs...)
+	f.released = append(f.released, ids)
+	for _, id := range ids {
+		delete(f.claimed, id)
+	}
 	return nil
 }
 
@@ -89,22 +141,25 @@ type rig struct {
 	site    *fakeLimiter
 	quota   *fakeQuota
 	pub     *fakePublisher
+	deduper *fakeDeduper
 	handler http.Handler
 }
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
 	resolved := &site.ResolvedSite{
-		ID:          "site-1",
-		WorkspaceID: "ws-1",
-		Domain:      "example.com",
-		Settings:    site.DefaultSettings(),
+		ID:                "site-1",
+		WorkspaceID:       "ws-1",
+		Domain:            "example.com",
+		Settings:          site.DefaultSettings(),
+		MonthlyEventQuota: 1_000_000,
 	}
 	r := &rig{
-		ip:    &fakeLimiter{allow: true},
-		site:  &fakeLimiter{allow: true},
-		quota: &fakeQuota{},
-		pub:   &fakePublisher{},
+		ip:      &fakeLimiter{allow: true},
+		site:    &fakeLimiter{allow: true},
+		quota:   &fakeQuota{},
+		pub:     &fakePublisher{},
+		deduper: &fakeDeduper{},
 	}
 	r.srv = &Server{
 		Sites:            fakeSites{site: resolved},
@@ -112,6 +167,7 @@ func newRig(t *testing.T) *rig {
 		Limiter:          r.ip,
 		SiteLimiter:      r.site,
 		Quota:            r.quota,
+		Deduper:          r.deduper,
 		MaxBody:          32768,
 		TrustedProxyHops: 1,
 		QuotaFailOpen:    true,
@@ -184,6 +240,9 @@ func publishedEvents(r *rig) []enrich.EnrichedEvent {
 
 func TestMetricsEndpointAndTraceHeader(t *testing.T) {
 	r := newRig(t)
+	health := httptest.NewRecorder()
+	r.handler.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/health", nil))
+
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	req.Header.Set("X-Request-ID", "trace-123")
 	w := httptest.NewRecorder()
@@ -196,7 +255,10 @@ func TestMetricsEndpointAndTraceHeader(t *testing.T) {
 		t.Fatalf("X-Request-ID = %q, want trace-123", got)
 	}
 	body := w.Body.String()
-	if !strings.Contains(body, "http_requests_total") || !strings.Contains(body, "http_request_latency_ms") {
+	if !strings.Contains(w.Header().Get("Content-Type"), "text/plain; version=0.0.4") ||
+		!strings.Contains(body, "# TYPE http_request_duration_seconds histogram") ||
+		!strings.Contains(body, `http_request_duration_seconds_bucket{route="GET /health",status_class="2xx"`) ||
+		!strings.Contains(body, "# TYPE edge_events_total counter") {
 		t.Fatalf("metrics output missing expected values: %s", body)
 	}
 }
@@ -218,6 +280,152 @@ func TestValidBatchIsPublished(t *testing.T) {
 	}
 	if strings.Contains(events[0].URL, "secret") {
 		t.Fatalf("query secrets must be stripped before publishing: %s", events[0].URL)
+	}
+}
+
+func TestEdgeDedupeDropsRetriesWithoutChargingOrRepublishing(t *testing.T) {
+	r := newRig(t)
+	r.srv.EdgeDedupe = true
+	body := batch(withID(1, nil))
+
+	first := post(r.handler, "/v1/batch", body, nil)
+	second := post(r.handler, "/v1/batch", body, nil)
+
+	if first.Code != http.StatusAccepted || second.Code != http.StatusAccepted {
+		t.Fatalf("statuses = %d, %d; want both 202", first.Code, second.Code)
+	}
+	if got := len(r.pub.published); got != 1 {
+		t.Fatalf("publish calls = %d, want 1", got)
+	}
+	if got := len(r.quota.reserved); got != 1 {
+		t.Fatalf("quota reservations = %d, want one for the original event", got)
+	}
+	response := decode(t, second)
+	if response["processed"] != float64(1) || response["duplicates"] != float64(1) {
+		t.Fatalf("duplicate response = %v, want processed=1 duplicates=1", response)
+	}
+	if got := len(r.deduper.confirmed); got != 1 || len(r.deduper.confirmed[0]) != 1 {
+		t.Fatalf("confirmed claims = %v, want the original event ID confirmed once", r.deduper.confirmed)
+	}
+}
+
+func TestDuplicateIDsWithinOneBatchAreClaimedOnlyOnce(t *testing.T) {
+	r := newRig(t)
+	r.srv.EdgeDedupe = true
+	ev := withID(1, nil)
+
+	w := post(r.handler, "/v1/batch", batch(ev, ev), nil)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, body %s", w.Code, w.Body.String())
+	}
+	if got := len(publishedEvents(r)); got != 1 {
+		t.Fatalf("published events = %d, want 1", got)
+	}
+	body := decode(t, w)
+	if body["processed"] != float64(2) || body["duplicates"] != float64(1) {
+		t.Fatalf("response = %v, want processed=2 duplicates=1", body)
+	}
+}
+
+func TestPublishFailureReleasesClaimsAndQuotaForRetry(t *testing.T) {
+	r := newRig(t)
+	r.srv.EdgeDedupe = true
+	r.pub.err = errors.New("kafka unavailable")
+	body := batch(withID(1, nil))
+
+	failed := post(r.handler, "/v1/batch", body, nil)
+	if failed.Code != http.StatusInternalServerError {
+		t.Fatalf("first status = %d, want 500", failed.Code)
+	}
+	if got := len(r.deduper.released); got != 1 || len(r.deduper.released[0]) != 1 {
+		t.Fatalf("released claims = %v, want failed event claim released", r.deduper.released)
+	}
+	if got := len(r.quota.released); got != 1 || r.quota.released[0]["ws-1"] != 1 {
+		t.Fatalf("released quota = %v, want one event released", r.quota.released)
+	}
+
+	r.pub.err = nil
+	retry := post(r.handler, "/v1/batch", body, nil)
+	if retry.Code != http.StatusAccepted {
+		t.Fatalf("retry status = %d, body %s", retry.Code, retry.Body.String())
+	}
+	if got := len(publishedEvents(r)); got != 1 {
+		t.Fatalf("published events after retry = %d, want 1", got)
+	}
+}
+
+func TestQuotaRejectionReleasesNewClaims(t *testing.T) {
+	r := newRig(t)
+	r.srv.EdgeDedupe = true
+	r.quota.deny = true
+	body := batch(withID(1, nil))
+
+	rejected := post(r.handler, "/v1/batch", body, nil)
+	if rejected.Code != http.StatusPaymentRequired {
+		t.Fatalf("status = %d, want 402", rejected.Code)
+	}
+	if got := len(r.deduper.released); got != 1 || len(r.deduper.released[0]) != 1 {
+		t.Fatalf("released claims = %v, want quota-rejected ID released", r.deduper.released)
+	}
+
+	r.quota.deny = false
+	retry := post(r.handler, "/v1/batch", body, nil)
+	if retry.Code != http.StatusAccepted {
+		t.Fatalf("retry status = %d, body %s", retry.Code, retry.Body.String())
+	}
+	if got := len(publishedEvents(r)); got != 1 {
+		t.Fatalf("published events after quota retry = %d, want 1", got)
+	}
+}
+
+func TestPublishFailureDoesNotReleaseQuotaThatFailedOpenWasNeverReserved(t *testing.T) {
+	r := newRig(t)
+	r.srv.EdgeDedupe = true
+	r.quota.err = errors.New("quota redis unavailable")
+	r.pub.err = errors.New("kafka unavailable")
+
+	w := post(r.handler, "/v1/batch", batch(withID(1, nil)), nil)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", w.Code)
+	}
+	if got := len(r.quota.released); got != 0 {
+		t.Fatalf("quota releases = %v, want none because fail-open reserved nothing", r.quota.released)
+	}
+}
+
+func TestPartialKafkaWriteKeepsSuccessfulClaimsAndReleasesFailedQuota(t *testing.T) {
+	r := newRig(t)
+	r.srv.EdgeDedupe = true
+	r.pub.err = errors.New("partial kafka write")
+	r.pub.indices = []int{0}
+	body := batch(withID(1, nil), withID(2, nil))
+
+	w := post(r.handler, "/v1/batch", body, nil)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", w.Code)
+	}
+	if got := r.deduper.confirmed; len(got) != 1 || len(got[0]) != 1 || got[0][0] != "3f2b8c1e-5a47-4d9e-8b21-00000000000b" {
+		t.Fatalf("confirmed claims = %v, want only first event", got)
+	}
+	if got := r.deduper.released; len(got) != 1 || len(got[0]) != 1 || got[0][0] != "3f2b8c1e-5a47-4d9e-8b21-00000000000c" {
+		t.Fatalf("released claims = %v, want only failed second event", got)
+	}
+	if got := len(r.quota.released); got != 1 || r.quota.released[0]["ws-1"] != 1 {
+		t.Fatalf("released quota = %v, want one failed event released", r.quota.released)
+	}
+}
+
+func TestDedupeRedisFailureFailsOpen(t *testing.T) {
+	r := newRig(t)
+	r.srv.EdgeDedupe = true
+	r.deduper.claimErr = errors.New("redis unavailable")
+
+	w := post(r.handler, "/v1/batch", batch(withID(1, nil)), nil)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 during dedupe Redis outage", w.Code)
+	}
+	if got := len(publishedEvents(r)); got != 1 {
+		t.Fatalf("published events = %d, want accepted event published", got)
 	}
 }
 
@@ -399,6 +607,61 @@ func TestQuotaStoreDownCanFailClosed(t *testing.T) {
 	}
 }
 
+func TestKnownBotIsDroppedNotPublishedAndNotCharged(t *testing.T) {
+	r := newRig(t)
+	w := post(r.handler, "/v1/batch", batch(withID(1, nil)), func(req *http.Request) {
+		req.Header.Set("User-Agent", "Mozilla/5.0 compatible; Googlebot/2.1; +http://www.google.com/bot.html")
+	})
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 so the SDK does not retry crawler traffic", w.Code)
+	}
+	body := decode(t, w)
+	if body["processed"] != float64(0) || body["droppedBots"] != float64(1) {
+		t.Fatalf("body = %v, want processed 0 droppedBots 1", body)
+	}
+	if len(r.pub.published) != 0 {
+		t.Fatal("known bots must not be published")
+	}
+	if len(r.quota.reserved) != 0 {
+		t.Fatalf("quota reserved = %v, known bots must not be billed", r.quota.reserved)
+	}
+}
+
+func TestHeuristicBotIsStoredButNotCharged(t *testing.T) {
+	r := newRig(t)
+	w := post(r.handler, "/v1/batch", batch(withID(1, nil)), func(req *http.Request) {
+		req.Header.Del("User-Agent")
+	})
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, body %s", w.Code, w.Body.String())
+	}
+	got := publishedEvents(r)
+	if len(got) != 1 || got[0].BotStatus != "heuristic_bot" {
+		t.Fatalf("published = %+v, want one heuristic_bot event", got)
+	}
+	if len(r.quota.reserved) != 0 {
+		t.Fatalf("quota reserved = %v, heuristic bots must not be billed", r.quota.reserved)
+	}
+}
+
+func TestQuotaUsesWorkspaceMonthlyLimitNotAnArbitrarySite(t *testing.T) {
+	r := newRig(t)
+	r.srv.Sites = fakeSites{site: &site.ResolvedSite{
+		ID:                "site-1",
+		WorkspaceID:       "ws-1",
+		Domain:            "example.com",
+		Settings:          site.DefaultSettings(),
+		MonthlyEventQuota: 42,
+	}}
+	post(r.handler, "/v1/batch", batch(withID(1, nil), withID(2, nil)), nil)
+	if len(r.quota.reserved) != 1 || r.quota.reserved[0] != 2 {
+		t.Fatalf("reserved deltas = %v, want 2 human events against the workspace quota", r.quota.reserved)
+	}
+	if len(r.quota.quotas) != 1 || r.quota.quotas[0] != 42 {
+		t.Fatalf("quota values = %v, want the workspace monthly limit 42", r.quota.quotas)
+	}
+}
+
 func TestPublishFailureGives500AndReleasesTheReservedQuota(t *testing.T) {
 	r := newRig(t)
 	r.pub.err = errors.New("kafka: leader not available")
@@ -409,6 +672,51 @@ func TestPublishFailureGives500AndReleasesTheReservedQuota(t *testing.T) {
 	}
 	if len(r.quota.released) != 1 || r.quota.released[0]["ws-1"] != 2 {
 		t.Fatalf("released = %v, want the 2 reserved events given back", r.quota.released)
+	}
+}
+
+func TestQuotaUsesWorkspaceLimitFromResolvedSite(t *testing.T) {
+	r := newRig(t)
+	post(r.handler, "/v1/batch", batch(withID(1, nil)), nil)
+	if len(r.quota.quotas) != 1 || r.quota.quotas[0] != 1_000_000 {
+		t.Fatalf("quotas = %v, want workspace monthly_event_quota", r.quota.quotas)
+	}
+}
+
+func TestKnownBotIsDroppedAndNotCharged(t *testing.T) {
+	r := newRig(t)
+	w := post(r.handler, "/v1/batch", batch(withID(1, nil)), func(req *http.Request) {
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Googlebot/2.1)")
+	})
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 so the SDK does not retry crawler traffic", w.Code)
+	}
+	body := decode(t, w)
+	if body["processed"] != float64(0) || body["droppedBots"] != float64(1) {
+		t.Fatalf("body = %v, want processed 0 droppedBots 1", body)
+	}
+	if len(r.pub.published) != 0 {
+		t.Fatal("known bots must not be published")
+	}
+	if len(r.quota.reserved) != 0 {
+		t.Fatalf("reserved = %v, known bots must not be billed", r.quota.reserved)
+	}
+}
+
+func TestHeuristicBotIsStoredButNotBilled(t *testing.T) {
+	r := newRig(t)
+	w := post(r.handler, "/v1/batch", batch(withID(1, nil)), func(req *http.Request) {
+		req.Header.Set("User-Agent", "")
+	})
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d", w.Code)
+	}
+	got := publishedEvents(r)
+	if len(got) != 1 || got[0].BotStatus != "heuristic_bot" {
+		t.Fatalf("published = %+v, want one heuristic_bot event", got)
+	}
+	if len(r.quota.reserved) != 0 {
+		t.Fatalf("reserved = %v, heuristic bots must not be billed", r.quota.reserved)
 	}
 }
 

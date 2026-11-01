@@ -92,7 +92,8 @@ export async function runUsageMetering(deps: UsageMeteringDeps = {}): Promise<vo
     const resultSet = await client.query({
       query: USAGE_METERING_SQL,
       format: "JSONEachRow",
-      query_params: { start, end },
+      // A JS Date is sent as epoch seconds, which ClickHouse rejects for a Date parameter.
+      query_params: { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) },
     });
     const rows = await resultSet.json<{
       workspace_id: string;

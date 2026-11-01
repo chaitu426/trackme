@@ -1,5 +1,5 @@
 import { MetricQueryRequest } from "@trackme/contracts";
-import { getClickHouseClient } from "../client.js";
+import { readClient, variantAware, type ReadVariant } from "../read-mode.js";
 import { buildDimensionFilterSql } from "./filters.js";
 
 export type CampaignBreakdownItem = {
@@ -20,10 +20,11 @@ export type CampaignBreakdownResponse = {
  * getBreakdown which only groups by a single dimension. Excludes traffic
  * with no campaign attached.
  */
-export async function getCampaignBreakdown(
+async function getCampaignBreakdownImpl(
   request: MetricQueryRequest
-): Promise<CampaignBreakdownResponse> {
-  const client = getClickHouseClient();
+,
+  variant: ReadVariant): Promise<CampaignBreakdownResponse> {
+  const client = readClient(variant);
   const filter = buildDimensionFilterSql(request.filters);
 
   const resultSet = await client.query({
@@ -39,7 +40,7 @@ export async function getCampaignBreakdown(
         AND site_id = {siteId:UUID}
         AND timestamp >= {from:DateTime64}
         AND timestamp <= {to:DateTime64}
-        AND bot_status = 'human'
+        AND bot_status = 'human' AND type = 'pageview'
         AND campaign_name != ''
         ${filter.clause}
       GROUP BY campaign_name, campaign_source, campaign_medium
@@ -80,3 +81,5 @@ export async function getCampaignBreakdown(
     items,
   };
 }
+
+export const getCampaignBreakdown = variantAware("getCampaignBreakdown", getCampaignBreakdownImpl);

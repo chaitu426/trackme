@@ -204,35 +204,35 @@ export function GoalsManager({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Total Conversions</span>
-            <Award className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs font-medium">Total Conversions</span>
+            <Award className="w-4 h-4 text-zinc-300" />
           </div>
-          <div className="text-2xl font-bold tracking-tight text-zinc-100">
+          <div className="text-2xl font-medium text-zinc-100">
             {totalConversions.toLocaleString()}
           </div>
-          <p className="text-[11px] text-zinc-500 mt-1">Across all active conversion rules</p>
+          <p className="text-xs text-zinc-500 mt-1">Across all active conversion rules</p>
         </div>
 
         <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Avg. Conversion Rate</span>
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-medium">Avg. Conversion Rate</span>
+            <TrendingUp className="w-4 h-4 text-[#4cc38a]" />
           </div>
-          <div className="text-2xl font-bold tracking-tight text-emerald-400">
+          <div className="text-2xl font-medium text-[#4cc38a]">
             {avgConvRate}%
           </div>
-          <p className="text-[11px] text-zinc-500 mt-1">Weighted conversion efficiency</p>
+          <p className="text-xs text-zinc-500 mt-1">Weighted conversion efficiency</p>
         </div>
 
         <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Active Goals</span>
-            <Zap className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-medium">Active Goals</span>
+            <Zap className="w-4 h-4 text-zinc-300" />
           </div>
-          <div className="text-2xl font-bold tracking-tight text-zinc-100">
+          <div className="text-2xl font-medium text-zinc-100">
             {activeCount} / {goals.length}
           </div>
-          <p className="text-[11px] text-zinc-500 mt-1">Monitoring and matching events</p>
+          <p className="text-xs text-zinc-500 mt-1">Monitoring and matching events</p>
         </div>
       </div>
 
@@ -262,7 +262,7 @@ export function GoalsManager({
               onSubmit={handleCreate}
               className="space-y-4 rounded-xl border border-white/10 bg-zinc-900/60 p-5 text-xs"
             >
-              <div className="text-sm font-semibold text-zinc-200">Define New Conversion Goal</div>
+              <div className="text-sm font-medium text-zinc-200">Define New Conversion Goal</div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -273,7 +273,7 @@ export function GoalsManager({
                     placeholder="e.g. Completed Checkout or Demo Request"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-zinc-950 p-2.5 text-zinc-200 outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
                   />
                 </div>
 
@@ -282,7 +282,7 @@ export function GoalsManager({
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value as "pageview_rule" | "custom_event")}
-                    className="w-full rounded-lg border border-white/10 bg-zinc-950 p-2.5 text-zinc-200 outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
                   >
                     <option value="pageview_rule">Pageview Rule (URL Path)</option>
                     <option value="custom_event">Custom Event (JavaScript Trigger)</option>
@@ -300,7 +300,7 @@ export function GoalsManager({
                       placeholder="e.g. /pricing, /thank-you, /checkout/*"
                       value={pathPattern}
                       onChange={(e) => setPathPattern(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-zinc-950 p-2.5 font-mono text-zinc-200 outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-white/10 bg-card p-3 font-mono text-zinc-200 outline-none focus:border-white/[0.1]"
                     />
                   </div>
                 ) : (
@@ -312,7 +312,7 @@ export function GoalsManager({
                       placeholder="e.g. signup_clicked, upgrade_plan"
                       value={eventName}
                       onChange={(e) => setEventName(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-zinc-950 p-2.5 font-mono text-zinc-200 outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-white/10 bg-card p-3 font-mono text-zinc-200 outline-none focus:border-white/[0.1]"
                     />
                   </div>
                 )}
@@ -326,12 +326,12 @@ export function GoalsManager({
                     placeholder="e.g. 99.00"
                     value={targetValue}
                     onChange={(e) => setTargetValue(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-zinc-950 p-2.5 text-zinc-200 outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
                   />
                 </div>
               </div>
 
-              {error && <div className="text-rose-400 text-xs">{error}</div>}
+              {error && <div className="text-[#e5484d] text-xs">{error}</div>}
 
               <div className="flex justify-end space-x-2 pt-2">
                 <Button
@@ -363,7 +363,7 @@ export function GoalsManager({
                 return (
                   <div
                     key={goal.id}
-                    className={`flex flex-col justify-between gap-4 rounded-xl border p-4 text-xs transition-all md:flex-row md:items-center ${
+                    className={`flex flex-col justify-between gap-4 rounded-xl border p-4 text-xs transition-colors md:flex-row md:items-center ${
                       isEnabled
                         ? "border-white/[0.08] bg-zinc-950/70"
                         : "border-white/[0.04] bg-white/[0.01] opacity-60"
@@ -378,40 +378,40 @@ export function GoalsManager({
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             placeholder="Goal name"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-100"
+                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
                           />
                           <input
                             type="text"
                             value={editPattern}
                             onChange={(e) => setEditPattern(e.target.value)}
                             placeholder="Path or event"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-2.5 py-1.5 text-xs font-mono text-zinc-100"
+                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs font-mono text-zinc-100"
                           />
                           <input
                             type="number"
                             value={editTargetValue}
                             onChange={(e) => setEditTargetValue(e.target.value)}
                             placeholder="Target value ($)"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-100"
+                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
                           />
                         </div>
-                        <div className="flex items-center gap-1.5 pt-1">
+                        <div className="flex items-center gap-2 pt-1">
                           <button
                             onClick={() => handleSaveEdit(goal.id, goal.type)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600 text-white font-medium text-[11px]"
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded bg-white/[0.06] text-white font-medium text-xs"
                           >
                             <Check className="w-3 h-3" /> Save
                           </button>
                           <button
                             onClick={() => setEditingGoalId(null)}
-                            className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-zinc-200"
+                            className="px-3 py-1 text-xs text-zinc-400 hover:text-zinc-200"
                           >
                             Cancel
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           {/* Enable/Disable toggle */}
                           <button
@@ -420,25 +420,25 @@ export function GoalsManager({
                             title={isEnabled ? "Pause goal" : "Resume goal"}
                             className={`p-1 rounded-md transition ${
                               isEnabled
-                                ? "text-emerald-400 hover:bg-emerald-500/10"
+                                ? "text-[#4cc38a] hover:bg-[#4cc38a]/10"
                                 : "text-zinc-500 hover:bg-white/[0.04]"
                             }`}
                           >
                             <Power className="w-3.5 h-3.5" />
                           </button>
 
-                          <span className="text-sm font-bold text-zinc-100">{goal.name}</span>
+                          <span className="text-sm font-medium text-zinc-100">{goal.name}</span>
                           <Badge variant={goal.type === "pageview_rule" ? "default" : "warning"}>
                             {goal.type === "pageview_rule" ? "Pageview" : "Custom Event"}
                           </Badge>
                           {!isEnabled && (
-                            <span className="text-[10px] uppercase font-semibold text-zinc-500 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                            <span className="text-xs font-medium text-zinc-500 bg-white/[0.04] px-2 py-0.5 rounded">
                               Paused
                             </span>
                           )}
                         </div>
 
-                        <div className="font-mono text-[11px] text-zinc-400">
+                        <div className="font-mono text-xs text-zinc-400">
                           Matching:{" "}
                           <span className="text-zinc-300">
                             {goal.pathPattern || goal.eventName}
@@ -451,19 +451,19 @@ export function GoalsManager({
                     {/* Stats & Actions */}
                     <div className="flex items-center space-x-5">
                       <div className="text-right">
-                        <div className="text-base font-extrabold text-zinc-100">
+                        <div className="text-base font-medium text-zinc-100">
                           {(goal.conversions || 0).toLocaleString()}
                         </div>
-                        <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                        <div className="text-xs font-medium text-zinc-400">
                           Conversions
                         </div>
                       </div>
 
                       <div className="text-right">
-                        <div className="text-base font-extrabold text-emerald-400">
+                        <div className="text-base font-medium text-[#4cc38a]">
                           {goal.conversionRate || 0}%
                         </div>
-                        <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                        <div className="text-xs font-medium text-zinc-400">
                           Conv. Rate
                         </div>
                       </div>
@@ -482,7 +482,7 @@ export function GoalsManager({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-rose-500 hover:bg-rose-500/10 hover:text-rose-400"
+                        className="h-8 px-2 text-[#e5484d] hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
                         disabled={pending}
                         onClick={() => void handleDelete(goal.id)}
                       >

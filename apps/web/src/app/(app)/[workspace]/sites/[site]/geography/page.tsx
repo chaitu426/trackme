@@ -1,17 +1,22 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/page-header";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { FileText, Globe2, X, Compass } from "lucide-react";
-import { getBreakdown, getOverviewMetrics } from "@trackme/analytics";
-import { AudienceMap } from "@/components/audience-map";
+import { Globe2, X, Compass } from "lucide-react";
+import { cachedBreakdown, cachedOverview } from "@/lib/cached-analytics";
+import { GeoGlobe } from "@/components/geo-globe";
+import { RangeSwitcher } from "@/components/range-switcher";
+import { MapCardSkeleton, RankingCardSkeleton, StatsGridSkeleton } from "@/components/ui/skeleton";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RankingList } from "@/components/ui/ranking-list";
 import { FlagImage } from "@/components/ui/flag-image";
 import { StatsCard } from "@/components/ui/stats-card";
 import { requireUser } from "@/lib/auth";
 import { countryName } from "@/lib/countries";
-import { parseRangeKey, percentChange, RANGE_OPTIONS, resolveDateRange } from "@/lib/date-range";
+import { parseRangeKey, percentChange, resolveDateRange, type RangeKey } from "@/lib/date-range";
 import { formatChange, formatNumber, formatPercent } from "@/lib/format";
 import { buildMetricRequest } from "@/lib/metrics";
+import { sourceLabel } from "@/lib/channels";
 import { requireDashboardSite } from "@/lib/tenancy";
 
 export default async function AudienceGeographyPage({
@@ -34,21 +39,74 @@ export default async function AudienceGeographyPage({
     notFound();
   }
   const { workspace, site } = context;
+  return (
+    <div className="w-full space-y-5 text-left">
+      <PageHeader title="Audience Geography" art="globe" actions={<RangeSwitcher range={range} extraQuery={selectedCountry ? `&country=${selectedCountry}` : ""} />}>
+        Where visitors come from, by country, for <span className="font-mono text-zinc-300">{site.domain}</span>
+      </PageHeader>
+
+      <Suspense key={`${range}:${selectedCountry ?? ""}`} fallback={<GeographySkeleton />}>
+        <GeographyBody
+          workspaceId={workspace.id}
+          siteId={site.id}
+          range={range}
+          {...(selectedCountry ? { selectedCountry } : {})}
+        />
+      </Suspense>
+
+      {/* Privacy note */}
+      <div className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs text-zinc-400 text-left">
+        <Compass className="mt-0.5 h-4 w-4 shrink-0 text-zinc-200" />
+        <p className="leading-relaxed">
+          Country is derived transiently from connection headers at the ingestion edge and stored only in aggregate. TrackMe never logs raw IP addresses or tracks precise visitor latitude/longitude coordinates.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function GeographySkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.85fr)]">
+        <MapCardSkeleton />
+        <RankingCardSkeleton rows={8} />
+      </div>
+      <StatsGridSkeleton count={3} className="grid grid-cols-1 gap-4 sm:grid-cols-3" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RankingCardSkeleton rows={6} />
+        <RankingCardSkeleton rows={6} />
+      </div>
+    </div>
+  );
+}
+
+async function GeographyBody({
+  workspaceId,
+  siteId,
+  range,
+  selectedCountry,
+}: {
+  workspaceId: string;
+  siteId: string;
+  range: RangeKey;
+  selectedCountry?: string;
+}) {
   const { current, previous } = resolveDateRange(range);
-  const countryRequest = buildMetricRequest(workspace.id, site.id, current, { limit: 100 });
-  const previousCountryRequest = buildMetricRequest(workspace.id, site.id, previous, { limit: 100 });
+  const countryRequest = buildMetricRequest(workspaceId, siteId, current, { limit: 100 });
+  const previousCountryRequest = buildMetricRequest(workspaceId, siteId, previous, { limit: 100 });
   const focusFilters = selectedCountry ? { country: selectedCountry } : undefined;
-  const focusRequest = buildMetricRequest(workspace.id, site.id, current, {
+  const focusRequest = buildMetricRequest(workspaceId, siteId, current, {
     limit: 8,
     ...(focusFilters ? { filters: focusFilters } : {}),
   });
 
   const [countries, previousCountries, focusMetrics, topPages, topReferrers] = await Promise.all([
-    getBreakdown(countryRequest, "country"),
-    getBreakdown(previousCountryRequest, "country"),
-    getOverviewMetrics(focusRequest),
-    getBreakdown(focusRequest, "path"),
-    getBreakdown(focusRequest, "referrer"),
+    cachedBreakdown(countryRequest, "country"),
+    cachedBreakdown(previousCountryRequest, "country"),
+    cachedOverview(focusRequest),
+    cachedBreakdown(focusRequest, "path"),
+    cachedBreakdown(focusRequest, "referrer"),
   ]);
 
   const countryItems = countries.items.filter((item) => /^[A-Z]{2}$/.test(item.name));
@@ -58,42 +116,10 @@ export default async function AudienceGeographyPage({
   const audienceLabel = focusedCountry ? countryName(focusedCountry.name) : "Global Audience";
 
   return (
-    <div className="w-full space-y-5 text-left">
-      {/* ── Top Header: Strictly Left-Anchored ── */}
-      <div className="flex flex-col justify-between gap-4 border-b border-white/[0.06] pb-4 sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-zinc-50">Audience Geography</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-blue-400">
-              <Globe2 className="h-3 w-3" />
-              Country-level
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-zinc-400">
-            Regional distribution and international traffic breakdown for{" "}
-            <span className="font-mono font-medium text-zinc-300">{site.domain}</span>
-          </p>
-        </div>
-
-        <div className="flex items-center rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium text-zinc-400 gap-0.5">
-          {RANGE_OPTIONS.map((option) => (
-            <Link
-              key={option.key}
-              href={`?range=${option.key}${selectedCountry ? `&country=${selectedCountry}` : ""}`}
-              className={`rounded-[5px] px-3 py-1.5 transition-colors font-medium ${option.key === range
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                  : "hover:bg-white/[0.04] hover:text-zinc-300 text-zinc-500"
-                }`}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-
+    <div className="space-y-5 reveal">
       {focusedCountry && (
-        <div className="flex items-center justify-between rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-xs text-blue-200">
-          <span className="flex items-center gap-2.5 font-medium">
+        <div className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-card px-4 py-3 text-xs text-zinc-100">
+          <span className="flex items-center gap-3 font-medium">
             <FlagImage code={focusedCountry.name} size={22} />
             <span>
               Filtering analytics strictly for <strong>{countryName(focusedCountry.name)}</strong>
@@ -101,9 +127,9 @@ export default async function AudienceGeographyPage({
           </span>
           <Link
             href={`?range=${range}`}
-            className="flex items-center gap-1 rounded-md border border-blue-400/20 bg-blue-400/10 px-2 py-1 font-semibold text-blue-200 transition hover:bg-blue-400/20"
+            className="flex items-center gap-1 rounded-md border border-white/[0.14] bg-white/[0.07] px-2 py-1 font-medium text-zinc-100 transition hover:bg-white/[0.07]"
           >
-            <X className="h-3.5 w-3.5" /> Clear Filter
+            <X className="h-4 w-4" /> Clear Filter
           </Link>
         </div>
       )}
@@ -113,15 +139,15 @@ export default async function AudienceGeographyPage({
         <Card>
           <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
             <div>
-              <CardTitle>Visitor Distribution Map</CardTitle>
+              <CardTitle>Visitor Globe</CardTitle>
               <CardDescription>
                 {formatNumber(countries.total)} visitors across {formatNumber(countryItems.length)} countries
               </CardDescription>
             </div>
-            <Globe2 className="h-4 w-4 text-blue-400" />
+            <Globe2 className="h-4 w-4 text-zinc-200" />
           </CardHeader>
           <div className="pt-3">
-            <AudienceMap
+            <GeoGlobe
               countries={countryItems}
               {...(selectedCountry ? { selectedCountry } : {})}
               range={range}
@@ -135,7 +161,7 @@ export default async function AudienceGeographyPage({
               <CardTitle>Top Regional Markets</CardTitle>
               <CardDescription>Ranked by unique visitor count</CardDescription>
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+            <span className="font-mono text-xs text-zinc-500 font-medium">
               Visitors · % Share
             </span>
           </CardHeader>
@@ -168,7 +194,7 @@ export default async function AudienceGeographyPage({
       </div>
 
       {/* Focus Stats Cards: Left-Anchored Headings */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatsCard
           title={audienceLabel}
           value={formatNumber(focusMetrics.visitors)}
@@ -194,7 +220,7 @@ export default async function AudienceGeographyPage({
               <CardTitle>Popular Pages for Region</CardTitle>
               <CardDescription>Most visited paths by this audience</CardDescription>
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+            <span className="font-mono text-xs text-zinc-500 font-medium">
               Pageviews
             </span>
           </CardHeader>
@@ -204,7 +230,6 @@ export default async function AudienceGeographyPage({
                 name: item.name,
                 value: item.pageviews,
                 percentage: item.percentage,
-                icon: <FileText className="h-3.5 w-3.5 text-blue-400" />,
               }))}
               empty="No page data for this audience yet."
               valueFormatter={formatNumber}
@@ -218,31 +243,22 @@ export default async function AudienceGeographyPage({
               <CardTitle>Top Inbound Sources</CardTitle>
               <CardDescription>Referrers directing this geographic audience</CardDescription>
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+            <span className="font-mono text-xs text-zinc-500 font-medium">
               Visitors
             </span>
           </CardHeader>
           <div className="pt-2">
             <RankingList
               items={topReferrers.items.map((item) => ({
-                name: item.name === "(direct / none)" ? "Direct / None" : item.name || "Direct / None",
+                name: sourceLabel(item.name),
                 value: item.visitors,
                 percentage: item.percentage,
-                icon: <Globe2 className="h-3.5 w-3.5 text-blue-400" />,
               }))}
               empty="No referrer data for this audience yet."
               valueFormatter={formatNumber}
             />
           </div>
         </Card>
-      </div>
-
-      {/* Privacy note */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs text-zinc-400 text-left">
-        <Compass className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
-        <p className="leading-relaxed">
-          Country is derived transiently from connection headers at the ingestion edge and stored only in aggregate. TrackMe never logs raw IP addresses or tracks precise visitor latitude/longitude coordinates.
-        </p>
       </div>
     </div>
   );

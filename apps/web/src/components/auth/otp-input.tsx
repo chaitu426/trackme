@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Loader2, RefreshCw, KeyRound, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
 
 interface OtpInputProps {
   email: string;
@@ -157,30 +156,24 @@ export function OtpVerificationModal({
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-1.5">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-zinc-900 border border-white/[0.08] text-white flex items-center justify-center shadow-md mb-3">
-          <KeyRound className="w-5 h-5 text-indigo-400" />
-        </div>
-        <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-          Two-Factor Security Code
-        </h2>
-        <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-          We’ve dispatched a 6-digit one-time passcode to{" "}
-          <span className="font-semibold text-zinc-200">{email}</span>.
+      <div>
+        <h2 className="text-[28px] font-medium leading-9 tracking-[-0.02em] text-zinc-50">Check your email</h2>
+        <p className="mt-2 text-sm leading-5 text-zinc-400">
+          We sent a 6-digit code to <span className="text-zinc-100">{email}</span>. Enter it below.
         </p>
       </div>
 
-      {/* Dev helper badge */}
+      {/* Shown only outside production: the API never returns the code there. */}
       {devCode && (
-        <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
-          <p className="text-[11px] font-mono text-amber-400 font-medium">
-            Local Dev Code: <span className="font-bold tracking-wider text-amber-300">{devCode}</span>
+        <div className="rounded-lg border border-white/[0.1] bg-card px-3 py-2">
+          <p className="font-mono text-xs text-zinc-400">
+            Development code: <span className="text-zinc-100">{devCode}</span>
           </p>
         </div>
       )}
 
       {/* 6 Digit Inputs */}
-      <div className="flex justify-center gap-2 sm:gap-2.5" onPaste={handlePaste}>
+      <div className="flex gap-2" onPaste={handlePaste} role="group" aria-label="One-time code">
         {digits.map((digit, idx) => (
           <input
             key={idx}
@@ -192,52 +185,48 @@ export function OtpVerificationModal({
             pattern="[0-9]*"
             maxLength={1}
             value={digit}
+            aria-label={`Digit ${idx + 1}`}
+            autoComplete={idx === 0 ? "one-time-code" : "off"}
             onChange={(e) => handleChange(idx, e.target.value)}
             onKeyDown={(e) => handleKeyDown(idx, e)}
             disabled={loading}
-            className={`w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-mono font-bold rounded-xl border transition-all ${
-              digit
-                ? "border-zinc-200 bg-zinc-900 text-zinc-100 shadow-xs ring-2 ring-white/10"
-                : "border-white/[0.08] bg-zinc-900/60 text-zinc-100 focus:border-zinc-300 focus:bg-zinc-900 focus:ring-1 focus:ring-zinc-400/20"
-            } focus:outline-none`}
+            className={`h-12 min-w-0 flex-1 rounded-lg border bg-card text-center font-mono text-xl text-zinc-50 outline-none transition-colors duration-150 ${
+              digit ? "border-white/[0.35]" : "border-white/[0.1] hover:border-white/[0.18] focus:border-white/[0.4]"
+            }`}
           />
         ))}
       </div>
 
       {error && (
-        <div className="text-xs text-rose-400 bg-rose-950/40 border border-rose-900/60 rounded-xl px-3.5 py-2.5 text-center">
+        <p role="alert" className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
           {error}
-        </div>
+        </p>
       )}
 
-      <div className="space-y-3 pt-2">
-        <Button
+      <div className="space-y-4">
+        <button
           type="button"
           onClick={() => submitCode()}
-          className="w-full h-11 text-xs font-semibold rounded-xl"
           disabled={loading || digits.some((d) => !d)}
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
         >
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Verifying Code…
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Verifying…
             </>
           ) : (
             <>
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Verify & Enter
+              <CheckCircle2 className="h-4 w-4" />
+              Verify and continue
             </>
           )}
-        </Button>
+        </button>
 
-        <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
+        <div className="flex items-center justify-between text-sm">
           {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="text-zinc-400 hover:text-zinc-200 transition"
-            >
-              ← Back
+            <button type="button" onClick={onCancel} className="text-zinc-400 transition-colors duration-150 hover:text-zinc-100">
+              Back
             </button>
           )}
 
@@ -245,14 +234,12 @@ export function OtpVerificationModal({
             type="button"
             onClick={handleResend}
             disabled={resendCooldown > 0 || isResending}
-            className={`inline-flex items-center gap-1.5 ml-auto text-xs font-medium transition ${
-              resendCooldown > 0
-                ? "text-zinc-500 cursor-not-allowed"
-                : "text-zinc-200 hover:underline cursor-pointer"
+            className={`ml-auto inline-flex items-center gap-2 transition-colors duration-150 ${
+              resendCooldown > 0 ? "cursor-not-allowed text-zinc-500" : "text-zinc-200 hover:text-white"
             }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isResending ? "animate-spin" : ""}`} />
-            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
+            <RefreshCw className={`h-4 w-4 ${isResending ? "animate-spin" : ""}`} />
+            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
           </button>
         </div>
       </div>

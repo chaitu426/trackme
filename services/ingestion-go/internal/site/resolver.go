@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/trackme/ingestion-go/internal/metrics"
 )
 
 type Settings struct {
@@ -58,7 +59,11 @@ type ResolvedSite struct {
 var ErrNotFound = errors.New("site not found")
 
 const (
-	cacheTTL    = 60 * time.Second
+	cacheTTL = 60 * time.Second
+	// An entry past cacheTTL is still served for up to staleMax while one background
+	// query refreshes it, so the request that happens to land on expiry no longer pays
+	// the database round trip. Past staleMax (a long database outage) it is not served.
+	staleMax    = 5 * time.Minute
 	cacheMax    = 5000
 	negativeTTL = 10 * time.Second // short, so a site created a moment ago starts working quickly
 	negativeMax = 10000
@@ -81,7 +86,7 @@ type inflight struct {
 }
 
 // Resolver maps a public site key to its settings. Lookups are cached per key
-// hash, concurrent lookups for one key share a single database query, and keys
+// hash (stale-while-revalidate past the TTL), concurrent lookups for one key share a single database query, and keys
 // that do not exist are remembered briefly so a flood of junk keys cannot turn
 // into a flood of queries.
 type Resolver struct {
@@ -214,12 +219,21 @@ func (r *Resolver) Resolve(ctx context.Context, publicKey string) (*ResolvedSite
 
 	r.mu.Lock()
 	if site, ok := r.cachedLocked(hash); ok {
+		metrics.Default.SiteCache.WithLabelValues("hit").Inc()
 		r.mu.Unlock()
 		return &site, nil
 	}
 	if r.missingLocked(hash) {
+		metrics.Default.SiteCache.WithLabelValues("negative").Inc()
 		r.mu.Unlock()
 		return nil, ErrNotFound
+	}
+	if site, ok := r.staleLocked(hash); ok {
+		// Answer from the expired entry now and refresh behind it.
+		metrics.Default.SiteCache.WithLabelValues("stale").Inc()
+		r.refreshLocked(hash)
+		r.mu.Unlock()
+		return &site, nil
 	}
 
 	call, running := r.inflight[hash]
@@ -230,6 +244,7 @@ func (r *Resolver) Resolve(ctx context.Context, publicKey string) (*ResolvedSite
 	r.mu.Unlock()
 
 	if !running {
+		metrics.Default.SiteCache.WithLabelValues("miss").Inc()
 		// Own goroutine, so even the caller that started the lookup can give up
 		// on its own context without waiting for the database.
 		go r.run(hash, call)
@@ -259,6 +274,8 @@ func (r *Resolver) run(hash string, call *inflight) {
 	case err == nil:
 		r.storeLocked(hash, site)
 	case errors.Is(err, ErrNotFound):
+		// The site is gone: stop serving its stale entry too.
+		delete(r.cache, hash)
 		r.storeMissingLocked(hash)
 	}
 	delete(r.inflight, hash)
@@ -274,6 +291,24 @@ func (r *Resolver) cachedLocked(hash string) (ResolvedSite, bool) {
 		return ResolvedSite{}, false
 	}
 	return entry.site, true
+}
+
+func (r *Resolver) staleLocked(hash string) (ResolvedSite, bool) {
+	entry, ok := r.cache[hash]
+	if !ok || r.now().Sub(entry.cachedAt) >= staleMax {
+		return ResolvedSite{}, false
+	}
+	return entry.site, true
+}
+
+// refreshLocked starts one background lookup for hash unless one is already running.
+func (r *Resolver) refreshLocked(hash string) {
+	if _, running := r.inflight[hash]; running {
+		return
+	}
+	call := &inflight{done: make(chan struct{})}
+	r.inflight[hash] = call
+	go r.run(hash, call)
 }
 
 func (r *Resolver) missingLocked(hash string) bool {
@@ -315,10 +350,15 @@ func (r *Resolver) storeMissingLocked(hash string) {
 
 // InvalidateByHash drops a cached site, and any remembered miss for the same
 // key, after settings or signing rotate or a site is created.
+//
+// The entry is dropped (never served stale after an invalidation, since the change may
+// be a revoked signing secret) and reloaded straight away, so the next request finds it
+// warm or joins the lookup already running instead of starting a cold one.
 func (r *Resolver) InvalidateByHash(publicKeyHash string) {
 	r.mu.Lock()
 	delete(r.cache, publicKeyHash)
 	delete(r.missing, publicKeyHash)
+	r.refreshLocked(publicKeyHash)
 	r.mu.Unlock()
 }
 

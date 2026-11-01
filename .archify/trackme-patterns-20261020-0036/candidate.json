@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "TrackMe: Reusable Architecture Patterns",
+    "output": ".archify/trackme-patterns-20261020-0036/trackme-patterns.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/chaitu426/trackme.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "91658b382c23fea17f05d0a8a1e2d7c3062feb90"
+    }
+  },
+  "components": [
+    {
+      "id": "tracker",
+      "type": "frontend",
+      "label": "Browser tracker",
+      "sublabel": "Collect + batch events",
+      "sources": [
+        { "path": "packages/tracker/src/index.ts", "line": 1, "end_line": 45 },
+        { "path": "packages/tracker/src/transport.ts", "line": 1, "end_line": 130 }
+      ],
+      "pos": [40, 100],
+      "size": [185, 82]
+    },
+    {
+      "id": "ingress",
+      "type": "backend",
+      "label": "Ingestion API",
+      "sublabel": "Go · HTTP handlers",
+      "sources": [
+        { "path": "services/ingestion-go/internal/httpapi/server.go", "line": 20, "end_line": 65 },
+        { "path": "services/ingestion-go/internal/httpapi/server.go", "line": 166, "end_line": 345 }
+      ],
+      "pos": [300, 100],
+      "size": [200, 86]
+    },
+    {
+      "id": "rate-limit",
+      "type": "backend",
+      "label": "Atomic rate-limit gate",
+      "sublabel": "Fixed window · Lua script",
+      "sources": [
+        { "path": "services/ingestion-go/internal/ratelimit/limiter.go", "line": 24, "end_line": 51 }
+      ],
+      "pos": [300, 345],
+      "size": [215, 86]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis state",
+      "sublabel": "Atomic counters · TTL · ZSET · locks",
+      "sources": [
+        { "path": "infra/docker/docker-compose.yml", "line": 50, "end_line": 65 },
+        { "path": "services/ingestion-go/internal/ratelimit/limiter.go", "line": 32, "end_line": 51 },
+        { "path": "services/event-worker/src/state/redis-realtime.ts", "line": 14, "end_line": 43 }
+      ],
+      "pos": [600, 345],
+      "size": [230, 90]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka event backbone",
+      "sublabel": "Partition key preserves session ordering",
+      "sources": [
+        { "path": "services/ingestion-go/internal/queue/kafka.go", "line": 13, "end_line": 65 },
+        { "path": "infra/docker/docker-compose.yml", "line": 66, "end_line": 101 }
+      ],
+      "pos": [600, 100],
+      "size": [245, 90]
+    },
+    {
+      "id": "consumer",
+      "type": "backend",
+      "label": "Batch consumer",
+      "sublabel": "Validate · isolate bad rows · resolve offsets",
+      "sources": [
+        { "path": "services/event-worker/src/worker.ts", "line": 103, "end_line": 181 },
+        { "path": "services/event-worker/src/isolate.ts", "line": 1, "end_line": 28 }
+      ],
+      "pos": [920, 100],
+      "size": [255, 94]
+    },
+    {
+      "id": "dlq",
+      "type": "messagebus",
+      "label": "Dead-letter topic",
+      "sublabel": "Malformed / rejected records",
+      "sources": [
+        { "path": "services/event-worker/src/dlq.ts", "line": 1, "end_line": 41 },
+        { "path": "services/event-worker/src/worker.ts", "line": 135, "end_line": 170 }
+      ],
+      "pos": [920, 345],
+      "size": [230, 86]
+    },
+    {
+      "id": "clickhouse",
+      "type": "database",
+      "label": "ClickHouse event sink",
+      "sublabel": "Batch JSONEachRow · event_id dedupe",
+      "sources": [
+        { "path": "services/event-worker/src/writers/clickhouse.ts", "line": 31, "end_line": 135 },
+        { "path": "infra/migrations/clickhouse/001_events_raw.sql", "line": 1, "end_line": 58 }
+      ],
+      "pos": [1270, 100],
+      "size": [250, 92]
+    },
+    {
+      "id": "web-query",
+      "type": "backend",
+      "label": "Web query boundary",
+      "sublabel": "Tenant guard → operational / analytics reads",
+      "sources": [
+        { "path": "packages/authz/src/tenancy.ts", "line": 1, "end_line": 35 },
+        { "path": "packages/db/src/client.ts", "line": 1, "end_line": 14 },
+        { "path": "packages/analytics/src/client.ts", "line": 1, "end_line": 27 }
+      ],
+      "pos": [40, 590],
+      "size": [260, 92]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Tenant and application records",
+      "sources": [
+        { "path": "infra/docker/docker-compose.yml", "line": 3, "end_line": 20 },
+        { "path": "packages/db/src/client.ts", "line": 1, "end_line": 14 }
+      ],
+      "pos": [390, 590],
+      "size": [225, 86]
+    },
+    {
+      "id": "scheduler",
+      "type": "backend",
+      "label": "Scheduled jobs",
+      "sublabel": "Cron + Redis distributed lock",
+      "sources": [
+        { "path": "services/scheduled-worker/src/scheduler.ts", "line": 1, "end_line": 88 },
+        { "path": "services/scheduled-worker/src/lock.ts", "line": 1, "end_line": 90 }
+      ],
+      "pos": [700, 590],
+      "size": [250, 90]
+    }
+  ],
+  "connections": [
+    { "id": "tracker-posts", "from": "tracker", "to": "ingress", "label": "POST", "variant": "emphasis" },
+    { "id": "ingress-limit", "from": "ingress", "to": "rate-limit" },
+    { "id": "limit-redis", "from": "rate-limit", "to": "redis", "label": "Lua" },
+    { "id": "ingress-publish", "from": "ingress", "to": "kafka", "label": "publish", "variant": "emphasis" },
+    { "id": "kafka-consumer", "from": "kafka", "to": "consumer", "variant": "emphasis" },
+    { "id": "consumer-write", "from": "consumer", "to": "clickhouse", "label": "write" },
+    { "id": "consumer-dlq", "from": "consumer", "to": "dlq" },
+    { "id": "consumer-realtime", "from": "consumer", "to": "redis" },
+    { "id": "web-postgres", "from": "web-query", "to": "postgres" },
+    { "id": "web-clickhouse", "from": "web-query", "to": "clickhouse" },
+    { "id": "scheduler-redis", "from": "scheduler", "to": "redis" },
+    { "id": "scheduler-clickhouse", "from": "scheduler", "to": "clickhouse" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Resilient event delivery",
+      "items": [
+        "The consumer validates a batch, isolates individual ClickHouse row failures, and sends rejects to the DLQ.",
+        "Offsets resolve only after the ClickHouse write and required DLQ sends succeed; a failed step causes Kafka redelivery.",
+        "event_id plus ReplacingMergeTree makes replayed inserts converge during merges; this is at-least-once delivery, not end-to-end exactly-once."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Fast, bounded state",
+      "items": [
+        "A Redis Lua script increments a time-bucketed counter and repairs/sets expiry atomically in one server-side operation.",
+        "The consumer pipelines active-session TTL keys, a sorted-set index and per-site notifications.",
+        "Scheduled jobs use Redis locks to avoid duplicate work across worker replicas."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Explicit boundaries",
+      "items": [
+        "Go handler interfaces invert dependencies so Redis, PostgreSQL and Kafka failure paths can be tested with substitutes.",
+        "Shared tenant context checks role permissions and workspace identity before protected operations.",
+        "PostgreSQL serves operational records while ClickHouse serves analytical scans: a useful CQRS-like workload split, not a claim of strict CQRS."
+      ]
+    }
+  ]
+}

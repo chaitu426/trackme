@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { X, Monitor, Smartphone, Tablet, Globe2, ChevronDown, Check } from "lucide-react";
 import { countryName } from "@/lib/countries";
 import { FlagImage } from "@/components/ui/flag-image";
+import { RangeSwitcher } from "@/components/range-switcher";
 import type { RangeKey } from "@/lib/date-range";
 
 type Country = { code: string; visitors: number };
@@ -13,12 +15,6 @@ const DEVICE_ICONS: Record<string, React.ReactNode> = {
   desktop: <Monitor className="w-3.5 h-3.5" />,
   mobile: <Smartphone className="w-3.5 h-3.5" />,
   tablet: <Tablet className="w-3.5 h-3.5" />,
-};
-
-const RANGE_LABELS: Record<RangeKey, string> = {
-  "24h": "24h",
-  "7d": "7d",
-  "30d": "30d",
 };
 
 export function AnalyticsFilterBar({
@@ -34,6 +30,8 @@ export function AnalyticsFilterBar({
   countries: Country[];
   devices: string[];
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = React.useTransition();
   const formRef = React.useRef<HTMLFormElement>(null);
   const [countryOpen, setCountryOpen] = React.useState(false);
   const [deviceOpen, setDeviceOpen] = React.useState(false);
@@ -57,27 +55,22 @@ export function AnalyticsFilterBar({
     const params = new URLSearchParams({ range });
     if (newCountry) params.set("country", newCountry);
     if (newDevice) params.set("device", newDevice);
-    window.location.search = params.toString();
+    startTransition(() => router.push(`?${params.toString()}`));
   }
 
   return (
-    <form ref={formRef} className="flex flex-wrap items-center gap-2" action="" method="get">
+    <form
+      ref={formRef}
+      className="flex flex-wrap items-center gap-2"
+      action=""
+      method="get"
+      aria-busy={isPending}
+    >
       {/* Range pills */}
-      <div className="flex items-center rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium text-zinc-400 gap-0.5">
-        {(["24h", "7d", "30d"] as RangeKey[]).map((option) => (
-          <Link
-            key={option}
-            href={`?range=${option}${country ? `&country=${country}` : ""}${device ? `&device=${device}` : ""}`}
-            className={`rounded-[5px] px-3 py-1.5 transition-colors font-medium ${
-              option === range
-                ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                : "hover:bg-white/[0.04] hover:text-zinc-300 text-zinc-500"
-            }`}
-          >
-            {RANGE_LABELS[option]}
-          </Link>
-        ))}
-      </div>
+      <RangeSwitcher
+        range={range}
+        extraQuery={`${country ? `&country=${country}` : ""}${device ? `&device=${device}` : ""}`}
+      />
       <input type="hidden" name="range" value={range} />
 
       {/* Country dropdown */}
@@ -85,10 +78,10 @@ export function AnalyticsFilterBar({
         <button
           type="button"
           onClick={() => { setCountryOpen(!countryOpen); setDeviceOpen(false); }}
-          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex h-8 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
             country
-              ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
-              : "border-white/[0.08] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:border-white/[0.14] hover:bg-white/[0.04]"
+              ? "border-white/[0.25] bg-white/[0.07] text-zinc-100"
+              : "border-border text-zinc-400 hover:border-white/[0.16] hover:text-zinc-100"
           }`}
         >
           {selectedCountry
@@ -101,7 +94,7 @@ export function AnalyticsFilterBar({
         </button>
 
         {countryOpen && (
-          <div className="absolute left-0 top-full mt-1.5 z-50 w-56 rounded-xl border border-white/[0.08] bg-zinc-950 p-1 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.6)] overflow-hidden">
+          <div className="absolute left-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card p-1 shadow-float overflow-hidden">
             <DropItem
               label="All countries"
               isSelected={!country}
@@ -129,10 +122,10 @@ export function AnalyticsFilterBar({
         <button
           type="button"
           onClick={() => { setDeviceOpen(!deviceOpen); setCountryOpen(false); }}
-          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex h-8 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors ${
             device
-              ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
-              : "border-white/[0.08] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:border-white/[0.14] hover:bg-white/[0.04]"
+              ? "border-white/[0.25] bg-white/[0.07] text-zinc-100"
+              : "border-border text-zinc-400 hover:border-white/[0.16] hover:text-zinc-100"
           }`}
         >
           {device && DEVICE_ICONS[device] ? DEVICE_ICONS[device] : <Monitor className="w-3.5 h-3.5" />}
@@ -141,7 +134,7 @@ export function AnalyticsFilterBar({
         </button>
 
         {deviceOpen && (
-          <div className="absolute left-0 top-full mt-1.5 z-50 w-44 rounded-xl border border-white/[0.08] bg-zinc-950 p-1 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.6)]">
+          <div className="absolute left-0 top-full mt-2 z-50 w-44 rounded-xl border border-border bg-card p-1 shadow-float">
             <DropItem
               label="All devices"
               isSelected={!device}
@@ -166,9 +159,9 @@ export function AnalyticsFilterBar({
       {hasFilters && (
         <Link
           href={`?range=${range}`}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] px-2.5 text-[11px] font-medium text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-200 hover:border-white/[0.14]"
+          className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.08] px-3 text-xs font-medium text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-200 hover:border-white/[0.14]"
         >
-          <X className="h-3 w-3" /> Clear
+          <X className="h-4 w-4" /> Clear
         </Link>
       )}
     </form>
@@ -196,9 +189,9 @@ function DropItem({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
+      className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
         isSelected
-          ? "bg-white/[0.08] text-zinc-100 font-semibold"
+          ? "bg-white/[0.08] text-zinc-100 font-medium"
           : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
       }`}
     >
@@ -207,11 +200,11 @@ function DropItem({
         {!flag && icon && <span className="shrink-0 text-zinc-500">{icon}</span>}
         <span className="truncate">{label}</span>
       </span>
-      <span className="flex items-center gap-1.5 shrink-0">
+      <span className="flex items-center gap-2 shrink-0">
         {badge && (
-          <span className="font-mono text-[10px] text-zinc-600 tabular-nums">{badge}</span>
+          <span className="font-mono text-xs text-zinc-600 tabular-nums">{badge}</span>
         )}
-        {isSelected && <Check className="w-3 h-3 text-blue-400" />}
+        {isSelected && <Check className="w-3 h-3 text-zinc-200" />}
       </span>
     </button>
   );

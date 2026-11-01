@@ -196,7 +196,7 @@ export async function sendOtpEmail(
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #09090b;
+            background: #0a0a0a;
             color: #f4f4f5;
             padding: 40px 20px;
           }
@@ -217,14 +217,14 @@ export async function sendOtpEmail(
             color: #fff;
             margin-bottom: 32px;
           }
-          .logo-dot { width: 8px; height: 8px; background: #818cf8; border-radius: 50%; }
+          .logo-dot { width: 8px; height: 8px; background: #bcbcbc; border-radius: 50%; }
           h1 { font-size: 20px; font-weight: 600; color: #fafafa; margin-bottom: 12px; }
           .subtitle { font-size: 14px; color: #a1a1aa; line-height: 1.6; margin-bottom: 32px; }
           .code-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #71717a; text-transform: uppercase; margin-bottom: 12px; }
           .code-box {
             display: inline-flex;
             gap: 8px;
-            background: #09090b;
+            background: #0a0a0a;
             border: 1px solid #3f3f46;
             border-radius: 12px;
             padding: 20px 28px;
@@ -234,7 +234,7 @@ export async function sendOtpEmail(
             font-size: 28px;
             font-weight: 700;
             font-family: 'SF Mono', 'Fira Code', monospace;
-            color: #818cf8;
+            color: #bcbcbc;
             letter-spacing: 0.05em;
           }
           .expiry {
@@ -245,7 +245,7 @@ export async function sendOtpEmail(
           }
           .divider { border: none; border-top: 1px solid #27272a; margin: 0 0 24px; }
           .security-note {
-            background: #0c0c10;
+            background: #0e0e0e;
             border: 1px solid #27272a;
             border-radius: 8px;
             padding: 12px 16px;
@@ -257,7 +257,7 @@ export async function sendOtpEmail(
           }
           .security-note strong { color: #a1a1aa; }
           .footer { font-size: 11px; color: #52525b; line-height: 1.6; }
-          .footer a { color: #818cf8; text-decoration: none; }
+          .footer a { color: #bcbcbc; text-decoration: none; }
         </style>
       </head>
       <body>
@@ -343,7 +343,7 @@ export async function sendInviteEmail({
   const roleLabel =
     role === "admin" ? "Admin" : role === "viewer" ? "Viewer" : "Member";
   const roleBadgeColor =
-    role === "admin" ? "#f59e0b" : role === "viewer" ? "#60a5fa" : "#818cf8";
+    role === "admin" ? "#f59e0b" : role === "viewer" ? "#adadad" : "#bcbcbc";
 
   const subject = `${inviterName} invited you to join ${workspaceName} on TrackMe`;
 
@@ -358,7 +358,7 @@ export async function sendInviteEmail({
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #09090b;
+            background: #0a0a0a;
             color: #f4f4f5;
             padding: 40px 20px;
           }
@@ -370,7 +370,7 @@ export async function sendInviteEmail({
             overflow: hidden;
           }
           .header {
-            background: linear-gradient(135deg, #1e1b4b 0%, #18181b 100%);
+            background: linear-gradient(135deg, #333333 0%, #18181b 100%);
             padding: 32px;
             text-align: center;
             border-bottom: 1px solid #27272a;
@@ -384,11 +384,11 @@ export async function sendInviteEmail({
             color: #fff;
             margin-bottom: 20px;
           }
-          .logo-dot { display: inline-block; width: 8px; height: 8px; background: #818cf8; border-radius: 50%; }
+          .logo-dot { display: inline-block; width: 8px; height: 8px; background: #bcbcbc; border-radius: 50%; }
           .avatar {
             width: 56px;
             height: 56px;
-            background: linear-gradient(135deg, #818cf8, #6366f1);
+            background: linear-gradient(135deg, #bcbcbc, #aaaaaa);
             border-radius: 50%;
             margin: 0 auto 16px;
             display: flex;
@@ -404,7 +404,7 @@ export async function sendInviteEmail({
           h1 { font-size: 20px; font-weight: 700; color: #fafafa; margin-bottom: 8px; }
           .subtitle { font-size: 14px; color: #a1a1aa; line-height: 1.6; margin-bottom: 24px; }
           .workspace-card {
-            background: #09090b;
+            background: #0a0a0a;
             border: 1px solid #3f3f46;
             border-radius: 12px;
             padding: 16px 20px;
@@ -428,7 +428,7 @@ export async function sendInviteEmail({
           .cta {
             display: block;
             width: 100%;
-            background: #4f46e5;
+            background: #969696;
             color: #fff;
             text-align: center;
             padding: 14px;
@@ -438,7 +438,7 @@ export async function sendInviteEmail({
             text-decoration: none;
             margin-bottom: 16px;
           }
-          .cta:hover { background: #4338ca; }
+          .cta:hover { background: #818181; }
           .url-fallback {
             font-size: 11px;
             color: #52525b;
@@ -446,10 +446,10 @@ export async function sendInviteEmail({
             text-align: center;
             margin-bottom: 24px;
           }
-          .url-fallback a { color: #818cf8; }
+          .url-fallback a { color: #bcbcbc; }
           .divider { border: none; border-top: 1px solid #27272a; margin: 0 0 24px; }
           .security {
-            background: #0c0c10;
+            background: #0e0e0e;
             border: 1px solid #27272a;
             border-radius: 8px;
             padding: 12px 16px;
@@ -460,7 +460,7 @@ export async function sendInviteEmail({
           }
           .security strong { color: #a1a1aa; }
           .footer { font-size: 11px; color: #52525b; text-align: center; line-height: 1.6; }
-          .footer a { color: #818cf8; text-decoration: none; }
+          .footer a { color: #bcbcbc; text-decoration: none; }
         </style>
       </head>
       <body>

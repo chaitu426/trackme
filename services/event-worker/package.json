@@ -10,14 +10,16 @@
     "start": "node dist/worker.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",
-    "test": "node --import tsx --test src/contract.test.ts src/isolate.test.ts src/writers/clickhouse.test.ts"
+    "test": "node --import tsx --test"
   },
   "dependencies": {
     "@trackme/analytics": "workspace:*",
     "@trackme/config": "workspace:*",
     "@trackme/contracts": "workspace:*",
+    "fzstd": "^0.1.1",
     "ioredis": "^5.6.0",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "prom-client": "^15"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
