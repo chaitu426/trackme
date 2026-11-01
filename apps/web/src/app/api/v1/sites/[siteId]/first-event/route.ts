@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirstEventStatus } from "@trackme/analytics";
 import { requireSiteAccess } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { timedRoute } from "@/lib/metrics-registry";
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   { params }: { params: Promise<{ siteId: string }> }
 ) {
@@ -16,3 +17,5 @@ export async function GET(
     return jsonError(error);
   }
 }
+
+export const GET = timedRoute("first_event", handleGet);

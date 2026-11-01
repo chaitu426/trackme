@@ -37,12 +37,17 @@ end
 return n
 `)
 
+// WindowKey is the counter key for a rate-limit key in the window containing now.
+// Exported so the combined admission script shares counters with Limiter.
+func WindowKey(key string, windowMs int, now time.Time) string {
+	return fmt.Sprintf("rl:ingest:%s:%d", key, now.UnixMilli()/int64(windowMs))
+}
+
 // Allow records one hit for key and reports whether it is within the limit.
 // The error is Redis being unreachable; callers decide whether that means
 // "allow" or "refuse".
 func (l *Limiter) Allow(ctx context.Context, key string) (bool, error) {
-	bucket := time.Now().UnixMilli() / int64(l.windowMs)
-	redisKey := fmt.Sprintf("rl:ingest:%s:%d", key, bucket)
+	redisKey := WindowKey(key, l.windowMs, time.Now())
 
 	n, err := hitScript.Run(ctx, l.rdb, []string{redisKey}, l.windowMs).Int64()
 	if err != nil {

@@ -6,7 +6,11 @@ const PUBLIC_API_PREFIXES = [
   "/api/auth/login",
   "/api/auth/signup",
   "/api/auth/session",
+  // Called before a session exists: the code itself is the credential, and verify issues the session.
+  "/api/auth/otp",
   "/api/v1/invites/accept",
+  // Authenticates itself with METRICS_TOKEN (404 when unset); Prometheus has no session.
+  "/api/internal/metrics",
 ];
 
 export function isPublicPath(pathname: string): boolean {

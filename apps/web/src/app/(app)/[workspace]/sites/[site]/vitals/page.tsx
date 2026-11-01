@@ -1,13 +1,18 @@
-import Link from "next/link";
+import { Suspense } from "react";
+import { PageHeader } from "@/components/ui/page-header";
 import { notFound } from "next/navigation";
-import { Info, Gauge } from "lucide-react";
-import { getWebVitalsSummary, type WebVitalSummary } from "@trackme/analytics";
+import { Info } from "lucide-react";
+import { type WebVitalSummary } from "@trackme/analytics";
+import { cachedWebVitals } from "@/lib/cached-analytics";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
 import { requireDashboardSite } from "@/lib/tenancy";
 import { buildMetricRequest } from "@/lib/metrics";
-import { RANGE_OPTIONS, parseRangeKey, resolveDateRange } from "@/lib/date-range";
+import { parseRangeKey, resolveDateRange, type RangeKey } from "@/lib/date-range";
+import { RangeSwitcher } from "@/components/range-switcher";
+import { CardHeaderSkeleton, Skeleton } from "@/components/ui/skeleton";
+import { Card as SkeletonCard } from "@/components/ui/card";
 
 interface MetricConfig {
   name: string;
@@ -69,8 +74,8 @@ const METRIC_CONFIGS: Record<string, MetricConfig> = {
 
 const ratingStyles = {
   good: {
-    badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    bar: "bg-emerald-500",
+    badge: "bg-[#4cc38a]/10 text-[#4cc38a] border-[#4cc38a]/20",
+    bar: "bg-[#4cc38a]",
     label: "Good",
   },
   "needs-improvement": {
@@ -79,8 +84,8 @@ const ratingStyles = {
     label: "Needs Work",
   },
   poor: {
-    badge: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-    bar: "bg-rose-500",
+    badge: "bg-[#e5484d]/10 text-[#e5484d] border-[#e5484d]/20",
+    bar: "bg-[#e5484d]",
     label: "Poor",
   },
 };
@@ -105,9 +110,51 @@ export default async function SiteWebVitalsPage({
   }
   const { workspace, site } = context;
 
+  return (
+    <div className="w-full space-y-5 text-left">
+      <PageHeader title="Web Vitals" art="gauge" actions={<RangeSwitcher range={range} />}>
+        Real-visitor p75 performance for <span className="font-mono text-zinc-300">{site.domain}</span>
+      </PageHeader>
+
+      {/* ── p75 Methodology notice: Left-Anchored ── */}
+      <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-card p-4 text-xs text-zinc-300 text-left">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+        <div className="space-y-1">
+          <p className="font-medium text-zinc-100">Google p75 methodology</p>
+          <p className="text-zinc-400 leading-relaxed">
+            Google Core Web Vitals criteria require 75% of all real-world user page visits to pass the Good threshold. Metrics are sampled continuously via browser PerformanceObserver APIs and stored in ClickHouse.
+          </p>
+        </div>
+      </div>
+
+      <Suspense key={range} fallback={<VitalsSkeleton />}>
+        <VitalsGrid workspaceId={workspace.id} siteId={site.id} range={range} />
+      </Suspense>
+    </div>
+  );
+}
+
+function VitalsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 5 }, (_, i) => (
+        <SkeletonCard key={i}>
+          <CardHeaderSkeleton />
+          <div className="space-y-4 pt-3">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-2 w-full rounded-full" />
+            <Skeleton className="h-3 w-full" />
+          </div>
+        </SkeletonCard>
+      ))}
+    </div>
+  );
+}
+
+async function VitalsGrid({ workspaceId, siteId, range }: { workspaceId: string; siteId: string; range: RangeKey }) {
   const { current } = resolveDateRange(range);
-  const request = buildMetricRequest(workspace.id, site.id, current);
-  const vitalsSummary = await getWebVitalsSummary(request);
+  const request = buildMetricRequest(workspaceId, siteId, current);
+  const vitalsSummary = await cachedWebVitals(request);
 
   const vitalsMap = new Map<string, WebVitalSummary>();
   for (const v of vitalsSummary) {
@@ -117,53 +164,7 @@ export default async function SiteWebVitalsPage({
   const metricKeys = ["LCP", "CLS", "INP", "FCP", "TTFB"];
 
   return (
-    <div className="w-full space-y-5 text-left">
-      {/* ── Header: Strictly Left-Anchored ── */}
-      <div className="flex flex-col justify-between gap-4 border-b border-white/[0.06] pb-4 sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-zinc-50">Core Web Vitals</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-blue-400">
-              <Gauge className="h-3 w-3" />
-              RUM Telemetry
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-zinc-400">
-            Real-user 75th-percentile (p75) performance audit for{" "}
-            <span className="font-mono font-medium text-zinc-300">{site.domain}</span>
-          </p>
-        </div>
-
-        <div className="flex items-center rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium text-zinc-400 gap-0.5">
-          {RANGE_OPTIONS.map((option) => (
-            <Link
-              key={option.key}
-              href={`?range=${option.key}`}
-              className={`rounded-[5px] px-3 py-1.5 transition-colors font-medium ${
-                option.key === range
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                  : "hover:bg-white/[0.04] hover:text-zinc-300 text-zinc-500"
-              }`}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* ── p75 Methodology notice: Left-Anchored ── */}
-      <div className="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-xs text-zinc-300 text-left">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
-        <div className="space-y-1">
-          <p className="font-medium text-blue-200">Google p75 Standard Methodology</p>
-          <p className="text-zinc-400 leading-relaxed">
-            Google Core Web Vitals criteria require 75% of all real-world user page visits to pass the Good threshold. Metrics are sampled continuously via browser PerformanceObserver APIs and stored in ClickHouse.
-          </p>
-        </div>
-      </div>
-
-      {/* ── Vitals Grid: Left-Anchored Card Headers ── */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 reveal">
         {metricKeys.map((key) => {
           const config = METRIC_CONFIGS[key]!;
           const data = vitalsMap.get(key);
@@ -180,7 +181,7 @@ export default async function SiteWebVitalsPage({
                 </CardHeader>
                 <div className="space-y-2 pt-3 text-xs text-zinc-400 text-left">
                   <p>{config.description}</p>
-                  <p className="font-mono text-[11px] text-zinc-400 pt-1">
+                  <p className="font-mono text-xs text-zinc-400 pt-1">
                     Target: {config.goodThreshold}
                   </p>
                 </div>
@@ -200,12 +201,12 @@ export default async function SiteWebVitalsPage({
                 <div>
                   <div className="flex items-baseline gap-2">
                     <CardTitle>{config.name}</CardTitle>
-                    <span className="text-[11px] font-normal text-zinc-400">{config.fullName}</span>
+                    <span className="text-xs font-normal text-zinc-400">{config.fullName}</span>
                   </div>
                   <CardDescription className="mt-1">{config.description}</CardDescription>
                 </div>
                 <span
-                  className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${styles.badge}`}
+                  className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium ${styles.badge}`}
                 >
                   {styles.label}
                 </span>
@@ -215,28 +216,28 @@ export default async function SiteWebVitalsPage({
                 {/* p75 Metric Value */}
                 <div className="flex items-baseline justify-between border-b border-white/[0.06] pb-3">
                   <div>
-                    <span className="font-mono text-3xl font-bold tracking-tight text-zinc-50">
+                    <span className="font-mono text-3xl font-medium text-zinc-50">
                       {config.formatValue(data.p75)}
                     </span>
-                    <span className="ml-1.5 font-mono text-[11px] text-zinc-400">p75</span>
+                    <span className="ml-2 font-mono text-xs text-zinc-400">p75</span>
                   </div>
-                  <span className="font-mono text-[11px] text-zinc-400">
+                  <span className="font-mono text-xs text-zinc-400">
                     {data.totalSamples.toLocaleString()} samples
                   </span>
                 </div>
 
                 {/* Distribution bar */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[11px] text-zinc-400">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-zinc-400">
                     <span>Performance Distribution</span>
-                    <span className="font-semibold text-emerald-400">{goodPct}% Good</span>
+                    <span className="font-medium text-[#4cc38a]">{goodPct}% Good</span>
                   </div>
                   <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                    <div style={{ width: `${goodPct}%` }} className="bg-emerald-500 h-full transition-all" />
-                    <div style={{ width: `${needsPct}%` }} className="bg-amber-400 h-full transition-all" />
-                    <div style={{ width: `${poorPct}%` }} className="bg-rose-500 h-full transition-all" />
+                    <div style={{ width: `${goodPct}%` }} className="bg-[#4cc38a] h-full transition-colors" />
+                    <div style={{ width: `${needsPct}%` }} className="bg-amber-400 h-full transition-colors" />
+                    <div style={{ width: `${poorPct}%` }} className="bg-[#e5484d] h-full transition-colors" />
                   </div>
-                  <div className="flex justify-between font-mono text-[10px] text-zinc-500">
+                  <div className="flex justify-between font-mono text-xs text-zinc-500">
                     <span>Target: {config.goodThreshold}</span>
                     <span>Poor: {config.poorThreshold}</span>
                   </div>
@@ -246,6 +247,5 @@ export default async function SiteWebVitalsPage({
           );
         })}
       </div>
-    </div>
   );
 }

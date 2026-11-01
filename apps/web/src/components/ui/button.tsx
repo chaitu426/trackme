@@ -12,14 +12,14 @@ export function Button({
   children: ReactNode;
 }) {
   const base =
-    "inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/[0.2] disabled:pointer-events-none disabled:opacity-50";
 
   const variants: Record<string, string> = {
     primary: "bg-zinc-100 hover:bg-white text-zinc-950",
     secondary: "bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200",
     outline: "border border-white/10 hover:border-white/20 bg-transparent hover:bg-white/[0.04] text-zinc-300",
     ghost: "hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100",
-    danger: "text-rose-400 hover:bg-rose-500/10 border border-transparent",
+    danger: "text-[#e5484d] hover:bg-[#e5484d]/10 border border-transparent",
   };
 
   const sizes: Record<string, string> = {

@@ -87,7 +87,7 @@ const sentEvents = (call: Call) => (JSON.parse(call.init.body) as { events: unkn
 const queued = () => JSON.parse(store.get("_gi_retry_queue") ?? "[]") as { event: { eventId: string }; attempts: number }[];
 const fire = (type: string) => listeners[type]?.forEach((fn) => fn());
 const make = (opts: Partial<ConstructorParameters<typeof Transport>[0]> = {}) =>
-  new Transport({ endpoint: "https://edge.test/v1/batch", flushIntervalMs: 500, ...opts });
+  new Transport({ endpoint: "https://edge.test/v1/batch", flushIntervalMs: 500, random: () => 0.5, ...opts });
 
 test("classifyStatus retries only failures that can clear up", () => {
   for (const s of [200, 202]) assert.equal(classifyStatus(s), "sent");
@@ -200,6 +200,48 @@ test("retry backoff grows after consecutive failures", async () => {
   timers.shift()?.fn();
   await t.flush();
   assert.equal(timers[0]?.ms, 45_000);
+});
+
+test("being offline does not use up attempts", async () => {
+  statuses = Array(8).fill("network");
+  const t = make({ batchSize: 1 });
+  t.enqueue(event());
+  await t.flush();
+  for (let i = 0; i < 7; i++) {
+    timers.shift()?.fn();
+    await t.flush();
+  }
+  assert.equal(fetchCalls.length, 8);
+  assert.equal(queued().length, 1, "an offline event waits for the network, it is not given up on");
+  assert.equal(queued()[0]?.attempts, 0);
+});
+
+test("coming back online retries at once instead of waiting out the backoff", async () => {
+  statuses = ["network"];
+  const t = make({ batchSize: 1 });
+  t.enqueue(event());
+  await t.flush();
+  assert.equal(queued().length, 1);
+  assert.equal(timers.length, 1);
+  fire("online");
+  await t.flush();
+  assert.equal(fetchCalls.length, 2);
+  assert.equal(queued().length, 0);
+  assert.equal(timers.length, 0, "the pending backoff timer is cancelled");
+});
+
+test("retry delays are jittered within 25% of the backoff", async () => {
+  statuses = [500, 500];
+  const low = make({ batchSize: 1, random: () => 0 });
+  low.enqueue(event());
+  await low.flush();
+  assert.equal(timers[0]?.ms, 3_750);
+  timers = [];
+  store.clear();
+  const high = make({ batchSize: 1, random: () => 1 });
+  high.enqueue(event());
+  await high.flush();
+  assert.equal(timers[0]?.ms, 6_250);
 });
 
 test("an event is dropped after five failed attempts", async () => {
@@ -391,4 +433,31 @@ test("a failed beacon falls back to fetch keepalive", () => {
   t.enqueue(event());
   fire("pagehide");
   assert.equal(fetchCalls.length, 1);
+});
+
+test("the first event after an idle period is sent on the next tick, not after the interval", async () => {
+  const t = make({ batchSize: 1000 });
+  t.enqueue(event());
+  t.enqueue(event()); // same tick: batched with the first
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0]?.ms, 0);
+  timers.shift()?.fn();
+  await t.flush();
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(sentEvents(fetchCalls[0] as Call).length, 2);
+});
+
+test("events sent right after a request wait out the rest of the interval", async () => {
+  const t = make({ batchSize: 1000, flushIntervalMs: 100 });
+  await t.flush();
+  t.enqueue(event());
+  const wait = timers[0]?.ms ?? -1;
+  assert.ok(wait > 0 && wait <= 100, `expected a wait inside the 100 ms window, got ${wait}`);
+});
+
+test("the default interval is 100 ms", () => {
+  const t = new Transport({ endpoint: "https://edge.test/v1/batch", batchSize: 1000 });
+  void t.flush();
+  t.enqueue(event());
+  assert.ok((timers[0]?.ms ?? 999) <= 100);
 });

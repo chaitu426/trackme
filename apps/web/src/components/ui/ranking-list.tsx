@@ -1,11 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Paginated } from "@/components/ui/paginated";
+import { MatrixArt } from "@/components/ui/matrix-art";
 
 export type RankingItem = {
   name: string;
   value: number;
   percentage: number;
   href?: string;
+  /** Makes the row a button. Only usable where the list renders in a client component. */
+  onClick?: () => void;
+  /** Draws the row as the current selection. */
+  active?: boolean;
   meta?: string;
   icon?: ReactNode;
 };
@@ -15,27 +21,27 @@ export function RankingList({
   empty = "No data yet.",
   valueFormatter = (value: number) => value.toLocaleString(),
   showBar = true,
+  pageSize = 10,
 }: {
   items: RankingItem[];
   empty?: string;
   valueFormatter?: (value: number) => string;
   showBar?: boolean;
+  /** Rows per page; the pager only appears when there are more rows than this. */
+  pageSize?: number;
 }) {
   if (!items.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 gap-2">
-        <div className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-          <span className="text-zinc-600 text-xs">–</span>
-        </div>
-        <p className="text-xs text-zinc-500">{empty}</p>
-      </div>
+      <MatrixArt variant="pulse" className="h-32" strength={0.7}>
+        <p className="rounded-md bg-sidebar/90 px-3 py-1.5 text-xs text-zinc-400">{empty}</p>
+      </MatrixArt>
     );
   }
 
   const maxValue = Math.max(...items.map((i) => i.value), 1);
 
   return (
-    <div className="space-y-0.5">
+    <Paginated pageSize={pageSize} className="space-y-0.5">
       {items.map((item, rank) => {
         const widthPct = Math.max((item.value / maxValue) * 100, 1.5);
 
@@ -44,10 +50,10 @@ export function RankingList({
             {/* Percentage bar — full row background */}
             {showBar && (
               <div
-                className="pointer-events-none absolute inset-y-0 left-0 rounded-[5px] transition-all duration-500"
+                className="pointer-events-none absolute inset-y-0 left-0 rounded-md"
                 style={{
                   width: `${widthPct}%`,
-                  background: "linear-gradient(90deg, rgba(59,130,246,0.10) 0%, rgba(59,130,246,0.04) 100%)",
+                  background: "linear-gradient(90deg, rgba(237,237,237,0.10) 0%, rgba(237,237,237,0.04) 100%)",
                 }}
               />
             )}
@@ -55,7 +61,7 @@ export function RankingList({
             {/* Row content */}
             <div className="relative z-10 flex items-center gap-3 w-full">
               {/* Rank number */}
-              <span className="shrink-0 w-4 text-right font-mono text-[10px] text-zinc-600 tabular-nums">
+              <span className="shrink-0 w-4 text-right font-mono text-xs text-zinc-600 tabular-nums">
                 {rank + 1}
               </span>
 
@@ -70,16 +76,16 @@ export function RankingList({
                   {item.name}
                 </p>
                 {item.meta && (
-                  <p className="truncate text-[11px] text-zinc-500 mt-0.5">{item.meta}</p>
+                  <p className="truncate text-xs text-zinc-500 mt-0.5">{item.meta}</p>
                 )}
               </div>
 
               {/* Value */}
               <div className="shrink-0 flex items-center gap-2 text-right">
-                <span className="font-mono text-[12px] tabular-nums text-zinc-300 font-medium">
+                <span className="font-mono text-xs tabular-nums text-zinc-300 font-medium">
                   {valueFormatter(item.value)}
                 </span>
-                <span className="font-mono text-[10px] tabular-nums text-zinc-600 w-8 text-right">
+                <span className="font-mono text-xs tabular-nums text-zinc-600 w-8 text-right">
                   {item.percentage.toFixed(0)}%
                 </span>
               </div>
@@ -88,7 +94,21 @@ export function RankingList({
         );
 
         const rowCls =
-          "relative flex items-center overflow-hidden rounded-[6px] px-2.5 py-2 transition-colors hover:bg-white/[0.04] cursor-default";
+          "relative flex items-center overflow-hidden rounded-[6px] px-3 py-2 transition-colors hover:bg-white/[0.04] cursor-default";
+
+        if (item.onClick) {
+          return (
+            <button
+              key={item.name}
+              type="button"
+              onClick={item.onClick}
+              aria-pressed={item.active ?? false}
+              className={`${rowCls} w-full cursor-pointer text-left ${item.active ? "bg-white/[0.07] ring-1 ring-white/[0.2]" : ""}`}
+            >
+              {content}
+            </button>
+          );
+        }
 
         if (item.href) {
           return (
@@ -104,6 +124,6 @@ export function RankingList({
           </div>
         );
       })}
-    </div>
+    </Paginated>
   );
 }

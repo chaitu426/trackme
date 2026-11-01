@@ -17,7 +17,7 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",
-    "test": "node --import tsx --test src/fixtures.test.ts"
+    "test": "node --import tsx --test"
   },
   "dependencies": {
     "zod": "^3.24.2"

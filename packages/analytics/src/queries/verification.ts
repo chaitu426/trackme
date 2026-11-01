@@ -1,4 +1,4 @@
-import { getClickHouseClient } from "../client.js";
+import { readClient, variantAware, type ReadVariant } from "../read-mode.js";
 
 export type FirstEventStatus = {
   received: boolean;
@@ -10,11 +10,12 @@ export type FirstEventStatus = {
  * Checks whether a freshly onboarded site has received any events yet, so
  * the onboarding flow can confirm installation instead of assuming success.
  */
-export async function getFirstEventStatus(
+async function getFirstEventStatusImpl(
   workspaceId: string,
   siteId: string
-): Promise<FirstEventStatus> {
-  const client = getClickHouseClient();
+,
+  variant: ReadVariant): Promise<FirstEventStatus> {
+  const client = readClient(variant);
 
   const resultSet = await client.query({
     query: `
@@ -43,3 +44,5 @@ export async function getFirstEventStatus(
     totalEvents,
   };
 }
+
+export const getFirstEventStatus = variantAware("getFirstEventStatus", getFirstEventStatusImpl);

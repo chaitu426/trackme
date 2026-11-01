@@ -5,6 +5,7 @@ import { db, goals, eq, desc } from "@trackme/db";
 import { requireSiteAccess } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
+import { timedRoute } from "@/lib/metrics-registry";
 
 const CreateGoalSchema = z.object({
   name: z.string().trim().min(2).max(64),
@@ -27,7 +28,7 @@ const CreateGoalSchema = z.object({
   }
 );
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   { params }: { params: Promise<{ siteId: string }> }
 ) {
@@ -99,3 +100,5 @@ export async function POST(
     return jsonError(error);
   }
 }
+
+export const GET = timedRoute("goals", handleGet);

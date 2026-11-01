@@ -38,3 +38,30 @@ func TestTrustedProxyHopsDefaultsToOne(t *testing.T) {
 		t.Fatalf("TrustedProxyHops = %d, want 0 when explicitly set", got)
 	}
 }
+
+func TestEdgeDedupeIsOptIn(t *testing.T) {
+	t.Setenv("EDGE_DEDUPE", "")
+	if got := Load().EdgeDedupe; got {
+		t.Fatal("EdgeDedupe = true by default, want false for staged rollout")
+	}
+	t.Setenv("EDGE_DEDUPE", "true")
+	if got := Load().EdgeDedupe; !got {
+		t.Fatal("EdgeDedupe = false, want true when enabled")
+	}
+}
+
+func TestOpsDefaults(t *testing.T) {
+	t.Setenv("METRICS_PORT", "")
+	t.Setenv("KAFKA_PUBLISH_TIMEOUT_MS", "")
+	c := Load()
+	if c.MetricsPort != 0 {
+		t.Fatalf("MetricsPort = %d, want 0 (served on the main port unless configured)", c.MetricsPort)
+	}
+	if c.KafkaPublishTimeoutMs != 4000 {
+		t.Fatalf("KafkaPublishTimeoutMs = %d, want 4000, under the 10 s HTTP write timeout", c.KafkaPublishTimeoutMs)
+	}
+	t.Setenv("METRICS_PORT", "9091")
+	if got := Load().MetricsPort; got != 9091 {
+		t.Fatalf("MetricsPort = %d, want 9091", got)
+	}
+}

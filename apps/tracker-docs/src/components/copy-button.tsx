@@ -41,18 +41,18 @@ export function CopyButton({ className }: { className?: string }) {
       onClick={handleCopy}
       aria-label={copied ? "Copied" : "Copy code"}
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-zinc-400 transition hover:bg-white/[0.06] hover:text-zinc-100 active:scale-95",
+        "inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs text-zinc-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-zinc-50 active:scale-[0.97]",
         className
       )}
     >
       {copied ? (
         <>
-          <Check className="h-3.5 w-3.5 text-emerald-400" />
-          <span className="text-emerald-400">Copied</span>
+          <Check className="h-4 w-4 text-[#4cc38a]" />
+          <span className="text-[#4cc38a]">Copied</span>
         </>
       ) : (
         <>
-          <Copy className="h-3.5 w-3.5" />
+          <Copy className="h-4 w-4" />
           <span className="hidden sm:inline">Copy</span>
         </>
       )}

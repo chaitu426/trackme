@@ -61,9 +61,9 @@ export function CodeTabs({ items, group }: { items: TabItem[]; group?: string | 
   return (
     <figure
       data-code-root
-      className="not-prose my-5 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0c0c0e]"
+      className="not-prose my-6 overflow-hidden rounded-xl border border-white/[0.1] bg-[#0f0f10]"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] bg-white/[0.02] pl-1.5 pr-1.5">
+      <div className="flex min-h-11 items-center justify-between gap-2 border-b border-white/[0.08] bg-[#141415] px-2">
         <div role="tablist" className="flex min-w-0 items-center gap-0.5 overflow-x-auto py-1.5">
           {items.map((item) => {
             const selected = item.label === current?.label;
@@ -75,9 +75,9 @@ export function CodeTabs({ items, group }: { items: TabItem[]; group?: string | 
                 aria-selected={selected}
                 onClick={() => select(item.label)}
                 className={cn(
-                  "shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition",
+                  "shrink-0 rounded-lg px-3 py-1.5 text-xs transition-colors duration-150",
                   selected
-                    ? "bg-white/[0.08] text-zinc-50"
+                    ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                     : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"
                 )}
               >
@@ -88,7 +88,7 @@ export function CodeTabs({ items, group }: { items: TabItem[]; group?: string | 
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {current?.filename && (
-            <span className="hidden font-mono text-[11px] text-zinc-500 md:inline">{current.filename}</span>
+            <span className="hidden font-mono text-xs text-zinc-500 md:inline">{current.filename}</span>
           )}
           <CopyButton />
         </div>

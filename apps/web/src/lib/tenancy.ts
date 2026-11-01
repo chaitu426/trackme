@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { cache } from "react";
 import { NextRequest } from "next/server";
 import {
   AppError,
@@ -30,45 +30,10 @@ import {
   workspaces,
 } from "@trackme/db";
 import { requireApiUser } from "./auth";
+import { cachedMembershipRole, cachedSiteInWorkspace } from "./authz-cache";
+import { decryptSiteSigningSecret, encryptSiteSigningSecret } from "./tenancy-secrets";
 
-const SITE_SIGNING_SECRET_PREFIX = "enc:v1:";
-
-export function siteSigningSecretKey(): string {
-  const key = process.env.SITE_SIGNING_SECRET_KEY ?? "dev-site-signing-secret-key-min-32-chars";
-  if (key.length < 32) {
-    throw new AppError(500, "CONFIG_ERROR", "SITE_SIGNING_SECRET_KEY must be at least 32 chars");
-  }
-  return key;
-}
-
-export function encryptSiteSigningSecret(value: string): string {
-  if (!value || value.startsWith(SITE_SIGNING_SECRET_PREFIX)) {
-    return value;
-  }
-  const key = createHash("sha256").update(siteSigningSecretKey()).digest();
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${SITE_SIGNING_SECRET_PREFIX}${Buffer.concat([iv, ciphertext, tag]).toString("base64url")}`;
-}
-
-export function decryptSiteSigningSecret(value: string | undefined): string | undefined {
-  if (!value || !value.startsWith(SITE_SIGNING_SECRET_PREFIX)) {
-    return value;
-  }
-  const key = createHash("sha256").update(siteSigningSecretKey()).digest();
-  const payload = Buffer.from(value.slice(SITE_SIGNING_SECRET_PREFIX.length), "base64url");
-  if (payload.length <= 28) {
-    throw new AppError(500, "CONFIG_ERROR", "Site signing secret is corrupted");
-  }
-  const iv = payload.subarray(0, 12);
-  const tag = payload.subarray(payload.length - 16);
-  const ciphertext = payload.subarray(12, payload.length - 16);
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
-}
+export { decryptSiteSigningSecret, encryptSiteSigningSecret, siteSigningSecretKey } from "./tenancy-secrets";
 
 function encryptSiteSettingsSecret(settings: SiteSettings): SiteSettings {
   if (!settings.signingSecret) {
@@ -112,7 +77,19 @@ function roleFromApiKeyScopes(scopes: ApiKeyScope[]): WorkspaceRole {
   throw new AppError(403, "FORBIDDEN", "API key is missing analytics read scope");
 }
 
-async function loadMembershipContext(userId: string, workspaceId: string): Promise<TenantContext> {
+async function loadMembershipContext(
+  userId: string,
+  workspaceId: string,
+  options: { cache?: boolean } = {}
+): Promise<TenantContext> {
+  if (options.cache) {
+    const role = await cachedMembershipRole(userId, workspaceId, async () => (await queryMembership(userId, workspaceId)).role);
+    return { userId, workspaceId, role: parseRole(role) };
+  }
+  return queryMembership(userId, workspaceId);
+}
+
+async function queryMembership(userId: string, workspaceId: string): Promise<TenantContext> {
   const rows = await db
     .select({
       role: workspaceMembers.role,
@@ -184,12 +161,13 @@ async function authenticateApiKey(
 export async function authenticateRequest(
   request: NextRequest,
   workspaceId: string,
-  requiredScopeOrPermission: ApiKeyScope | Permission | "read:analytics" | "admin:workspace" = "analytics:read"
+  requiredScopeOrPermission: ApiKeyScope | Permission | "read:analytics" | "admin:workspace" = "analytics:read",
+  options: { cacheMembership?: boolean } = {}
 ): Promise<TenantContext> {
   const apiKeyContext = await authenticateApiKey(request, workspaceId);
   const ctx =
     apiKeyContext ??
-    (await loadMembershipContext((await requireApiUser(request)).id, workspaceId));
+    (await loadMembershipContext((await requireApiUser(request)).id, workspaceId, { cache: options.cacheMembership === true }));
 
   assertWorkspaceMatch(ctx, workspaceId);
 
@@ -209,29 +187,29 @@ export async function requireMetricsAccess(
   workspaceId: string,
   siteId: string
 ): Promise<TenantContext> {
-  const ctx = await authenticateRequest(request, workspaceId, "read:analytics");
+  // Read-only analytics path: membership (30 s) and site ownership (10 min) are
+  // cached, with explicit invalidation on member removal/role change and site delete.
+  const ctx = await authenticateRequest(request, workspaceId, "read:analytics", { cacheMembership: true });
 
-  const siteRows = await db
-    .select({
-      id: sites.id,
-      workspaceId: sites.workspaceId,
-    })
-    .from(sites)
-    .where(and(eq(sites.id, siteId), eq(sites.workspaceId, workspaceId)))
-    .limit(1);
-
-  const site = siteRows[0];
-  if (!site) {
+  const belongs = await cachedSiteInWorkspace(siteId, workspaceId, async () => {
+    const siteRows = await db
+      .select({ id: sites.id })
+      .from(sites)
+      .where(and(eq(sites.id, siteId), eq(sites.workspaceId, workspaceId)))
+      .limit(1);
+    return siteRows.length > 0;
+  });
+  if (!belongs) {
     throw new AppError(403, "TENANT_ISOLATION_VIOLATION", "Site does not belong to this workspace");
   }
 
   return {
     ...ctx,
-    siteId: site.id,
+    siteId,
   };
 }
 
-export async function requireWorkspaceBySlug(userId: string, slug: string) {
+export const requireWorkspaceBySlug = cache(async (userId: string, slug: string) => {
   const rows = await db
     .select({
       id: workspaces.id,
@@ -258,9 +236,9 @@ export async function requireWorkspaceBySlug(userId: string, slug: string) {
     slug: workspace.slug,
     role: parseRole(workspace.role),
   };
-}
+});
 
-export async function listWorkspaceSites(workspaceId: string) {
+export const listWorkspaceSites = cache(async (workspaceId: string) => {
   return db
     .select({
       id: sites.id,
@@ -270,9 +248,9 @@ export async function listWorkspaceSites(workspaceId: string) {
     })
     .from(sites)
     .where(eq(sites.workspaceId, workspaceId));
-}
+});
 
-export async function listUserWorkspaces(userId: string) {
+export const listUserWorkspaces = cache(async (userId: string) => {
   return db
     .select({
       id: workspaces.id,
@@ -285,7 +263,7 @@ export async function listUserWorkspaces(userId: string) {
       workspaceMembers,
       and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId))
     );
-}
+});
 
 export type DashboardSite = {
   id: string;
@@ -338,10 +316,10 @@ async function getSiteSettingsRaw(siteId: string): Promise<SiteSettings | null> 
   return decryptSiteSettingsSecret(SiteSettingsSchema.parse(rows[0].settings ?? {}));
 }
 
-export async function requireSiteByDomain(
+export const requireSiteByDomain = cache(async (
   workspaceId: string,
   domain: string
-): Promise<DashboardSite> {
+): Promise<DashboardSite> => {
   const rows = await db
     .select(SITE_COLUMNS)
     .from(sites)
@@ -354,7 +332,7 @@ export async function requireSiteByDomain(
   }
 
   return toDashboardSite(site);
-}
+});
 
 /**
  * Session-based authorization for server-rendered dashboard pages: verifies
@@ -394,11 +372,11 @@ export async function requirePrimarySite(userId: string, workspaceSlug: string) 
   return { workspace, site };
 }
 
-export async function getSiteById(siteId: string): Promise<DashboardSite | null> {
+export const getSiteById = cache(async (siteId: string): Promise<DashboardSite | null> => {
   const rows = await db.select(SITE_COLUMNS).from(sites).where(eq(sites.id, siteId)).limit(1);
   const site = rows[0];
   return site ? toDashboardSite(site) : null;
-}
+});
 
 /**
  * Request-based authorization for site-scoped API routes (settings,

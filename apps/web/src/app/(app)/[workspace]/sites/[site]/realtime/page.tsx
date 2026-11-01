@@ -39,11 +39,11 @@ export default async function SiteRealtimeReport({
             <CardTitle>Event Stream Log</CardTitle>
             <CardDescription>Live event stream tail · last 20 ingested events</CardDescription>
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+          <span className="font-mono text-xs text-zinc-500 font-medium">
             Telemetry Feed
           </span>
         </CardHeader>
-        <div className="space-y-1 pt-2 font-mono text-[11px]">
+        <div className="space-y-1 pt-2 font-mono text-xs">
           {recentEvents.length === 0 ? (
             <p className="py-8 text-center font-sans text-xs text-zinc-500">No events received yet.</p>
           ) : (
@@ -52,15 +52,15 @@ export default async function SiteRealtimeReport({
                 key={e.eventId}
                 className="flex items-center justify-between rounded-lg px-3 py-2 transition hover:bg-white/[0.04]"
               >
-                <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex min-w-0 items-center gap-3">
                   <span className="shrink-0 text-zinc-500">{formatRelativeTime(e.occurredAt)}</span>
-                  <Badge variant={e.type === "custom" ? "warning" : "default"} className="shrink-0 text-[10px]">
+                  <Badge variant={e.type === "custom" ? "outline" : "default"} className="shrink-0 text-xs">
                     {e.type === "custom" ? `custom:${e.eventName}` : e.type}
                   </Badge>
                   <span className="max-w-[280px] truncate text-zinc-200">{e.path}</span>
                 </div>
-                <div className="flex shrink-0 items-center gap-2 text-[10px] text-zinc-500">
-                  <span className="rounded bg-white/[0.04] px-1.5 py-0.5 font-semibold text-zinc-400">
+                <div className="flex shrink-0 items-center gap-2 text-xs text-zinc-500">
+                  <span className="rounded bg-white/[0.04] px-2 py-0.5 font-medium text-zinc-400">
                     {e.country || "??"}
                   </span>
                   <span>·</span>

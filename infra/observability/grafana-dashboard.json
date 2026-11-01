@@ -1,0 +1,81 @@
+{
+  "title": "TrackMe pipeline",
+  "uid": "trackme-pipeline",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "description": "Rollout dashboard from the optimization plan, section 10. Import into Grafana and pick the Prometheus data source.",
+  "templating": {
+    "list": [{ "name": "ds", "type": "datasource", "query": "prometheus", "label": "Prometheus" }]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Ingest latency p50 / p99 (/v1/batch)", "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"edge\",route=\"/v1/batch\"}[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"edge\",route=\"/v1/batch\"}[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Edge outcomes per second", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [{ "expr": "sum by (outcome) (rate(edge_events_total{job=\"edge\"}[5m]))", "legendFormat": "{{outcome}}" }]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Kafka publish errors / Redis errors", "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [
+        { "expr": "sum(rate(edge_kafka_publish_errors_total{job=\"edge\"}[5m]))", "legendFormat": "kafka publish" },
+        { "expr": "sum by (op) (rate(edge_redis_errors_total{job=\"edge\"}[5m]))", "legendFormat": "redis {{op}}" }
+      ]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Consumer lag by partition", "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [{ "expr": "worker_consumer_lag{job=\"worker\"}", "legendFormat": "partition {{partition}}" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Events stored per second / insert p95", "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [
+        { "expr": "rate(worker_events_stored_total{job=\"worker\"}[5m])", "legendFormat": "events/s" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(worker_insert_duration_seconds_bucket{job=\"worker\"}[5m])))", "legendFormat": "insert p95 (s)" }
+      ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Dead letters and shadow-write errors", "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [
+        { "expr": "sum by (reason) (rate(worker_dlq_total{job=\"worker\"}[5m]))", "legendFormat": "dlq {{reason}}" },
+        { "expr": "rate(worker_v2_write_errors_total{job=\"worker\"}[5m])", "legendFormat": "v2 write errors" }
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Dashboard route p95", "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, route) (rate(web_route_duration_seconds_bucket{job=\"web\"}[5m])))", "legendFormat": "{{route}}" }]
+    },
+    {
+      "id": 8, "type": "stat", "title": "Query cache hit ratio", "gridPos": { "x": 12, "y": 24, "w": 6, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [{ "expr": "sum(rate(query_cache_total{job=\"web\",result=\"hit\"}[15m])) / sum(rate(query_cache_total{job=\"web\",result=~\"hit|miss\"}[15m]))" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Shadow read differences (v1 vs v2)", "gridPos": { "x": 18, "y": 24, "w": 6, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [{ "expr": "sum by (query) (increase(analytics_shadow_diff_total{job=\"web\"}[1h]))", "legendFormat": "{{query}}" }]
+    },
+    {
+      "id": 10, "type": "table", "title": "Scheduled jobs: seconds since last success", "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [{ "expr": "time() - scheduled_job_last_success_timestamp_seconds{job=\"scheduler\"}", "instant": true, "legendFormat": "{{task}}" }]
+    },
+    {
+      "id": 11, "type": "stat", "title": "Reconciliation findings", "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
+      "datasource": "${ds}",
+      "targets": [{ "expr": "sum by (kind) (reconciliation_findings{job=\"scheduler\"})", "legendFormat": "{{kind}}" }]
+    }
+  ]
+}

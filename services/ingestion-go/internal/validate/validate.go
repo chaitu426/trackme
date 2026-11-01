@@ -58,7 +58,7 @@ var (
 	propKeyRe  = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 	vitalNames = map[string]bool{"CLS": true, "FCP": true, "FID": true, "INP": true, "LCP": true, "TTFB": true}
 	vitalRates = map[string]bool{"good": true, "needs-improvement": true, "poor": true}
-	eventTypes = map[string]bool{"pageview": true, "custom": true, "web_vital": true, "identify": true}
+	eventTypes = map[string]bool{"pageview": true, "custom": true, "web_vital": true, "identify": true, "engagement": true}
 )
 
 // Event checks one event. On success it returns the event (with its timestamp

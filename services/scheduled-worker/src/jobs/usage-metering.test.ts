@@ -74,6 +74,8 @@ test("usage metering reads from the rollup table and upserts one aggregated row 
 
   assert.equal(queryCalls.length, 1);
   assert.equal(queryCalls[0].query, USAGE_METERING_SQL);
+  // ClickHouse rejects a JS Date (sent as epoch seconds) for a {Date} parameter.
+  assert.deepEqual(queryCalls[0].query_params, { start: "2026-10-01", end: "2026-11-01" });
   assert.equal(dbCalls.length, 1);
   assert.deepEqual(dbCalls[0].rows, [
     {

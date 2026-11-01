@@ -9,8 +9,8 @@ export default function InviteAcceptLayout({
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#09090b]">
-          <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="w-6 h-6 border-2 border-white/[0.25] border-t-transparent rounded-full animate-spin" />
         </div>
       }
     >

@@ -1,0 +1,147 @@
+# Prometheus alert rules for the analytics pipeline (optimization plan, section 9.2).
+# Load with: rule_files: ["alerts.yml"]. Every alert links to its runbook in docs/RUNBOOK.md.
+#
+# Scrape targets this file assumes:
+#   edge        ingestion-go           :3001/metrics
+#   worker      event-worker           :9464/metrics
+#   scheduler   scheduled-worker       :9465/metrics
+#   web         Next.js                /api/internal/metrics   (Bearer METRICS_TOKEN)
+
+groups:
+  - name: ingest
+    rules:
+      - alert: IngestErrorRateHigh
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="edge",route="/v1/batch",status=~"5.."}[5m]))
+            / sum(rate(http_request_duration_seconds_count{job="edge",route="/v1/batch"}[5m])) > 0.01
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 1 % of event batches fail with 5xx"
+          runbook: "docs/RUNBOOK.md#ingestion-5xx"
+
+      - alert: IngestLatencyHigh
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job="edge",route="/v1/batch"}[5m]))) > 0.25
+        for: 10m
+        labels: { severity: warn }
+        annotations:
+          summary: "Edge p99 for /v1/batch is above 250 ms"
+          runbook: "docs/RUNBOOK.md#ingestion-5xx"
+
+      - alert: EdgeKafkaPublishFailing
+        expr: sum(rate(edge_kafka_publish_errors_total{job="edge"}[5m])) > 0
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "The edge cannot publish to Kafka; senders get 500 and retry"
+          runbook: "docs/RUNBOOK.md#kafka-publish-errors"
+
+      - alert: EdgeRedisFailOpen
+        expr: sum(rate(edge_redis_errors_total{job="edge"}[5m])) > 0
+        for: 5m
+        labels: { severity: warn }
+        annotations:
+          summary: "Redis errors at the edge: quota, dedupe and rate limits are failing open"
+          runbook: "docs/RUNBOOK.md#redis-fail-open"
+
+  - name: worker
+    rules:
+      - alert: ConsumerLagHigh
+        expr: max(worker_consumer_lag{job="worker"}) > 100000
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "The event worker is far behind Kafka (lag in messages; tune the threshold to about 60 s of traffic)"
+          runbook: "docs/RUNBOOK.md#consumer-lag"
+
+      - alert: WorkerInsertSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(worker_insert_duration_seconds_bucket{job="worker"}[5m]))) > 5
+        for: 10m
+        labels: { severity: warn }
+        annotations:
+          summary: "ClickHouse inserts from the worker take more than 5 s at p95"
+          runbook: "docs/RUNBOOK.md#consumer-lag"
+
+      - alert: WorkerDeadLettering
+        expr: sum(rate(worker_dlq_total{job="worker"}[15m])) > 0
+        for: 15m
+        labels: { severity: warn }
+        annotations:
+          summary: "Messages are being dead-lettered ({{ $labels.reason }})"
+          runbook: "docs/RUNBOOK.md#dead-letters"
+
+      - alert: ShadowWriteFailing
+        expr: sum(rate(worker_v2_write_errors_total{job="worker"}[15m])) > 0
+        for: 15m
+        labels: { severity: warn }
+        annotations:
+          summary: "Shadow writes to events_ingest are failing; v2 is falling behind legacy"
+          runbook: "docs/RUNBOOK.md#shadow-write-failing"
+
+  - name: clickhouse
+    rules:
+      # Needs ClickHouse's own metrics endpoint (or the clickhouse exporter) as job="clickhouse".
+      - alert: ClickHouseTooManyParts
+        expr: max(ClickHouseAsyncMetrics_MaxPartCountForPartition{job="clickhouse"}) > 200
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "A partition has more than 200 active parts; inserts will start failing at 300"
+          runbook: "docs/RUNBOOK.md#too-many-parts"
+
+  - name: dashboard
+    rules:
+      - alert: DashboardLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum by (le, route) (rate(web_route_duration_seconds_bucket{job="web"}[10m]))) > 1.5
+        for: 10m
+        labels: { severity: warn }
+        annotations:
+          summary: "Dashboard route {{ $labels.route }} p95 is above 1.5 s"
+          runbook: "docs/RUNBOOK.md#dashboard-slow"
+
+      - alert: QueryCacheMostlyMissing
+        expr: |
+          sum(rate(query_cache_total{job="web",result="hit"}[15m]))
+            / sum(rate(query_cache_total{job="web",result=~"hit|miss"}[15m])) < 0.3
+        for: 30m
+        labels: { severity: info }
+        annotations:
+          summary: "Dashboard cache hit ratio is below 30 %"
+          runbook: "docs/RUNBOOK.md#dashboard-slow"
+
+      - alert: ShadowReadDiffering
+        expr: sum by (query) (increase(analytics_shadow_diff_total{job="web"}[1h])) > 0
+        for: 1h
+        labels: { severity: warn }
+        annotations:
+          summary: "ANALYTICS_READ=shadow: {{ $labels.query }} differs between v1 and v2"
+          runbook: "docs/RUNBOOK.md#shadow-read-differences"
+
+  - name: scheduled-jobs
+    rules:
+      - alert: ScheduledJobStale
+        expr: |
+          time() - scheduled_job_last_success_timestamp_seconds{job="scheduler",task!="reconciliation"} > 3600
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "Scheduled job {{ $labels.task }} has not succeeded for over an hour"
+          runbook: "docs/RUNBOOK.md#scheduled-job-stale"
+
+      - alert: ReconciliationNotRun
+        expr: time() - scheduled_job_last_success_timestamp_seconds{job="scheduler",task="reconciliation"} > 129600
+        for: 5m
+        labels: { severity: warn }
+        annotations:
+          summary: "The nightly reconciliation has not succeeded in 36 hours"
+          runbook: "docs/RUNBOOK.md#reconciliation"
+
+      - alert: ReconciliationFindings
+        expr: sum(reconciliation_findings{job="scheduler"}) > 0
+        for: 5m
+        labels: { severity: warn }
+        annotations:
+          summary: "Aggregate tables drift from raw events, or event ids are duplicated"
+          runbook: "docs/RUNBOOK.md#reconciliation"

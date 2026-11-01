@@ -85,6 +85,7 @@ func TestSignsTheExactBodyAndForwardsIt(t *testing.T) {
 	if w.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want 202", w.Code)
 	}
+
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(body))
 	want := hex.EncodeToString(mac.Sum(nil))
@@ -96,6 +97,27 @@ func TestSignsTheExactBodyAndForwardsIt(t *testing.T) {
 	}
 	if ct := up.last.headers.Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("upstream content type = %q, want application/json", ct)
+	}
+}
+
+func TestMetricsEndpointUsesPrometheusTextFormat(t *testing.T) {
+	h := newHandler(testConfig("http://127.0.0.1:9", "*"), http.DefaultClient)
+	health := httptest.NewRecorder()
+	h.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Header().Get("Content-Type"), "text/plain; version=0.0.4") {
+		t.Fatalf("unexpected metrics content type: %q", w.Header().Get("Content-Type"))
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "# TYPE http_request_duration_seconds histogram") ||
+		!strings.Contains(body, `http_request_duration_seconds_bucket{route="GET /health",status_class="2xx"`) {
+		t.Fatalf("metrics output missing Prometheus request histogram: %s", body)
 	}
 }
 

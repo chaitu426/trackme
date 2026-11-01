@@ -102,6 +102,9 @@ export async function verifySessionToken(
     ) {
       return null;
     }
+    if (typeof parsed.iat !== "number") {
+      parsed.iat = 0;
+    }
     if (parsed.exp < Math.floor(Date.now() / 1000)) {
       return null;
     }

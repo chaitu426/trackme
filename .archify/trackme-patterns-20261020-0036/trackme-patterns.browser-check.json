@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "browser-check",
+  "evidenceKind": "automated-browser",
+  "status": "fail",
+  "visualReview": "not-requested",
+  "provenance": "current",
+  "deliveryReceiptId": "e0631e2b-39a9-4e8f-9582-0d9bc2da6cd2",
+  "artifact": {
+    "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+    "sha256": "65fbe31d5edf7e9194368241cb47e8c7a98a70aceb0fefcdeceba6d38bb87394",
+    "bytes": 770819
+  },
+  "state": {
+    "detail": "read",
+    "motion": "still"
+  },
+  "chrome": {
+    "status": "available",
+    "executable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/browser-check-runtime",
+      "severity": "error",
+      "message": "browser-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools event timeout failed: Page.loadEventFired: event timed out after 15000ms\nChrome process: still running.\nChrome stderr:\n[21868:12920:1020/010157.575:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 20092: Access is denied. (0x5)\r\n[21868:12920:1020/010158.843:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.859:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.878:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010209.649:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 15216: Access is denied. (0x5)\nChrome transport: Node v24.21.0, libuv 1.52.1, win32; pid=21868, exitCode=null, signalCode=null.\nChrome read pipe: readable=true, ended=false, destroyed=false, receivedBytes=20881, messages=82, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=26, writtenBytes=64656, bufferedBytes=0."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun browser-check"
+      ]
+    }
+  ],
+  "containment": {
+    "status": "fail",
+    "policy": "fit-or-reader-declared-readable-vertical-scroll",
+    "viewports": []
+  },
+  "themeStates": {
+    "status": "fail",
+    "viewports": []
+  },
+  "readability": {
+    "status": "fail",
+    "minimumProjectedNodeTextPx": 6,
+    "viewports": []
+  },
+  "viewerChrome": {
+    "status": "fail",
+    "viewports": []
+  },
+  "captures": {
+    "status": "not-requested",
+    "screenshots": [],
+    "contactSheet": null
+  },
+  "sidecars": {
+    "receipt": "trackme-patterns.browser-check.json",
+    "files": []
+  },
+  "error": "Chrome DevTools event timeout failed: Page.loadEventFired: event timed out after 15000ms\nChrome process: still running.\nChrome stderr:\n[21868:12920:1020/010157.575:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 20092: Access is denied. (0x5)\r\n[21868:12920:1020/010158.843:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.859:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.878:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010209.649:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 15216: Access is denied. (0x5)\nChrome transport: Node v24.21.0, libuv 1.52.1, win32; pid=21868, exitCode=null, signalCode=null.\nChrome read pipe: readable=true, ended=false, destroyed=false, receivedBytes=20881, messages=82, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=26, writtenBytes=64656, bufferedBytes=0."
+}

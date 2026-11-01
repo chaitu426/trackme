@@ -1,9 +1,24 @@
 import { notFound } from "next/navigation";
 import { db, siteFunnels, eq, desc } from "@trackme/db";
-import { analyzeFunnel, type FunnelStepDefinition, type FunnelAnalysisResult } from "@trackme/analytics";
+import { cachedFunnel } from "@/lib/query-cache";
+import { cachedBreakdown } from "@/lib/cached-analytics";
+import { buildMetricRequest } from "@/lib/metrics";
+import { resolveDateRange } from "@/lib/date-range";
+import { analyzeFunnel, getCustomEventsSummary, type FunnelStepDefinition, type FunnelAnalysisResult } from "@trackme/analytics";
 import { requireUser } from "@/lib/auth";
 import { requireDashboardSite } from "@/lib/tenancy";
-import { FunnelsClient, type FunnelItem } from "./funnels-client";
+import { FunnelsClient, type FunnelItem, type FunnelSuggestions } from "./funnels-client";
+
+/** Pages and events seen in the last 30 days, to autocomplete step targets. Never rejects. */
+async function loadSuggestions(workspaceId: string, siteId: string): Promise<FunnelSuggestions> {
+  try {
+    const request = buildMetricRequest(workspaceId, siteId, resolveDateRange("30d").current, { limit: 50 });
+    const [paths, events] = await Promise.all([cachedBreakdown(request, "path"), getCustomEventsSummary(request)]);
+    return { paths: paths.items.map((i) => i.name), events: events.map((e) => e.eventName) };
+  } catch {
+    return { paths: [], events: [] };
+  }
+}
 
 export default async function SiteFunnelsPage({
   params,
@@ -20,6 +35,9 @@ export default async function SiteFunnelsPage({
     notFound();
   }
   const { workspace, site } = context;
+
+  // Started now, awaited by nobody here: it streams to the create dialog when it resolves.
+  const suggestions = loadSuggestions(workspace.id, site.id);
 
   // Load existing funnels from Postgres
   const funnelRows = await db
@@ -38,22 +56,29 @@ export default async function SiteFunnelsPage({
 
   const activeFunnel = initialFunnels[0] || null;
   let initialAnalysis: FunnelAnalysisResult | null = null;
+  let initialAnalysisError: string | null = null;
 
   if (activeFunnel && activeFunnel.steps.length > 0) {
     const now = new Date();
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    initialAnalysis = await analyzeFunnel(
-      {
-        workspaceId: workspace.id,
-        siteId: site.id,
-        dateRange: {
-          from: thirtyDaysAgo.toISOString(),
-          to: now.toISOString(),
-          granularity: "day",
+    try {
+      initialAnalysis = await cachedFunnel(
+        {
+          workspaceId: workspace.id,
+          siteId: site.id,
+          dateRange: {
+            from: thirtyDaysAgo.toISOString(),
+            to: now.toISOString(),
+            granularity: "day",
+          },
         },
-      },
-      activeFunnel.steps
-    );
+        activeFunnel.steps,
+        86400,
+        (normalized) => analyzeFunnel(normalized, activeFunnel.steps)
+      );
+    } catch {
+      initialAnalysisError = "Analytics is temporarily unavailable. Retry in a moment.";
+    }
   }
 
   return (
@@ -62,6 +87,8 @@ export default async function SiteFunnelsPage({
       initialFunnels={initialFunnels}
       initialActiveFunnel={activeFunnel}
       initialAnalysis={initialAnalysis}
+      initialAnalysisError={initialAnalysisError}
+      suggestions={suggestions}
     />
   );
 }

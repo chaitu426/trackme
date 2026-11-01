@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"expvar"
 	"fmt"
 	"io"
 	"log"
@@ -97,12 +96,6 @@ var hopByHop = map[string]bool{
 	"transfer-encoding": true, "upgrade": true, "content-length": true,
 }
 
-var (
-	httpRequestsTotal = expvar.NewInt("ingest_proxy_http_requests_total")
-	httpRequestsInFlight = expvar.NewInt("ingest_proxy_http_requests_in_flight")
-	httpRequestLatencyMs = expvar.NewFloat("ingest_proxy_http_request_latency_ms")
-)
-
 type responseRecorder struct {
 	http.ResponseWriter
 	status int
@@ -126,13 +119,15 @@ func withRequestTracing(next http.Handler) http.Handler {
 			}
 		}
 		w.Header().Set("X-Request-ID", reqID)
-		httpRequestsInFlight.Add(1)
-		defer httpRequestsInFlight.Add(-1)
+		proxyRequestsInFlight.Inc()
 		statusWriter := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+		defer func() {
+			duration := time.Since(start)
+			proxyRequestsInFlight.Dec()
+			observeProxyRequest(proxyRouteLabel(r.Method, r.URL.Path), statusWriter.status, duration.Seconds())
+			log.Printf("%s %s request_id=%s status=%d latency_ms=%d", r.Method, r.URL.Path, reqID, statusWriter.status, duration.Milliseconds())
+		}()
 		next.ServeHTTP(statusWriter, r)
-		httpRequestsTotal.Add(1)
-		httpRequestLatencyMs.Add(float64(time.Since(start).Milliseconds()))
-		log.Printf("%s %s request_id=%s status=%d latency_ms=%d", r.Method, r.URL.Path, reqID, statusWriter.status, time.Since(start).Milliseconds())
 	})
 }
 
@@ -144,8 +139,7 @@ func newHandler(cfg config, client *http.Client) http.Handler {
 		_, _ = w.Write([]byte(`{"status":"ok","service":"ingest-proxy"}`))
 	})
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-		expvar.Handler().ServeHTTP(w, r)
+		metricsHandler().ServeHTTP(w, r)
 	})
 
 	mux.HandleFunc("OPTIONS /v1/batch", func(w http.ResponseWriter, r *http.Request) {

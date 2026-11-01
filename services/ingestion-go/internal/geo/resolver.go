@@ -15,6 +15,21 @@ type Resolver struct {
 	mu   sync.RWMutex
 	db   *geoip2.Reader
 	path string
+	// loopbackIP stands in for the client address when it is loopback or private,
+	// which is every request in local development (browser -> localhost). Without it
+	// there is nothing to look up and the audience map stays empty.
+	loopbackIP net.IP
+}
+
+// WithLoopbackIP sets the address looked up for loopback/private clients. Development
+// only: in production a private client address means a misconfigured proxy, and
+// substituting one fixed location would be wrong data, so config rejects it there.
+func (r *Resolver) WithLoopbackIP(ip string) *Resolver {
+	r.loopbackIP = net.ParseIP(strings.TrimSpace(ip))
+	if r.loopbackIP != nil {
+		log.Printf("geo: loopback/private clients are located as %s (development setting)", r.loopbackIP)
+	}
+	return r
 }
 
 func New(mmdbPath string) *Resolver {
@@ -49,7 +64,10 @@ func (r *Resolver) Lookup(headers map[string]string, clientIP string) (country, 
 
 	ip := net.ParseIP(strings.TrimSpace(clientIP))
 	if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() {
-		return "", ""
+		if r.loopbackIP == nil {
+			return "", ""
+		}
+		ip = r.loopbackIP
 	}
 
 	r.mu.RLock()
@@ -89,6 +107,15 @@ func fromCDN(headers map[string]string) (country, city string) {
 	}
 	if cf := get("cloudfront-viewer-country"); len(cf) == 2 {
 		return strings.ToUpper(cf), get("cloudfront-viewer-city")
+	}
+	if v := get("x-vercel-ip-country"); len(v) == 2 {
+		return strings.ToUpper(v), get("x-vercel-ip-city")
+	}
+	if v := get("x-appengine-country"); len(v) == 2 && v != "ZZ" {
+		return strings.ToUpper(v), get("x-appengine-city")
+	}
+	if v := get("x-country-code"); len(v) == 2 {
+		return strings.ToUpper(v), ""
 	}
 	return "", ""
 }

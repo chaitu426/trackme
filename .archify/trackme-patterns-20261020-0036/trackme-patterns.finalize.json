@@ -1,0 +1,417 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-10-19T19:31:32.021Z",
+  "specification": {
+    "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\candidate.json",
+    "sha256": "e838f6e4895f05da5dbdab003ad827c4a753a894d6005dd65e07150210f6abc5",
+    "bytes": 7658
+  },
+  "artifact": {
+    "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+    "sha256": "65fbe31d5edf7e9194368241cb47e8c7a98a70aceb0fefcdeceba6d38bb87394",
+    "bytes": 770819
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "C:\\Users\\chaitanya.abhade\\tools\\node\\node-v24.21.0-win-x64\\node.exe",
+        "C:\\Users\\chaitanya.abhade\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "deliver",
+        "architecture",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\candidate.json",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "e838f6e4895f05da5dbdab003ad827c4a753a894d6005dd65e07150210f6abc5",
+          "bytes": 7658
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 18539,
+      "command": [
+        "C:\\Users\\chaitanya.abhade\\tools\\node\\node-v24.21.0-win-x64\\node.exe",
+        "C:\\Users\\chaitanya.abhade\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "deliver",
+        "architecture",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\candidate.json",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "e0631e2b-39a9-4e8f-9582-0d9bc2da6cd2",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\candidate.json",
+        "output": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+        "specification": {
+          "sha256": "e838f6e4895f05da5dbdab003ad827c4a753a894d6005dd65e07150210f6abc5",
+          "bytes": 7658
+        },
+        "artifact": {
+          "sha256": "65fbe31d5edf7e9194368241cb47e8c7a98a70aceb0fefcdeceba6d38bb87394",
+          "bytes": 770819
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/chaitu426/trackme",
+          "revision": "91658b382c23fea17f05d0a8a1e2d7c3062feb90",
+          "references": 23
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 2429,
+      "command": [
+        "C:\\Users\\chaitanya.abhade\\tools\\node\\node-v24.21.0-win-x64\\node.exe",
+        "C:\\Users\\chaitanya.abhade\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "check",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+        "artifact": {
+          "sha256": "65fbe31d5edf7e9194368241cb47e8c7a98a70aceb0fefcdeceba6d38bb87394",
+          "bytes": 770819
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 1,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 34,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 6.902564102564103,
+            "maxBends": 4,
+            "routesOverSuggestedBends": 1,
+            "maxStretch": 1,
+            "routesOverSuggestedStretch": 0,
+            "minSegmentPx": 32,
+            "minInteriorSegmentPx": 42,
+            "shortSegmentCount": 0,
+            "shortEndpointSegmentCount": 0,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [
+              {
+                "left": {
+                  "id": "web-clickhouse",
+                  "from": "web-query",
+                  "to": "clickhouse",
+                  "label": "",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "right": {
+                  "id": "scheduler-redis",
+                  "from": "scheduler",
+                  "to": "redis",
+                  "label": "",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "point": [
+                  825,
+                  587
+                ]
+              }
+            ],
+            "detours": [
+              {
+                "relationship": {
+                  "id": "web-clickhouse",
+                  "from": "web-query",
+                  "to": "clickhouse",
+                  "label": "",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "bends": 4,
+                "stretch": 1
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": true,
+            "emptyTopPx": 100,
+            "emptyTopRatio": 0.133,
+            "occupiedTop": 100,
+            "viewBoxTop": 0,
+            "canvasHeight": 750,
+            "typicalNodeHeight": 90,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "recognized-declared-wide",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 1346,
+            "actualBudgetPx": 1346,
+            "actualReaderWidth": 1376,
+            "desiredReaderWidth": 1492.5,
+            "viewportCap": 1376,
+            "limit": "viewport-cap",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": false,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "tracker-posts",
+              "from": "tracker",
+              "to": "ingress"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 6.902564102564103,
+            "semanticTextCount": 26
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "e0631e2b-39a9-4e8f-9582-0d9bc2da6cd2"
+      }
+    },
+    "browser-check": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": 28101,
+      "command": [
+        "C:\\Users\\chaitanya.abhade\\tools\\node\\node-v24.21.0-win-x64\\node.exe",
+        "C:\\Users\\chaitanya.abhade\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "browser-check",
+        "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "fail",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "e0631e2b-39a9-4e8f-9582-0d9bc2da6cd2",
+        "artifact": {
+          "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html",
+          "sha256": "65fbe31d5edf7e9194368241cb47e8c7a98a70aceb0fefcdeceba6d38bb87394",
+          "bytes": 770819
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "available",
+          "executable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/browser-check-runtime",
+            "severity": "error",
+            "message": "browser-check could not complete its Chrome inspection.",
+            "subject": {
+              "artifact": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html"
+            },
+            "evidence": {
+              "reason": "Chrome DevTools event timeout failed: Page.loadEventFired: event timed out after 15000ms\nChrome process: still running.\nChrome stderr:\n[21868:12920:1020/010157.575:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 20092: Access is denied. (0x5)\r\n[21868:12920:1020/010158.843:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.859:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.878:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010209.649:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 15216: Access is denied. (0x5)\nChrome transport: Node v24.21.0, libuv 1.52.1, win32; pid=21868, exitCode=null, signalCode=null.\nChrome read pipe: readable=true, ended=false, destroyed=false, receivedBytes=20881, messages=82, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=26, writtenBytes=64656, bufferedBytes=0."
+            },
+            "supportedFixes": [
+              "resolve the reported Chrome inspection error, then rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "fail",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "fail",
+          "viewports": []
+        },
+        "readability": {
+          "status": "fail",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "fail",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "trackme-patterns.browser-check.json",
+          "files": []
+        },
+        "error": "Chrome DevTools event timeout failed: Page.loadEventFired: event timed out after 15000ms\nChrome process: still running.\nChrome stderr:\n[21868:12920:1020/010157.575:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 20092: Access is denied. (0x5)\r\n[21868:12920:1020/010158.843:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.859:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.878:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010209.649:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 15216: Access is denied. (0x5)\nChrome transport: Node v24.21.0, libuv 1.52.1, win32; pid=21868, exitCode=null, signalCode=null.\nChrome read pipe: readable=true, ended=false, destroyed=false, receivedBytes=20881, messages=82, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=26, writtenBytes=64656, bufferedBytes=0."
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/browser-check-runtime",
+      "severity": "error",
+      "message": "browser-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools event timeout failed: Page.loadEventFired: event timed out after 15000ms\nChrome process: still running.\nChrome stderr:\n[21868:12920:1020/010157.575:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 20092: Access is denied. (0x5)\r\n[21868:12920:1020/010158.843:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.859:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010158.878:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 17304: Access is denied. (0x5)\r\n[21868:16604:1020/010209.649:ERROR:chrome\\updater\\ipc\\update_service_dialer_win.cc:76] Failed to open named pipe server process 15216: Access is denied. (0x5)\nChrome transport: Node v24.21.0, libuv 1.52.1, win32; pid=21868, exitCode=null, signalCode=null.\nChrome read pipe: readable=true, ended=false, destroyed=false, receivedBytes=20881, messages=82, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=26, writtenBytes=64656, bufferedBytes=0."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.finalize.json",
+    "summaryReceipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\trackme-patterns-20261020-0036\\trackme-patterns.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-19T19:32:28.350Z",
+  "durationMs": 56328,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "timeout"
+  }
+}

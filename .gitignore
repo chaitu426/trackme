@@ -62,3 +62,9 @@ scratch/
 scratch_docx_text.txt
 spec.zip
 
+
+# Managed-service credentials (copy infra/aiven/.env.aiven.example)
+.env.aiven
+infra/aiven/certs/
+
+.next-preview/

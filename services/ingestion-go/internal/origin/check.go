@@ -3,6 +3,8 @@ package origin
 import (
 	"net/url"
 	"strings"
+
+	"github.com/trackme/ingestion-go/internal/enrich"
 )
 
 // RequestHost extracts a hostname from Origin or Referer (Origin preferred).
@@ -24,7 +26,7 @@ func RequestHost(originHeader, refererHeader string) string {
 // Allowed reports whether the browser Origin/Referer host matches the registered site domain.
 func Allowed(originHeader, refererHeader, siteDomain string, allowLocalhost bool) bool {
 	host := RequestHost(originHeader, refererHeader)
-	domain := strings.ToLower(strings.TrimSpace(siteDomain))
+	domain := enrich.NormalizeDomain(siteDomain)
 
 	if host == "" {
 		// No Origin/Referer — common for some non-browser clients; reject when match is required.
@@ -39,7 +41,7 @@ func Allowed(originHeader, refererHeader, siteDomain string, allowLocalhost bool
 		return true
 	}
 
-	if host == domain || strings.HasSuffix(host, "."+domain) {
+	if enrich.SameSiteHost(host, domain) {
 		return true
 	}
 

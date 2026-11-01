@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -11,7 +12,6 @@ import {
   Trash2,
   Clock,
   CheckCircle2,
-  Building,
   Loader2,
   RefreshCw,
   Link2,
@@ -51,10 +51,10 @@ interface OrganizationSettingsClientProps {
 }
 
 const ROLE_META = {
-  admin: { label: "Admin", icon: Crown, color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-  member: { label: "Member", icon: Users, color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
-  viewer: { label: "Viewer", icon: Eye, color: "text-sky-400 bg-sky-500/10 border-sky-500/20" },
-  owner: { label: "Owner", icon: Crown, color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+  admin: { label: "Admin", icon: Crown, color: "text-zinc-300 bg-white/[0.06] border-white/[0.1]" },
+  member: { label: "Member", icon: Users, color: "text-zinc-300 bg-white/[0.06] border-white/[0.1]" },
+  viewer: { label: "Viewer", icon: Eye, color: "text-zinc-300 bg-white/[0.06] border-white/[0.1]" },
+  owner: { label: "Owner", icon: Crown, color: "text-[#4cc38a] bg-[#4cc38a]/10 border-[#4cc38a]/20" },
 };
 
 export function OrganizationSettingsClient({
@@ -205,27 +205,14 @@ export function OrganizationSettingsClient({
 
   return (
     <div className="w-full space-y-8 animate-in fade-in duration-300">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.06] text-zinc-200">
-            <Building className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-100">
-              {workspace.name} · Organization Settings
-            </h1>
-            <p className="text-xs text-zinc-400">
-              Manage organization profile, team members, access roles, and invitations.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader title="Organization & Team" art="pulse">
+        Manage the profile, team members, access roles and invitations for {workspace.name}.
+      </PageHeader>
 
       {actionError && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-center justify-between">
+        <div className="p-3 bg-[#e5484d]/10 border border-[#e5484d]/20 rounded-xl text-xs text-[#e5484d] flex items-center justify-between">
           <span>{actionError}</span>
-          <button onClick={() => setActionError(null)} className="text-rose-400 hover:text-rose-200">✕</button>
+          <button onClick={() => setActionError(null)} className="text-[#e5484d] hover:text-[#e5484d]">✕</button>
         </div>
       )}
 
@@ -234,21 +221,21 @@ export function OrganizationSettingsClient({
         <div className="lg:col-span-1 space-y-4">
           {/* Org info */}
           <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-100">Organization Info</h3>
+            <h3 className="text-sm font-medium text-zinc-100">Organization Info</h3>
             <div className="space-y-3 text-xs">
               <div>
-                <span className="text-zinc-500 block text-[11px]">Organization Name</span>
+                <span className="text-zinc-500 block text-xs">Organization Name</span>
                 <span className="font-medium text-zinc-200">{workspace.name}</span>
               </div>
               <div>
-                <span className="text-zinc-500 block text-[11px]">Workspace Slug</span>
-                <span className="font-mono text-zinc-300 bg-white/[0.04] px-2 py-0.5 rounded text-[11px]">
+                <span className="text-zinc-500 block text-xs">Workspace Slug</span>
+                <span className="font-mono text-zinc-300 bg-white/[0.04] px-2 py-0.5 rounded text-xs">
                   {workspace.slug}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 block text-[11px]">Your Access Level</span>
-                <span className="inline-flex items-center gap-1 font-semibold uppercase text-[10px] tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="text-zinc-500 block text-xs">Your Access Level</span>
+                <span className="inline-flex items-center gap-1 font-medium text-xs px-2 py-0.5 rounded-full bg-[#4cc38a]/10 text-[#4cc38a] border border-[#4cc38a]/20">
                   <Shield className="w-3 h-3" />{workspace.role}
                 </span>
               </div>
@@ -257,7 +244,7 @@ export function OrganizationSettingsClient({
 
           {/* Role permission legend */}
           <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-5 space-y-3">
-            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Role Permissions</h3>
+            <h3 className="text-xs font-medium text-zinc-400">Role Permissions</h3>
             {[
               { role: "owner", desc: "Full access, billing, and ownership transfer" },
               { role: "admin", desc: "Manage members, sites, tracking keys, settings" },
@@ -266,23 +253,23 @@ export function OrganizationSettingsClient({
             ].map((r) => {
               const meta = ROLE_META[r.role as keyof typeof ROLE_META];
               return (
-                <div key={r.role} className="flex items-start gap-2.5">
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border shrink-0 mt-0.5 ${meta.color}`}>
+                <div key={r.role} className="flex items-start gap-3">
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 mt-0.5 ${meta.color}`}>
                     {r.role}
                   </span>
-                  <span className="text-[11px] text-zinc-500 leading-relaxed">{r.desc}</span>
+                  <span className="text-xs text-zinc-500 leading-relaxed">{r.desc}</span>
                 </div>
               );
             })}
           </div>
 
           {/* Privacy & Security */}
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4 space-y-2">
-            <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
+          <div className="rounded-2xl border border-[#4cc38a]/20 bg-[#4cc38a]/20 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-[#4cc38a] text-xs font-medium">
               <ShieldAlert className="w-4 h-4" />
               <span>Multi-Tenant Cryptographic Isolation</span>
             </div>
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
+            <p className="text-xs text-zinc-400 leading-relaxed">
               Every query and event stream is strictly partitioned to this workspace's tenant boundary.
             </p>
           </div>
@@ -293,8 +280,8 @@ export function OrganizationSettingsClient({
           {/* Invite Form */}
           <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-6 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-zinc-300" />
                 Invite Team Member
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
@@ -303,7 +290,7 @@ export function OrganizationSettingsClient({
             </div>
 
             {/* Role selector */}
-            <div className="grid grid-cols-3 gap-2 text-[11px]">
+            <div className="grid grid-cols-3 gap-2 text-xs">
               {(["admin", "member", "viewer"] as const).map((r) => {
                 const meta = ROLE_META[r];
                 return (
@@ -313,13 +300,13 @@ export function OrganizationSettingsClient({
                     onClick={() => setInviteRole(r)}
                     className={`rounded-xl border px-3 py-2 text-left transition ${meta.color} ${inviteRole === r ? "ring-1 ring-white/20" : "opacity-50 hover:opacity-75"}`}
                   >
-                    <div className="font-semibold capitalize">{r}</div>
+                    <div className="font-medium capitalize">{r}</div>
                   </button>
                 );
               })}
             </div>
 
-            <form onSubmit={handleInvite} className="flex gap-2.5">
+            <form onSubmit={handleInvite} className="flex gap-3">
               <div className="relative flex-1">
                 <input
                   type="email"
@@ -327,23 +314,23 @@ export function OrganizationSettingsClient({
                   placeholder="teammate@company.com"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 pl-9 text-xs text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
+                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-3 pl-9 text-xs text-zinc-100 placeholder-zinc-500 focus:border-white/[0.1] focus:outline-none transition"
                 />
                 <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <Button type="submit" disabled={isInviting || !inviteEmail.trim()} className="h-10 text-xs font-semibold shrink-0 gap-2">
+              <Button type="submit" disabled={isInviting || !inviteEmail.trim()} className="h-10 text-xs font-medium shrink-0 gap-2">
                 {isInviting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 {isInviting ? "Sending…" : "Send Invite"}
               </Button>
             </form>
 
             {inviteError && (
-              <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2 flex items-center gap-2">
+              <p className="text-xs text-[#e5484d] bg-[#e5484d]/10 border border-[#e5484d]/20 rounded-xl px-3 py-2 flex items-center gap-2">
                 <XCircle className="w-3.5 h-3.5 shrink-0" />{inviteError}
               </p>
             )}
             {inviteSuccess && (
-              <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 flex items-center gap-1.5">
+              <p className="text-xs text-[#4cc38a] bg-[#4cc38a]/10 border border-[#4cc38a]/20 rounded-xl px-3 py-2 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />{inviteSuccess}
               </p>
             )}
@@ -351,8 +338,8 @@ export function OrganizationSettingsClient({
 
           {/* Pending Invites */}
           {invites.length > 0 && (
-            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.02] p-5 space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+            <div className="rounded-2xl border border-white/[0.1] bg-white/[0.06] p-5 space-y-3">
+              <h4 className="text-xs font-medium text-zinc-300 flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5" />
                 Pending Invitations ({invites.length})
               </h4>
@@ -366,12 +353,12 @@ export function OrganizationSettingsClient({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-zinc-200">{invite.email}</span>
-                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${
-                            invite.role === "admin" ? "text-amber-400 bg-amber-500/10 border-amber-500/20" :
-                            invite.role === "viewer" ? "text-sky-400 bg-sky-500/10 border-sky-500/20" :
-                            "text-indigo-400 bg-indigo-500/10 border-indigo-500/20"
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded border ${
+                            invite.role === "admin" ? "text-zinc-300 bg-white/[0.06] border-white/[0.1]" :
+                            invite.role === "viewer" ? "text-zinc-300 bg-white/[0.06] border-white/[0.1]" :
+                            "text-zinc-300 bg-white/[0.06] border-white/[0.1]"
                           }`}>{invite.role}</span>
-                          <span className={`flex items-center gap-1 ${expiry.expired ? "text-rose-400" : expiry.urgent ? "text-amber-400" : "text-zinc-500"}`}>
+                          <span className={`flex items-center gap-1 ${expiry.expired ? "text-[#e5484d]" : expiry.urgent ? "text-zinc-300" : "text-zinc-500"}`}>
                             <Clock className="w-2.5 h-2.5" />{expiry.label}
                           </span>
                         </div>
@@ -381,7 +368,7 @@ export function OrganizationSettingsClient({
                         <button
                           onClick={() => handleResend(invite)}
                           disabled={!!isResending}
-                          className="text-zinc-500 hover:text-indigo-400 transition p-1.5 rounded-lg hover:bg-white/[0.04]"
+                          className="text-zinc-500 hover:text-zinc-300 transition p-2 rounded-lg hover:bg-white/[0.04]"
                           title="Resend invite"
                         >
                           {isResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -389,17 +376,17 @@ export function OrganizationSettingsClient({
                         {/* Copy link */}
                         <button
                           onClick={() => inviteManager.copyInviteLink(invite.token || invite.id, invite.id)}
-                          className="text-zinc-500 hover:text-zinc-300 transition p-1.5 rounded-lg hover:bg-white/[0.04]"
+                          className="text-zinc-500 hover:text-zinc-300 transition p-2 rounded-lg hover:bg-white/[0.04]"
                           title={hasToken ? "Copy invite link" : "Invite link unavailable"}
                         >
                           {inviteManager.copiedToken === invite.id
-                            ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ? <Check className="w-3.5 h-3.5 text-[#4cc38a]" />
                             : <Link2 className="w-3.5 h-3.5" />}
                         </button>
                         {/* Revoke */}
                         <button
                           onClick={() => handleRevokeInvite(invite.id)}
-                          className="text-zinc-500 hover:text-rose-400 transition p-1.5 rounded-lg hover:bg-white/[0.04]"
+                          className="text-zinc-500 hover:text-[#e5484d] transition p-2 rounded-lg hover:bg-white/[0.04]"
                           title="Revoke invite"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -414,7 +401,7 @@ export function OrganizationSettingsClient({
 
           {/* Members List */}
           <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
               <Users className="w-4 h-4 text-zinc-400" />
               Active Members ({members.length})
             </h3>
@@ -428,27 +415,27 @@ export function OrganizationSettingsClient({
                   : "TM";
 
                 return (
-                  <div key={member.id} className="flex items-center justify-between py-3.5 text-xs">
+                  <div key={member.id} className="flex items-center justify-between py-4 text-xs">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 text-[11px] font-bold text-zinc-200 shrink-0">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-raised text-xs font-medium text-zinc-200 shrink-0">
                         {initials}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-zinc-100 truncate">{member.name}</span>
+                          <span className="font-medium text-zinc-100 truncate">{member.name}</span>
                           {isSelf && (
-                            <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-indigo-300">
+                            <span className="rounded bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-zinc-300">
                               You
                             </span>
                           )}
                         </div>
-                        <span className="text-[11px] text-zinc-400 truncate block">{member.email}</span>
+                        <span className="text-xs text-zinc-400 truncate block">{member.email}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2.5 shrink-0 ml-3">
+                    <div className="flex items-center gap-3 shrink-0 ml-3">
                       {memberIsOwner ? (
-                        <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-400">
+                        <span className="rounded-md border border-[#4cc38a]/20 bg-[#4cc38a]/10 px-2 py-1 text-xs font-medium text-[#4cc38a]">
                           Owner
                         </span>
                       ) : (
@@ -456,7 +443,7 @@ export function OrganizationSettingsClient({
                           value={member.role}
                           disabled={busyMemberId === member.id || isSelf || (!isOwner && workspace.role !== "admin")}
                           onChange={(e) => handleChangeRole(member.id, e.target.value as "admin" | "member" | "viewer")}
-                          className="rounded-md border border-white/10 bg-zinc-900 px-2.5 py-1 text-[11px] text-zinc-300 focus:outline-none cursor-pointer"
+                          className="rounded-md border border-white/10 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 focus:outline-none cursor-pointer"
                         >
                           <option value="admin">Admin</option>
                           <option value="member">Member</option>
@@ -470,7 +457,7 @@ export function OrganizationSettingsClient({
                           type="button"
                           onClick={() => handleChangeRole(member.id, "owner")}
                           disabled={busyMemberId === member.id}
-                          className="text-zinc-500 hover:text-amber-400 transition p-1.5 rounded-lg hover:bg-white/[0.04]"
+                          className="text-zinc-500 hover:text-zinc-300 transition p-2 rounded-lg hover:bg-white/[0.04]"
                           title="Transfer Workspace Ownership"
                         >
                           <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -483,7 +470,7 @@ export function OrganizationSettingsClient({
                           type="button"
                           onClick={() => handleRemoveMember(member.id)}
                           disabled={busyMemberId === member.id}
-                          className="text-zinc-500 hover:text-rose-400 transition p-1.5 rounded-lg hover:bg-white/[0.04]"
+                          className="text-zinc-500 hover:text-[#e5484d] transition p-2 rounded-lg hover:bg-white/[0.04]"
                           title="Remove member"
                         >
                           {busyMemberId === member.id
@@ -498,7 +485,7 @@ export function OrganizationSettingsClient({
                           type="button"
                           onClick={() => handleLeaveWorkspace(member.id)}
                           disabled={busyMemberId === member.id}
-                          className="text-zinc-500 hover:text-rose-400 transition p-1.5 rounded-lg hover:bg-white/[0.04] flex items-center gap-1 text-[11px]"
+                          className="text-zinc-500 hover:text-[#e5484d] transition p-2 rounded-lg hover:bg-white/[0.04] flex items-center gap-1 text-xs"
                           title="Leave organization"
                         >
                           {busyMemberId === member.id ? (
@@ -520,7 +507,7 @@ export function OrganizationSettingsClient({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-zinc-400" />
-              <h3 className="text-sm font-semibold text-zinc-100">Audit Trail</h3>
+              <h3 className="text-sm font-medium text-zinc-100">Audit Trail</h3>
             </div>
             <AuditLogViewer logs={auditLogs} />
           </div>

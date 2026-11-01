@@ -33,6 +33,10 @@ func TestEvent(t *testing.T) {
 		{"valid pageview", func(e *enrich.TrackerEvent) {}, ""},
 		{"wrong schema version", func(e *enrich.TrackerEvent) { e.SchemaVersion = 2 }, ReasonSchema},
 		{"unknown type", func(e *enrich.TrackerEvent) { e.Type = "click" }, ReasonType},
+		{"engagement event", func(e *enrich.TrackerEvent) {
+			e.Type = "engagement"
+			e.Properties = map[string]interface{}{"engagementMs": 4200.0}
+		}, ""},
 		{"event id not a uuid", func(e *enrich.TrackerEvent) { e.EventID = "not-a-uuid" }, ReasonEventID},
 		{"event id wrong separators", func(e *enrich.TrackerEvent) { e.EventID = "3f2b8c1e_5a47_4d9e_8b21_0c6f7a1d9e42" }, ReasonEventID},
 		{"event id non-hex", func(e *enrich.TrackerEvent) { e.EventID = "zf2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42" }, ReasonEventID},

@@ -38,13 +38,13 @@ const ROLE_META: Record<string, { label: string; icon: React.ReactNode; color: s
   member: {
     label: "Member",
     icon: <Users className="w-4 h-4" />,
-    color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/30",
+    color: "text-zinc-200 bg-white/[0.07] border-white/[0.25]",
     description: "Read and edit analytics, funnels, and goals.",
   },
   viewer: {
     label: "Viewer",
     icon: <Eye className="w-4 h-4" />,
-    color: "text-sky-400 bg-sky-500/10 border-sky-500/30",
+    color: "text-zinc-200 bg-white/[0.07] border-white/[0.25]",
     description: "Read-only access to analytics dashboards.",
   },
 };
@@ -179,10 +179,10 @@ export default function InviteAcceptPage() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#09090b] px-4 py-16">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-16">
       {/* Background glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-indigo-600/10 rounded-full blur-[120px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-white/[0.07] rounded-full blur-[120px]" />
       </div>
 
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -190,7 +190,7 @@ export default function InviteAcceptPage() {
         {/* ── Loading ────────────────────────────────────────────────────── */}
         {state === "loading" && (
           <div className="flex flex-col items-center gap-4 text-zinc-400">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+            <Loader2 className="w-8 h-8 animate-spin text-zinc-200" />
             <p className="text-sm">Loading your invitation…</p>
           </div>
         )}
@@ -207,7 +207,7 @@ export default function InviteAcceptPage() {
             <p className="text-sm text-zinc-400 leading-relaxed">{errorMsg}</p>
             <button
               onClick={() => router.push("/login")}
-              className="text-sm text-indigo-400 hover:text-indigo-300 transition underline underline-offset-2"
+              className="text-sm text-zinc-200 hover:text-zinc-100 transition underline underline-offset-2"
             >
               Go to login
             </button>
@@ -234,7 +234,7 @@ export default function InviteAcceptPage() {
         {/* ── Accepting (loading) ───────────────────────────────────────── */}
         {state === "accepting" && (
           <div className="flex flex-col items-center gap-4 text-zinc-400">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+            <Loader2 className="w-8 h-8 animate-spin text-zinc-200" />
             <p className="text-sm">Setting up your access…</p>
           </div>
         )}
@@ -243,9 +243,9 @@ export default function InviteAcceptPage() {
         {(state === "preview") && invite && roleMeta && (
           <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-br from-indigo-950/60 to-zinc-950 px-6 pt-8 pb-6 text-center border-b border-white/[0.06]">
+            <div className="bg-gradient-to-br to-zinc-950 px-6 pt-8 pb-6 text-center border-b border-white/[0.06]">
               {/* Inviter avatar */}
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xl font-bold text-white mx-auto mb-4 shadow-lg shadow-indigo-900/40">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br to-violet-600 flex items-center justify-center text-xl font-bold text-white mx-auto mb-4 shadow-lg">
                 {(invite.inviterName ?? "T").slice(0, 1).toUpperCase()}
               </div>
               <div className="text-xs text-zinc-500 mb-1">Invitation from</div>
@@ -281,7 +281,7 @@ export default function InviteAcceptPage() {
               {/* CTA */}
               <button
                 onClick={handleAccept}
-                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition text-sm"
+                className="w-full flex items-center justify-center gap-2 bg-zinc-300 hover:bg-zinc-300 active:bg-zinc-300 text-white font-semibold py-3 rounded-xl transition text-sm"
               >
                 Accept Invitation
                 <ArrowRight className="w-4 h-4" />
@@ -301,7 +301,7 @@ export default function InviteAcceptPage() {
         {state === "signup-form" && invite && roleMeta && (
           <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-br from-indigo-950/60 to-zinc-950 px-6 pt-8 pb-6 border-b border-white/[0.06]">
+            <div className="bg-gradient-to-br to-zinc-950 px-6 pt-8 pb-6 border-b border-white/[0.06]">
               <div className="flex items-center justify-between mb-1">
                 <h1 className="text-lg font-bold text-zinc-100">Create your account</h1>
                 <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${roleMeta.color}`}>
@@ -340,7 +340,7 @@ export default function InviteAcceptPage() {
                   placeholder="Ada Lovelace"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none transition"
+                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-white/[0.25] focus:outline-none transition"
                 />
               </div>
 
@@ -354,7 +354,7 @@ export default function InviteAcceptPage() {
                     placeholder="Min. 8 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none transition pr-10"
+                    className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-white/[0.25] focus:outline-none transition pr-10"
                   />
                   <button
                     type="button"
@@ -376,7 +376,7 @@ export default function InviteAcceptPage() {
                   placeholder="Repeat password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none transition"
+                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-white/[0.25] focus:outline-none transition"
                 />
               </div>
 
@@ -388,7 +388,7 @@ export default function InviteAcceptPage() {
 
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition text-sm mt-1"
+                className="w-full flex items-center justify-center gap-2 bg-zinc-300 hover:bg-zinc-300 active:bg-zinc-300 text-white font-semibold py-3 rounded-xl transition text-sm mt-1"
               >
                 Create account & join workspace
                 <ArrowRight className="w-4 h-4" />
@@ -405,7 +405,7 @@ export default function InviteAcceptPage() {
         {/* Logo footer */}
         {state !== "success" && state !== "accepting" && (
           <div className="flex items-center justify-center gap-2 mt-8 text-zinc-600 text-xs">
-            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/60" />
+            <div className="w-1.5 h-1.5 rounded-full bg-white/[0.07]" />
             <span>TrackMe · Privacy-first analytics</span>
           </div>
         )}

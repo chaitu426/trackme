@@ -173,6 +173,36 @@ func SanitizeURL(raw string) (sanitizedURL, sanitizedPath string) {
 	return origin + pathWithQuery, pathWithQuery
 }
 
+// NormalizeDomain reduces a registered site domain to the bare host that traffic is
+// matched against: lower case, no scheme, path, port or leading "www.". Sites are often
+// saved as "www.example.com" or "localhost:3000" while the browser reports "example.com"
+// and "localhost" as the hostname.
+func NormalizeDomain(raw string) string {
+	d := strings.ToLower(strings.TrimSpace(raw))
+	if i := strings.Index(d, "://"); i >= 0 {
+		d = d[i+3:]
+	}
+	if i := strings.IndexAny(d, "/?#"); i >= 0 {
+		d = d[:i]
+	}
+	// A single colon is host:port; more than one is an IPv6 literal.
+	if strings.Count(d, ":") == 1 {
+		d = d[:strings.Index(d, ":")]
+	}
+	return strings.TrimPrefix(d, "www.")
+}
+
+// SameSiteHost reports whether host is the registered domain or one of its subdomains,
+// treating "www." as the same site.
+func SameSiteHost(host, siteDomain string) bool {
+	h := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(host)), "www.")
+	d := NormalizeDomain(siteDomain)
+	if d == "" {
+		return true
+	}
+	return h == d || strings.HasSuffix(h, "."+d)
+}
+
 func HostAllowed(eventURL, siteDomain string, allowLocalhost bool) bool {
 	if allowLocalhost && IsLocalOrFileURL(eventURL) {
 		return true
@@ -182,15 +212,11 @@ func HostAllowed(eventURL, siteDomain string, allowLocalhost bool) bool {
 		return false
 	}
 	host := strings.ToLower(u.Hostname())
-	domain := strings.ToLower(strings.TrimSpace(siteDomain))
-	if domain == "" {
-		return true
-	}
-	if host == domain || strings.HasSuffix(host, "."+domain) {
+	if SameSiteHost(host, siteDomain) {
 		return true
 	}
 	// Development convenience: registered domain "localhost" accepts loopback.
-	if domain == "localhost" && (host == "localhost" || host == "127.0.0.1") {
+	if NormalizeDomain(siteDomain) == "localhost" && (host == "localhost" || host == "127.0.0.1") {
 		return true
 	}
 	return false
@@ -198,4 +224,26 @@ func HostAllowed(eventURL, siteDomain string, allowLocalhost bool) bool {
 
 func NowUTC() string {
 	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+// StripSelfReferrer returns "" when the referrer is the site itself (or one of its
+// subdomains). A visitor moving between your own pages is not a traffic source, and older
+// trackers sent the previous page as the referrer on every client-side navigation.
+func StripSelfReferrer(referrer, siteDomain string) string {
+	if referrer == "" {
+		return ""
+	}
+	u, err := url.Parse(referrer)
+	if err != nil {
+		return referrer
+	}
+	host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(siteDomain)), "www.")
+	if host == "" || domain == "" {
+		return referrer
+	}
+	if host == domain || strings.HasSuffix(host, "."+domain) {
+		return ""
+	}
+	return referrer
 }

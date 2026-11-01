@@ -4,9 +4,16 @@
  * and Redis (live active visitors) with realistic SaaS traffic.
  */
 import crypto from "node:crypto";
-import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { db, sites, workspaces, goals, eq } from "@trackme/db";
-import { getClickHouseClient } from "@trackme/analytics";
+import {
+  getClickHouseClient,
+  SESSION_DURATION_SQL,
+  SESSION_ENGAGED_SQL,
+  SESSION_ENGAGEMENT_COLUMNS,
+} from "@trackme/analytics";
 
 function toClickHouseDateTime64(date: Date): string {
   const pad = (n: number, width = 2) => String(n).padStart(width, "0");
@@ -179,6 +186,105 @@ async function seedGoalsForSite(workspaceId: string, siteId: string) {
   }
 }
 
+/** Tables that hold a site's analytics. SEED_RESET=1 clears them for the site before seeding. */
+const SITE_TABLES = [
+  "events_raw",
+  "web_vitals",
+  "pageview_rollups_daily",
+  "pageview_rollups_hourly",
+  "session_engagement_daily",
+  "event_rollups_daily",
+  "daily_uniques",
+];
+
+async function resetSite(siteId: string) {
+  const client = getClickHouseClient();
+  for (const table of SITE_TABLES) {
+    await client.command({
+      query: `ALTER TABLE ${table} DELETE WHERE site_id = '${siteId}'`,
+      clickhouse_settings: { mutations_sync: "2" },
+    });
+  }
+  console.log(`   ✓ Cleared existing analytics for site ${siteId}`);
+}
+
+type SessionCtx = {
+  site: { id: string; workspaceId: string; domain: string; publicKey: string };
+  sessionId: string;
+  visitorPseudonym: string;
+  geo: { country: string; city: string };
+  dev: { browser: string; os: string; device: string };
+  src: { referrer: string; source: string; medium: string; name: string };
+};
+
+/**
+ * An event the new tracker sends besides pageviews: engagement time, scroll depth, outbound
+ * clicks, downloads. It carries no referrer (only a visit's pageviews do), as in the tracker.
+ */
+function trackerEvent(
+  ctx: SessionCtx,
+  at: Date,
+  path: string,
+  title: string,
+  type: "engagement" | "custom",
+  eventName: string,
+  properties: Record<string, string | number>
+) {
+  const ts = toClickHouseDateTime64(at);
+  return {
+    event_id: crypto.randomUUID(),
+    schema_version: 1,
+    workspace_id: ctx.site.workspaceId,
+    site_id: ctx.site.id,
+    site_key: ctx.site.publicKey,
+    timestamp: ts,
+    received_at: ts,
+    type,
+    event_name: type === "custom" ? eventName : "engagement",
+    session_id: ctx.sessionId,
+    visitor_pseudonym: ctx.visitorPseudonym,
+    url: `https://${ctx.site.domain}${path}`,
+    path,
+    title,
+    referrer: "",
+    campaign_source: "",
+    campaign_medium: "",
+    campaign_name: "",
+    campaign_term: "",
+    campaign_content: "",
+    country: ctx.geo.country,
+    city: ctx.geo.city,
+    browser: ctx.dev.browser,
+    os: ctx.dev.os,
+    device: ctx.dev.device,
+    bot_status: "human",
+    properties_json: JSON.stringify(type === "custom" ? properties : { ...properties }),
+  };
+}
+
+/** Engagement time for a page, plus the scroll and link events a real visitor would leave behind. */
+function pageActivity(ctx: SessionCtx, start: Date, path: string, title: string, activeMs: number) {
+  const out: ReturnType<typeof trackerEvent>[] = [];
+  const end = new Date(start.getTime() + activeMs);
+  out.push(trackerEvent(ctx, end, path, title, "engagement", "engagement", { engagementMs: activeMs }));
+
+  if (activeMs > 6000 && Math.random() < 0.7) {
+    const reached = Math.random() < 0.3 ? 100 : Math.random() < 0.55 ? 75 : Math.random() < 0.8 ? 50 : 25;
+    for (const depth of [25, 50, 75, 100]) {
+      if (depth > reached) break;
+      out.push(trackerEvent(ctx, new Date(start.getTime() + (activeMs * depth) / 130), path, title, "custom", "scroll_depth", { depth }));
+    }
+  }
+  if (Math.random() < 0.04) {
+    const dest = randomChoice(["github.com", "docs.example.org", "twitter.com", "linkedin.com"]);
+    out.push(trackerEvent(ctx, end, path, title, "custom", "outbound_click", { url: `https://${dest}/trackme`, host: dest }));
+  }
+  if (path === "/docs/getting-started" && Math.random() < 0.18) {
+    out.push(trackerEvent(ctx, end, path, title, "custom", "file_download", { file: "trackme-guide.pdf", ext: "pdf", host: ctx.site.domain }));
+  }
+  return out;
+}
+
 async function seedSiteData(site: {
   id: string;
   workspaceId: string;
@@ -188,6 +294,8 @@ async function seedSiteData(site: {
   const client = getClickHouseClient();
   const now = new Date(); // e.g. 2026-10-03/04
   console.log(`\n🌱 Seeding test data for site: ${site.domain} (id: ${site.id})...`);
+
+  if (process.env.SEED_RESET === "1") await resetSite(site.id);
 
   // 1. Seed PostgreSQL goals
   await seedGoalsForSite(site.workspaceId, site.id);
@@ -221,6 +329,7 @@ async function seedSiteData(site: {
       const geo = weightedRandomGeo();
       const dev = weightedRandomDevice();
       const src = weightedRandomSource();
+      const ctx: SessionCtx = { site, sessionId, visitorPseudonym, geo, dev, src };
 
       // Session start time: realistic diurnal distribution across 24h
       // Peak hours: 9:00 - 18:00 UTC
@@ -289,6 +398,10 @@ async function seedSiteData(site: {
           bot_status: "human",
           properties_json: "{}",
         });
+
+        // Some single-page visitors read for a while (engaged); the rest leave within seconds (bounce).
+        const readMs = Math.random() < 0.4 ? randomBetween(12_000, 90_000) : randomBetween(1_500, 8_000);
+        rawEventsBatch.push(...pageActivity(ctx, sessionStartTime, page.path, page.title, readMs));
 
         // 30% sample of web vitals
         if (Math.random() < 0.35) {
@@ -375,7 +488,7 @@ async function seedSiteData(site: {
             url: `https://${site.domain}${path}`,
             path,
             title: pageConfig.title,
-            referrer: step === 0 ? src.referrer : `https://${site.domain}${journey[step - 1]}`,
+            referrer: src.referrer,
             campaign_source: src.source,
             campaign_medium: src.medium,
             campaign_name: src.name,
@@ -466,7 +579,7 @@ async function seedSiteData(site: {
               url: `https://${site.domain}/signup`,
               path: "/signup",
               title: "TrackMe | Create Your Free Account",
-              referrer: `https://${site.domain}/pricing`,
+              referrer: "",
               campaign_source: src.source,
               campaign_medium: src.medium,
               campaign_name: src.name,
@@ -501,7 +614,7 @@ async function seedSiteData(site: {
               url: `https://${site.domain}/pricing`,
               path: "/pricing",
               title: "TrackMe | Plans & Pricing",
-              referrer: src.referrer,
+              referrer: "",
               campaign_source: src.source,
               campaign_medium: src.medium,
               campaign_name: src.name,
@@ -535,7 +648,7 @@ async function seedSiteData(site: {
               url: `https://${site.domain}/contact`,
               path: "/contact",
               title: "TrackMe | Contact Sales & Enterprise",
-              referrer: src.referrer,
+              referrer: "",
               campaign_source: src.source,
               campaign_medium: src.medium,
               campaign_name: src.name,
@@ -569,7 +682,7 @@ async function seedSiteData(site: {
               url: `https://${site.domain}/`,
               path: "/",
               title: pageConfig.title,
-              referrer: src.referrer,
+              referrer: "",
               campaign_source: src.source,
               campaign_medium: src.medium,
               campaign_name: src.name,
@@ -588,8 +701,13 @@ async function seedSiteData(site: {
             });
           }
 
-          // Advance time by 25 to 75 seconds for next pageview in session
-          currentTime = new Date(currentTime.getTime() + randomBetween(25, 75) * 1000);
+          // Advance time by 25 to 75 seconds for next pageview in session, most of it spent on the page
+          const gapMs = randomBetween(25, 75) * 1000;
+          const last = step === journey.length - 1;
+          rawEventsBatch.push(
+            ...pageActivity(ctx, currentTime, path, pageConfig.title, last ? randomBetween(15_000, 120_000) : Math.round(gapMs * 0.85))
+          );
+          currentTime = new Date(currentTime.getTime() + gapMs);
         }
       }
     }
@@ -691,7 +809,7 @@ async function seedSiteData(site: {
   });
   console.log(`   ✓ Populated pageview_rollups_hourly`);
 
-  // Session engagement rollup
+  // Session engagement rollup (same definition as the scheduled job)
   await client.command({
     query: `
       INSERT INTO session_engagement_daily (
@@ -703,8 +821,8 @@ async function seedSiteData(site: {
         site_id,
         toDate(session_start) AS date,
         count() AS sessions,
-        countIf(pageview_count = 1) AS bounced_sessions,
-        sum(duration_seconds) AS total_duration_seconds,
+        countIf(NOT ${SESSION_ENGAGED_SQL}) AS bounced_sessions,
+        sum(${SESSION_DURATION_SQL}) AS total_duration_seconds,
         sum(pageview_count) AS pageviews
       FROM (
         SELECT
@@ -712,8 +830,7 @@ async function seedSiteData(site: {
           site_id,
           session_id,
           min(timestamp) AS session_start,
-          dateDiff('second', min(timestamp), max(timestamp)) AS duration_seconds,
-          countIf(type = 'pageview') AS pageview_count
+          ${SESSION_ENGAGEMENT_COLUMNS}
         FROM events_raw
         WHERE workspace_id = '${site.workspaceId}'
           AND site_id = '${site.id}'
@@ -750,11 +867,29 @@ async function seedSiteData(site: {
   });
   console.log(`   ✓ Populated event_rollups_daily`);
 
+  await client.command({
+    query: `
+      INSERT INTO daily_uniques (workspace_id, site_id, date, visitors_state, sessions_state)
+      SELECT
+        workspace_id,
+        site_id,
+        toDate(timestamp) AS date,
+        uniqCombined64State(visitor_pseudonym) AS visitors_state,
+        uniqCombined64State(session_id) AS sessions_state
+      FROM events_raw
+      WHERE workspace_id = '${site.workspaceId}'
+        AND site_id = '${site.id}'
+        AND bot_status = 'human'
+      GROUP BY workspace_id, site_id, date
+    `,
+  });
+  console.log(`   ✓ Populated daily_uniques`);
+
   // 6. Seed Redis with active realtime sessions
-  seedRedisRealtime(site.id);
+  await seedRedisRealtime(site.id);
 }
 
-function seedRedisRealtime(siteId: string) {
+async function seedRedisRealtime(siteId: string) {
   const activeCount = 18;
   const nowSec = Math.floor(Date.now() / 1000);
   const ttlSec = 1800; // 30 minutes
@@ -771,37 +906,36 @@ function seedRedisRealtime(siteId: string) {
 
   const activeCountries = ["US", "DE", "GB", "IN", "CA", "FR", "NL"];
 
+  // ioredis is installed in the event-worker package, not at the repo root.
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const requireFromWorker = createRequire(path.join(here, "../services/event-worker/package.json"));
+  const Redis = requireFromWorker("ioredis");
+  const redis = new Redis(process.env.REDIS_STATE_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379", {
+    maxRetriesPerRequest: 2,
+    connectTimeout: 10_000,
+  });
+
   try {
     // Clear previous realtime index for site
-    execSync(`docker exec growth_redis redis-cli -a redis_dev_secret del rt:active:${siteId}`, { stdio: "ignore" });
+    await redis.del(`rt:active:${siteId}`);
 
     for (let i = 0; i < activeCount; i++) {
       const sessionId = `rt_sess_${crypto.randomBytes(6).toString("hex")}`;
-      const path = randomChoice(activePages);
-      const country = randomChoice(activeCountries);
       const payload = JSON.stringify({
-        path,
+        path: randomChoice(activePages),
         timestamp: new Date().toISOString(),
-        country,
+        country: randomChoice(activeCountries),
         device: randomChoice(["desktop", "desktop", "mobile"]),
       });
-
-      // ZADD rt:active:{siteId} {expiry} {sessionId}
-      execSync(
-        `docker exec growth_redis redis-cli -a redis_dev_secret zadd rt:active:${siteId} ${expiry} ${sessionId}`,
-        { stdio: "ignore" }
-      );
-
-      // SET active:{siteId}:{sessionId} {payload} EX 1800
-      execSync(
-        `docker exec growth_redis redis-cli -a redis_dev_secret set active:${siteId}:${sessionId} '${payload}' EX ${ttlSec}`,
-        { stdio: "ignore" }
-      );
+      await redis.zadd(`rt:active:${siteId}`, expiry, sessionId);
+      await redis.set(`active:${siteId}:${sessionId}`, payload, "EX", ttlSec);
     }
 
     console.log(`   ✓ Seeded ${activeCount} active realtime sessions in Redis`);
   } catch (err: any) {
     console.warn(`   ⚠️ Warning: Could not seed Redis realtime: ${err.message}`);
+  } finally {
+    redis.disconnect();
   }
 }
 
@@ -816,10 +950,16 @@ async function main() {
       domain: sites.domain,
       publicKey: sites.publicKey,
     })
-    .from(sites);
+    .from(sites)
+    // SEED_SITE_KEY=site_pub_... limits seeding to one site; without it every site is seeded.
+    .where(process.env.SEED_SITE_KEY ? eq(sites.publicKey, process.env.SEED_SITE_KEY) : undefined);
 
   if (allSites.length === 0) {
-    console.error("❌ No sites found in PostgreSQL database. Run pnpm seed:demo first.");
+    console.error(
+      process.env.SEED_SITE_KEY
+        ? `❌ No site with public key ${process.env.SEED_SITE_KEY}.`
+        : "❌ No sites found in PostgreSQL database. Run pnpm seed:demo first."
+    );
     process.exit(1);
   }
 

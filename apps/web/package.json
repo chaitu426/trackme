@@ -8,9 +8,12 @@
     "build": "node scripts/copy-tracker-assets.mjs && next build",
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "@trackme/analytics": "workspace:*",
     "@trackme/authz": "workspace:*",
     "@trackme/config": "workspace:*",
@@ -20,12 +23,16 @@
     "clsx": "^2.1.1",
     "ioredis": "^5.6.0",
     "lucide-react": "^1.47.0",
+    "motion": "^14.3.0",
     "next": "^15.2.1",
     "nodemailer": "^10.0.14",
+    "prom-client": "^15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-simple-maps": "^5.0.5",
     "tailwind-merge": "^3.0.2",
+    "three": "^0.186.1",
+    "three-globe": "^2.45.6",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -35,6 +42,7 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@types/react-simple-maps": "^3.0.6",
+    "@types/three": "^0.186.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",

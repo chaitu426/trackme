@@ -4,35 +4,39 @@
 
 @layer base {
   :root {
-    /* Linear / Vercel premium dark */
-    --background: #09090b;
+    /* One graphite ramp: the chrome stays neutral so the data carries the colour. */
+    --sidebar: #0f0f10;
+    --background: #141415;
     --foreground: #ededed;
 
-    --card: #0c0c0e;
-    --card-foreground: #fafafa;
+    --card: #19191b;
+    --card-foreground: #ededed;
+    --raised: #232325;
 
-    --border: rgba(255, 255, 255, 0.08);
-    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border: rgba(237, 237, 237, 0.08);
+    --border-subtle: rgba(237, 237, 237, 0.05);
 
     --primary: #fafafa;
-    --primary-foreground: #09090b;
+    --primary-foreground: #0a0a0a;
 
     --muted: #18181b;
     --muted-foreground: #a1a1aa;
 
-    --accent: #3b82f6;
-    --accent-foreground: #eff6ff;
+    --accent: #ededed;
+    --accent-foreground: #f7f7f7;
 
     --success: #22c55e;
     --warning: #eab308;
     --danger: #ef4444;
 
-    --chart: #3b82f6;
+    --chart: #ededed;
     --chart-muted: #3f3f46;
     --sparkline: #22c55e;
 
-    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    --font-sans: var(--font-geist), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: var(--font-geist-mono), "Geist Mono", "SF Mono", Consolas, monospace;
+
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
     --radius: 8px;
     --radius-sm: 6px;
@@ -48,7 +52,7 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.011em;
+    font-feature-settings: "cv11", "ss01";
     color-scheme: dark;
   }
 
@@ -60,7 +64,7 @@
   }
 
   ::selection {
-    background-color: rgba(59, 130, 246, 0.35);
+    background-color: rgba(237,237,237,0.35);
     color: #fafafa;
   }
 
@@ -80,13 +84,38 @@
   }
 
   :focus-visible {
-    outline: 2px solid rgba(59, 130, 246, 0.7);
+    outline: 2px solid rgba(237,237,237,0.7);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
+  }
+
+  /* One icon weight across the app; lucide draws at 2 by default. */
+  svg.lucide {
+    stroke-width: 1.5;
   }
 }
 
 @layer utilities {
+  /* Film grain for coloured bars and lines: the same texture as the journey flow ribbons.
+     Sits on top of the element's own colour and is clipped to its shape. */
+  .grain {
+    isolation: isolate;
+  }
+  .grain:not(.absolute):not(.fixed):not(.sticky) {
+    position: relative;
+  }
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0.55;
+    mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='1.15' intercept='-0.07'/%3E%3CfeFuncG type='linear' slope='1.15' intercept='-0.07'/%3E%3CfeFuncB type='linear' slope='1.15' intercept='-0.07'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+  }
+
   .surface-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -113,11 +142,11 @@
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.15s var(--ease);
   }
 
   .metric-card:hover {
-    border-color: rgba(255, 255, 255, 0.11);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .pulse-live {
@@ -175,8 +204,47 @@
     animation: slideDown 0.15s ease both;
   }
 
-  /* Premium glow on stat card hover */
-  .metric-card-glow:hover {
-    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15), 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* Skeleton loading: one shared shimmer so every placeholder pulses in sync. */
+@layer components {
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
   }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+    animation: skeletonShimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes skeletonShimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton::after {
+      animation: none;
+    }
+  }
+}
+
+/* Content swapping in behind a skeleton fades rather than pops. */
+@keyframes contentReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.reveal {
+  animation: contentReveal 0.25s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none; }
 }

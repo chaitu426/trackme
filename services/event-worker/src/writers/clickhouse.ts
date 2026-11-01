@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { EnrichedEvent } from "@trackme/contracts";
 import { DataError } from "../errors.js";
 
@@ -47,6 +48,66 @@ export interface WriterOptions {
    */
   asyncInsert: boolean;
   flushIntervalMs: number;
+  /**
+   * Where events go (WORKER_WRITE_V2). `off`: legacy tables only. `shadow`: legacy
+   * tables stay authoritative and events_ingest (-> events_v2 and the aggregates) is
+   * written too; a v2 failure is reported through onV2Error and does not fail the
+   * batch. `only`: events_ingest alone, and a failure fails the batch.
+   */
+  writeMode?: "off" | "shadow" | "only";
+  onV2Error?: (error: unknown) => void;
+}
+
+/**
+ * Settings for events_ingest inserts. Synchronous (the batches are already large), with
+ * a token derived from the batch's event ids so redelivering the same batch is a no-op,
+ * including in the materialized views that feed the aggregates.
+ */
+export function v2InsertSettings(events: EnrichedEvent[]): Settings {
+  const token = createHash("sha1")
+    .update(events.map((e) => e.eventId).join(","))
+    .digest("hex");
+  return {
+    insert_deduplication_token: token,
+    deduplicate_blocks_in_dependent_materialized_views: 1,
+  };
+}
+
+/** One events_ingest row. Hashing and derived columns happen in the materialized view. */
+export function toIngestRow(e: EnrichedEvent) {
+  return {
+    event_id: e.eventId,
+    schema_version: 2,
+    workspace_id: e.workspaceId,
+    site_id: e.siteId,
+    site_key: e.siteKey,
+    timestamp: toClickHouseDateTime64(e.occurredAt),
+    received_at: toClickHouseDateTime64(e.receivedAt),
+    type: e.type,
+    event_name: e.type === "custom" && e.properties?.eventName ? String(e.properties.eventName) : e.type,
+    session_id: e.sessionId,
+    visitor_pseudonym: e.visitorPseudonym,
+    url: e.url,
+    path: e.path,
+    title: e.title || "",
+    referrer: e.referrer || "",
+    campaign_source: e.campaign?.source || "",
+    campaign_medium: e.campaign?.medium || "",
+    campaign_name: e.campaign?.campaign || "",
+    campaign_term: e.campaign?.term || "",
+    campaign_content: e.campaign?.content || "",
+    country: e.country && e.country.length === 2 ? e.country.toUpperCase() : "",
+    city: e.city || "",
+    browser: e.browser || "",
+    os: e.os || "",
+    device: e.device || "desktop",
+    bot_status: e.botStatus || "human",
+    vital_name: e.webVital?.name ?? "",
+    vital_value: e.webVital?.value ?? 0,
+    vital_rating: e.webVital?.rating ?? "",
+    vital_nav_type: e.webVital?.navigationType ?? "",
+    properties_json: e.properties ? JSON.stringify(e.properties) : "{}",
+  };
 }
 
 export function insertSettings(options: Pick<WriterOptions, "asyncInsert" | "flushIntervalMs">): Settings | undefined {
@@ -68,8 +129,20 @@ export function createClickHouseWriter(options: WriterOptions): (events: Enriche
   const clickhouse_settings = insertSettings(options);
   const withSettings = clickhouse_settings ? { clickhouse_settings } : {};
 
+  const mode = options.writeMode ?? "off";
+
   return async (events) => {
     if (events.length === 0) return;
+
+    if (mode === "only") {
+      await client.insert({
+        table: "events_ingest",
+        values: events.map(toIngestRow),
+        format: "JSONEachRow",
+        clickhouse_settings: v2InsertSettings(events),
+      });
+      return;
+    }
 
     const rawRows = events.map((e) => ({
       event_id: e.eventId,
@@ -130,6 +203,21 @@ export function createClickHouseWriter(options: WriterOptions): (events: Enriche
         format: "JSONEachRow",
         ...withSettings,
       });
+    }
+
+    if (mode === "shadow") {
+      try {
+        await client.insert({
+          table: "events_ingest",
+          values: events.map(toIngestRow),
+          format: "JSONEachRow",
+          clickhouse_settings: v2InsertSettings(events),
+        });
+      } catch (error) {
+        // Legacy is authoritative during the shadow phase; v2 gaps are found by the
+        // per-hour count comparison and fixed by the backfill.
+        options.onV2Error?.(error);
+      }
     }
   };
 }

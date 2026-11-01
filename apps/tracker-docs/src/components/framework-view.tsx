@@ -60,11 +60,11 @@ export async function FrameworkView({ framework }: { framework: Framework }) {
 
   return (
     <>
-      <div className="not-prose my-5 overflow-hidden rounded-xl border border-white/[0.08]">
-        <dl className="divide-y divide-white/[0.06]">
+      <div className="not-prose my-6 overflow-hidden rounded-xl border border-white/[0.1] bg-[#19191b]">
+        <dl className="divide-y divide-white/[0.08]">
           {facts.map(([label, value]) => (
             <div key={label} className="grid gap-1 px-4 py-3 sm:grid-cols-[9rem_1fr] sm:gap-4">
-              <dt className="text-[11px] font-medium uppercase tracking-[0.1em] text-zinc-500">{label}</dt>
+              <dt className="font-mono text-xs text-zinc-500">{label}</dt>
               <dd className="text-[13.5px] leading-relaxed text-zinc-300">
                 <Inline text={value} />
               </dd>

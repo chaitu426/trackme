@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Menu, Shield, ChevronRight } from "lucide-react";
+import { Menu, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
@@ -61,14 +61,33 @@ export function DashboardShell({
       ? requestedSiteDomain
       : primarySiteDomain;
 
+  const PAGE_LABELS: Record<string, string> = {
+    overview: "Overview",
+    realtime: "Realtime",
+    people: "User Profiles",
+    journeys: "User Journeys",
+    funnels: "Funnels",
+    acquisition: "Acquisition",
+    geography: "Audience Geography",
+    events: "Goals & Events",
+    vitals: "Web Vitals",
+    pages: "Page Performance",
+  };
+  const segments = pathname.split("/").filter(Boolean);
+  const pageLabel = (() => {
+    if (segments[1] === "settings") return segments[2] === "sites" ? "Websites" : "Organization & Team";
+    if (segments[1] === "sites") return segments[3] === "settings" ? "Site Settings" : PAGE_LABELS[segments[3] ?? ""];
+    return PAGE_LABELS[segments[1] ?? ""];
+  })();
+
   return (
     <div className="dashboard-shell relative flex min-h-screen flex-col bg-background antialiased">
       <Sidebar
         workspace={workspace}
-        workspaces={workspaces}
         sites={sites}
         primarySiteDomain={activeSiteDomain}
         user={user}
+        role={currentWorkspace.role}
         collapsed={collapsed}
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}
@@ -81,7 +100,7 @@ export function DashboardShell({
           ${collapsed ? "lg:ml-16" : "lg:ml-60"}
         `}
       >
-        <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-white/[0.06] bg-background/80 px-4 backdrop-blur-xl sm:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-start border-b border-border bg-background px-4 sm:px-6">
           <div className="flex items-center space-x-3">
             <button
               type="button"
@@ -92,31 +111,26 @@ export function DashboardShell({
               <Menu className="h-4 w-4" />
             </button>
 
-            <div className="flex min-w-0 items-center gap-1.5 text-xs text-zinc-500">
+            <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-500">
               <OrganizationSwitcher current={currentWorkspace} workspaces={workspaces} />
               {activeSiteDomain && (
                 <>
-                  <ChevronRight className="h-3 w-3 shrink-0 text-zinc-700" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-zinc-700" />
                   <SiteSwitcher workspaceId={workspace.id} workspaceSlug={workspace.slug} currentDomain={activeSiteDomain} sites={sites} />
+                </>
+              )}
+              {pageLabel && (
+                <>
+                  <ChevronRight className="hidden h-3 w-3 shrink-0 text-zinc-700 sm:block" />
+                  <span className="hidden truncate text-zinc-300 sm:inline">{pageLabel}</span>
                 </>
               )}
             </div>
           </div>
 
-          <div className="flex items-center space-x-2.5">
-            <div className="flex items-center gap-1.5 rounded-md border border-emerald-500/15 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400">
-              <Shield className="h-3 w-3" strokeWidth={2.4} />
-              <span className="hidden sm:inline">Cookieless · Privacy-safe</span>
-              <span className="sm:hidden">Private</span>
-            </div>
-
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold text-zinc-200">
-              {user.email ? user.email.slice(0, 2).toUpperCase() : "TM"}
-            </div>
-          </div>
         </header>
 
-        <main className="relative z-10 mx-auto flex w-full max-w-[1400px] flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+        <main className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
       </div>

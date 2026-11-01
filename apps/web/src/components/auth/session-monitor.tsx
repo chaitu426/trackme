@@ -61,26 +61,26 @@ export function SessionMonitor() {
         <Clock className="w-4 h-4" />
       </div>
       <div className="flex-1 text-xs">
-        <p className="font-semibold text-zinc-900 dark:text-zinc-100">Session Expiring Soon</p>
+        <p className="font-medium text-zinc-900 dark:text-zinc-100">Session Expiring Soon</p>
         <p className="text-zinc-600 dark:text-zinc-400 mt-0.5">
           Your secure session will expire in{" "}
-          <span className="font-bold text-amber-600 dark:text-amber-400">
+          <span className="font-medium text-amber-600 dark:text-amber-400">
             {remainingMinutes <= 1 ? "less than a minute" : `${remainingMinutes} minutes`}
           </span>
           .
         </p>
-        <div className="flex items-center gap-2 mt-2.5">
+        <div className="flex items-center gap-2 mt-3">
           <button
             onClick={handleRefreshSession}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium text-[11px] hover:opacity-90 transition"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium text-xs hover:opacity-90 transition"
           >
             <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
             Extend Session
           </button>
           <button
             onClick={() => setWarningDismissed(true)}
-            className="px-2 py-1.5 text-[11px] text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition"
+            className="px-2 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition"
           >
             Dismiss
           </button>

@@ -51,6 +51,13 @@ const EnvironmentSchema = z.object({
   CLICKHOUSE_USER: z.string().default("default"),
   CLICKHOUSE_PASSWORD: z.string().default(DEV_DEFAULTS.CLICKHOUSE_PASSWORD),
   CLICKHOUSE_DB: z.string().default("growth_analytics"),
+  /**
+   * Read-only user for dashboard queries (settings profile with time, memory and
+   * rows-read limits). Required in production by the web app; development falls back
+   * to the main user. Workers never use it.
+   */
+  CLICKHOUSE_DASHBOARD_USER: z.string().optional(),
+  CLICKHOUSE_DASHBOARD_PASSWORD: z.string().optional(),
 
   // Redis (shared default for development; production should split by failure domain)
   REDIS_URL: z.string().default(DEV_DEFAULTS.REDIS_URL),
@@ -80,10 +87,40 @@ const EnvironmentSchema = z.object({
     .string()
     .transform((val) => val === "true" || val === "1")
     .default("true"),
+  /** Analytics read source: v1 (legacy tables), v2 (events_v2 + aggregates), shadow (run both, return v1, log differences). */
+  ANALYTICS_READ: z.enum(["v1", "v2", "shadow"]).default("v1"),
+  /** Event worker write target: off (legacy tables), shadow (legacy + events_ingest), only (events_ingest). */
+  WORKER_WRITE_V2: z.enum(["off", "shadow", "only"]).default("off"),
+  /**
+   * Fetch tuning. Defaults favour freshness: return as soon as any data is available (measured
+   * p50 event-to-dashboard notify 795 ms -> 498 ms vs. 1 MB / 500 ms). Under load batches still
+   * fill on their own; raise both to trade latency for larger ClickHouse blocks at low traffic.
+   */
+  WORKER_FETCH_MIN_BYTES: z.coerce.number().int().positive().default(2048),
+  WORKER_FETCH_MAX_WAIT_MS: z.coerce.number().int().positive().default(100),
+  WORKER_FETCH_MAX_BYTES_PER_PARTITION: z.coerce.number().int().positive().default(8_000_000),
+  /** Partitions processed in parallel by one worker. Replicas x this should not exceed partitions. */
+  WORKER_PARTITION_CONCURRENCY: z.coerce.number().int().positive().default(4),
+  /** Prometheus /metrics port for the scheduled worker; 0 disables it. */
+  SCHEDULER_METRICS_PORT: z.coerce.number().int().min(0).default(9465),
+  /** Prometheus /metrics port for the event worker; 0 disables it. */
+  WORKER_METRICS_PORT: z.coerce.number().int().min(0).default(9464),
   KAFKA_BROKERS: z.string().default("localhost:9092"),
   KAFKA_TOPIC: z.string().default("growth_events"),
   KAFKA_DLQ_TOPIC: z.string().default("growth_events_dlq"),
   KAFKA_CONSUMER_GROUP: z.string().default("event_worker_group"),
+  /** Managed Kafka (e.g. Aiven): TLS + SASL. All unset = the plaintext local broker. */
+  KAFKA_SSL: z
+    .string()
+    .transform((val) => val === "true" || val === "1")
+    .default("false"),
+  KAFKA_SASL_MECHANISM: z.enum(["plain", "scram-sha-256", "scram-sha-512"]).optional(),
+  KAFKA_SASL_USERNAME: z.string().optional(),
+  KAFKA_SASL_PASSWORD: z.string().optional(),
+  /** Path to the broker CA PEM. Omit to trust the system roots. */
+  KAFKA_CA_CERT_PATH: z.string().optional(),
+  /** Path to the ClickHouse server CA PEM, when the service uses a private CA. */
+  CLICKHOUSE_CA_CERT_PATH: z.string().optional(),
 
   // Geolocation & Privacy
   DERIVE_GEO_AT_EDGE: z
@@ -152,6 +189,16 @@ export function loadEnvironment(source: NodeJS.ProcessEnv): Environment {
     // Falling back would silently discard that value and run with known,
     // publicly-visible dev secrets instead.
     throw new Error("Invalid environment variables configuration. See errors above.");
+  }
+
+  // Outside production, role URLs not set explicitly follow REDIS_URL (as in the Go
+  // edge and getRedisURLForRole) rather than the localhost dev default. Production
+  // still requires each role to be set, so failure domains are split on purpose.
+  if (parsed.NODE_ENV !== "production" && source.REDIS_URL?.trim()) {
+    const roleVars = ["REDIS_RATELIMIT_URL", "REDIS_CACHE_URL", "REDIS_STATE_URL", "REDIS_COORD_URL"] as const;
+    for (const name of roleVars) {
+      if (!source[name]?.trim()) parsed[name] = parsed.REDIS_URL;
+    }
   }
 
   if (parsed.NODE_ENV === "production" && source.NEXT_PHASE !== "phase-production-build") {

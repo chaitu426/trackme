@@ -1,7 +1,10 @@
-import { getClickHouseClient } from "../client.js";
+import { readClient, variantAware, type ReadVariant } from "../read-mode.js";
+import { AnalyticsQueryError } from "../errors.js";
 
 export interface UserTimelineEvent {
   eventId: string;
+  /** Groups events into visits; the v2 read path maps this to session_hash. */
+  sessionId: string;
   timestamp: string;
   type: string;
   eventName: string;
@@ -17,17 +20,19 @@ export interface UserTimelineEvent {
   properties: Record<string, unknown>;
 }
 
-export async function getUserTimeline(params: {
+async function getUserTimelineImpl(params: {
   workspaceId: string;
   siteId: string;
   identifier: string; // distinctId or visitorPseudonym
   limit?: number;
-}): Promise<UserTimelineEvent[]> {
+},
+  variant: ReadVariant): Promise<UserTimelineEvent[]> {
   try {
-    const client = getClickHouseClient();
+    const client = readClient(variant);
     const query = `
       SELECT
         toString(event_id) AS event_id,
+        toString(session_id) AS session_id,
         formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%SZ') AS timestamp,
         type,
         event_name,
@@ -44,6 +49,7 @@ export async function getUserTimeline(params: {
       FROM events_raw
       WHERE workspace_id = {workspaceId:UUID}
         AND site_id = {siteId:UUID}
+        AND type != 'engagement'
         AND (
           visitor_pseudonym = {identifier:String}
           OR JSONExtractString(properties_json, 'distinctId') = {identifier:String}
@@ -65,6 +71,7 @@ export async function getUserTimeline(params: {
 
     const rows = await resultSet.json<{
       event_id: string;
+      session_id: string;
       timestamp: string;
       type: string;
       event_name: string;
@@ -89,6 +96,7 @@ export async function getUserTimeline(params: {
       }
       return {
         eventId: r.event_id,
+        sessionId: r.session_id,
         timestamp: r.timestamp,
         type: r.type,
         eventName: r.event_name,
@@ -105,7 +113,13 @@ export async function getUserTimeline(params: {
       };
     });
   } catch (err) {
-    console.error("⚠️ [UserTimeline] ClickHouse query failed:", err);
-    return [];
+    if (err instanceof AnalyticsQueryError) {
+      throw err;
+    }
+    throw new AnalyticsQueryError("ClickHouse user timeline query failed", { cause: err });
   }
 }
+
+export const getUserTimeline = variantAware("getUserTimeline", getUserTimelineImpl, {
+  normalize: (rows) => rows.map((r) => ({ ...r, country: r.country.trim() })),
+});

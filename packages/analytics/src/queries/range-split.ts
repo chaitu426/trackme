@@ -1,3 +1,5 @@
+import { AnalyticsRangeTooWideError } from "../errors.js";
+
 /**
  * Splits a rolling time range into whole UTC days and the two partial days at
  * its edges.
@@ -34,6 +36,19 @@ function startOfUtcDay(ms: number): number {
 
 function isoDate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** Longest range a query may scan over raw events instead of the aggregate tables. */
+export const RAW_SCAN_MAX_DAYS = 31;
+
+/**
+ * Throws AnalyticsRangeTooWideError when a query that must read raw events covers more
+ * than `maxDays`. Raising it here keeps an unbounded scan from reaching ClickHouse; the
+ * web layer maps the error to 422 RANGE_TOO_WIDE.
+ */
+export function assertRawScanRange(fromIso: string, toIso: string, maxDays = RAW_SCAN_MAX_DAYS): void {
+  const days = (new Date(toIso).getTime() - new Date(fromIso).getTime()) / 86_400_000;
+  if (days > maxDays) throw new AnalyticsRangeTooWideError(maxDays);
 }
 
 export function splitRange(fromIso: string, toIso: string): RangeSplit {

@@ -10,16 +10,16 @@ export function Badge({
   className?: string;
 }) {
   const variantStyles: Record<string, string> = {
-    default: "border border-white/10 bg-white/[0.04] text-zinc-300",
-    success: "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-    warning: "border border-amber-500/20 bg-amber-500/10 text-amber-400",
-    outline: "border border-white/10 bg-transparent text-zinc-400",
-    live: "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 font-mono",
+    default: "border border-border bg-white/[0.04] text-zinc-300",
+    success: "border border-border bg-white/[0.04] text-[#4cc38a]",
+    warning: "border border-border bg-white/[0.04] text-amber-400",
+    outline: "border border-border bg-transparent text-zinc-400",
+    live: "border border-border bg-white/[0.04] font-mono text-zinc-200",
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${variantStyles[variant] ?? variantStyles.default} ${className}`}
+      className={`inline-flex items-center gap-2 rounded-md px-2 py-0.5 text-xs font-normal ${variantStyles[variant] ?? variantStyles.default} ${className}`}
     >
       {children}
     </span>

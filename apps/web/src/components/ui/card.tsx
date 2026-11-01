@@ -9,12 +9,7 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <div
-      className={cn(
-        "relative rounded-xl border border-white/[0.08] bg-[#0c0d12]/90 backdrop-blur-md shadow-sm transition-all duration-200 hover:border-white/[0.13] p-4 sm:p-5 text-left",
-        className
-      )}
-    >
+    <div className={cn("relative rounded-xl border border-border bg-card p-5 text-left", className)}>
       {children}
     </div>
   );
@@ -28,7 +23,7 @@ export function CardHeader({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("flex flex-col space-y-1 text-left items-start pb-3.5", className)}>
+    <div className={cn("flex flex-col items-start space-y-1 pb-4 text-left", className)}>
       {children}
     </div>
   );
@@ -42,12 +37,7 @@ export function CardTitle({
   children: ReactNode;
 }) {
   return (
-    <h3
-      className={cn(
-        "text-[13px] sm:text-sm font-semibold tracking-[-0.01em] text-zinc-100 flex items-center gap-2 text-left",
-        className
-      )}
-    >
+    <h3 className={cn("flex items-center gap-2 text-left text-sm font-medium text-zinc-100", className)}>
       {children}
     </h3>
   );
@@ -60,11 +50,7 @@ export function CardDescription({
   className?: string;
   children: ReactNode;
 }) {
-  return (
-    <p className={cn("text-[11px] sm:text-xs text-zinc-400 font-normal leading-relaxed text-left", className)}>
-      {children}
-    </p>
-  );
+  return <p className={cn("text-left text-xs leading-4 text-zinc-400", className)}>{children}</p>;
 }
 
 export function CardContent({
@@ -85,7 +71,7 @@ export function CardFooter({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("flex items-center pt-3 border-t border-white/[0.06] text-left", className)}>
+    <div className={cn("flex items-center border-t border-border pt-4 text-left", className)}>
       {children}
     </div>
   );

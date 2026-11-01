@@ -13,17 +13,15 @@ export default async function WorkspaceLayout({
   const user = await requireUser();
   const { workspace: slug } = await params;
 
-  let workspace: Awaited<ReturnType<typeof requireWorkspaceBySlug>>;
-  try {
-    workspace = await requireWorkspaceBySlug(user.id, slug);
-  } catch {
-    notFound();
-  }
-
-  const [siteList, userWorkspaces] = await Promise.all([
-    listWorkspaceSites(workspace.id),
+  // The user's workspace list does not depend on the workspace lookup, so fetch both at once.
+  // A failed lookup becomes null here (rather than a rejection nobody awaits) and 404s below.
+  const [found, userWorkspaces] = await Promise.all([
+    requireWorkspaceBySlug(user.id, slug).catch(() => null),
     listUserWorkspaces(user.id),
   ]);
+  if (!found) notFound();
+  const workspace = found;
+  const siteList = await listWorkspaceSites(workspace.id);
   const primarySite = siteList[0];
   const primarySiteDomain = primarySite?.domain ?? "";
 

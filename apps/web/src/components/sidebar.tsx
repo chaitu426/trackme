@@ -11,7 +11,6 @@ import {
   Gauge,
   Radio,
   Settings2,
-  ShieldCheck,
   LogOut,
   BookOpen,
   PanelLeftClose,
@@ -22,16 +21,15 @@ import {
   Globe,
   UserCheck,
   Filter,
+  Waypoints,
+  FileText,
 } from "lucide-react";
-import { OrganizationSwitcher } from "@/components/organization-switcher";
-import { SiteSwitcher } from "@/components/site-switcher";
-
 interface SidebarProps {
   workspace: { id: string; name: string; slug: string };
-  workspaces: { id: string; name: string; slug: string; role: string }[];
   sites: { id: string; domain: string; displayName: string }[];
   primarySiteDomain: string;
   user: { id: string; email: string };
+  role: string;
   mobileOpen: boolean;
   onMobileClose: () => void;
   collapsed: boolean;
@@ -40,10 +38,10 @@ interface SidebarProps {
 
 export function Sidebar({
   workspace,
-  workspaces,
   sites,
   primarySiteDomain,
   user,
+  role,
   mobileOpen,
   onMobileClose,
   collapsed,
@@ -79,7 +77,9 @@ export function Sidebar({
         { href: `/${workspace.slug}/overview`, label: "Overview", icon: BarChart2, exact: true },
         { href: `/${workspace.slug}/sites/${primarySiteDomain}/realtime`, label: "Realtime", icon: Radio, badge: "live" },
         { href: `/${workspace.slug}/sites/${primarySiteDomain}/people`, label: "User Profiles", icon: UserCheck, badge: "new" },
+        { href: `/${workspace.slug}/sites/${primarySiteDomain}/journeys`, label: "User Journeys", icon: Waypoints, badge: "new" },
         { href: `/${workspace.slug}/sites/${primarySiteDomain}/funnels`, label: "Funnels", icon: Filter, badge: "new" },
+        { href: `/${workspace.slug}/sites/${primarySiteDomain}/pages`, label: "Page Performance", icon: FileText },
         { href: `/${workspace.slug}/sites/${primarySiteDomain}/acquisition`, label: "Acquisition", icon: TrendingUp },
         { href: `/${workspace.slug}/sites/${primarySiteDomain}/geography`, label: "Audience Geography", icon: MapPinned },
         { href: `/${workspace.slug}/sites/${primarySiteDomain}/events`, label: "Goals & Events", icon: Target },
@@ -91,12 +91,19 @@ export function Sidebar({
       items: [
         { href: `/${workspace.slug}/settings`, label: "Organization & Team", icon: Users },
         { href: `/${workspace.slug}/settings/sites`, label: `Websites (${sites.length})`, icon: Globe },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/settings`, label: "Site & Snippet", icon: Settings2 },
-        { href: "/legal/dpa", label: "Compliance & DPA", icon: ShieldCheck },
+        { href: `/${workspace.slug}/sites/${primarySiteDomain}/settings`, label: "Site Settings", icon: Settings2 },
         { href: "/legal/privacy", label: "Privacy Policy", icon: BookOpen },
       ],
     },
   ];
+
+  // An item is active when the path is its href or a child of it, and no other nav item
+  // matches more specifically (so /settings does not light up on /settings/sites).
+  const allHrefs = navGroups.flatMap((group) => group.items.map((item) => item.href));
+  const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const activeHref = allHrefs.filter(matches).sort((a, b) => b.length - a.length)[0];
+
+  const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -105,27 +112,20 @@ export function Sidebar({
 
   const userInitials = user.email ? user.email.slice(0, 2).toUpperCase() : "TM";
 
-  const sidebarContent = (
-    <div className="flex h-full flex-col justify-between overflow-hidden border-r border-white/[0.06] bg-background">
+  const renderContent = (collapsed: boolean) => (
+    <div className="flex h-full flex-col justify-between overflow-hidden border-r border-border bg-sidebar">
       <div>
-        <div className={`flex items-center justify-between border-b border-white/[0.06] p-3 ${collapsed ? "flex-col gap-2" : ""}`}>
-          <div className="flex min-w-0 items-center space-x-2.5 overflow-hidden">
+        <div className={`flex h-14 items-center justify-between border-b border-border px-3 ${collapsed ? "h-auto flex-col gap-2 py-3" : ""}`}>
+          <div className="flex min-w-0 items-center space-x-3 overflow-hidden">
             <Link
               href={`/${workspace.slug}/overview`}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition hover:bg-white"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white"
             >
-              <Activity className="h-3.5 w-3.5" strokeWidth={2.5} />
+              <Activity className="h-4 w-4" />
             </Link>
             {!collapsed && (
               <div className="flex min-w-0 flex-col">
-                <span className="text-[13px] font-semibold tracking-tight text-zinc-100">TrackMe</span>
-                <OrganizationSwitcher
-                  current={{
-                    ...workspace,
-                    role: workspaces.find((item) => item.id === workspace.id)?.role ?? "member",
-                  }}
-                  workspaces={workspaces}
-                />
+                <span className="text-base font-medium leading-none text-zinc-100">TrackMe</span>
               </div>
             )}
           </div>
@@ -140,31 +140,17 @@ export function Sidebar({
           </button>
         </div>
 
-        {!collapsed && primarySiteDomain && (
-          <div className="px-3 pb-1 pt-3">
-            <div className="flex items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.02] px-1 py-0.5 text-xs text-zinc-300">
-              <SiteSwitcher
-                workspaceId={workspace.id}
-                workspaceSlug={workspace.slug}
-                currentDomain={primarySiteDomain}
-                sites={sites}
-              />
-              <span className="mr-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 pulse-live" />
-            </div>
-          </div>
-        )}
-
-        <div className="max-h-[calc(100vh-180px)] space-y-5 overflow-y-auto px-2 py-3">
+        <div className="max-h-[calc(100vh-180px)] space-y-6 overflow-y-auto px-2 py-4">
           {navGroups.map((group) => (
-            <div key={group.title} className="space-y-1">
+            <div key={group.title} className="space-y-2">
               {!collapsed && (
-                <div className="px-2.5 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
+                <div className="px-3 text-xs text-zinc-500">
                   {group.title}
                 </div>
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  const isActive = item.href === activeHref;
                   const Icon = item.icon;
 
                   return (
@@ -173,31 +159,25 @@ export function Sidebar({
                       href={item.href}
                       title={collapsed ? item.label : undefined}
                       className={`
-                        group relative flex items-center rounded-md text-[13px] font-medium transition duration-150
-                        ${collapsed ? "mx-auto h-9 w-9 justify-center" : "space-x-2.5 px-2.5 py-1.5"}
+                        group relative flex items-center rounded-lg text-sm transition-colors duration-150
+                        ${collapsed ? "mx-auto h-8 w-8 justify-center" : "h-8 gap-3 px-3"}
                         ${
                           isActive
-                            ? "bg-white/[0.08] text-zinc-50"
-                            : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"
+                            ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                            : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
                         }
                       `}
                     >
-                      <Icon
-                        className={`h-4 w-4 shrink-0 ${isActive ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"}`}
-                        strokeWidth={isActive ? 2.25 : 2}
-                      />
+                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"}`} />
 
                       {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
 
                       {!collapsed && item.badge === "live" && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-emerald-400">
-                          <span className="h-1 w-1 rounded-full bg-emerald-400 pulse-live" />
-                          Live
-                        </span>
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" aria-label="Live" />
                       )}
 
                       {collapsed && (
-                        <div className="absolute left-full z-50 ml-2 hidden whitespace-nowrap rounded-md border border-white/10 bg-zinc-900 px-2 py-1 text-[11px] font-medium text-zinc-100 shadow-float group-hover:block">
+                        <div className="absolute left-full z-50 ml-2 hidden whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-xs text-zinc-100 shadow-float group-hover:block">
                           {item.label}
                         </div>
                       )}
@@ -210,16 +190,16 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="relative border-t border-white/[0.06] p-2" ref={profileMenuRef}>
+      <div className="relative border-t border-border p-2" ref={profileMenuRef}>
         {profileOpen && (
           <div
-            className={`absolute bottom-full z-50 mb-2 rounded-lg border border-white/10 bg-zinc-950 p-1.5 shadow-float ${collapsed ? "left-2 w-56" : "left-2 right-2"}`}
+            className={`absolute bottom-full z-50 mb-2 rounded-xl border border-border bg-card p-2 shadow-float ${collapsed ? "left-2 w-56" : "left-2 right-2"}`}
           >
-            <div className="border-b border-white/[0.06] px-2.5 py-2">
+            <div className="border-b border-white/[0.06] px-3 py-2">
               <p className="truncate text-xs font-medium text-zinc-100">{user.email}</p>
-              <div className="mt-1 flex items-center space-x-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                <span className="font-mono text-[10px] text-zinc-500">{workspace.slug} · Owner</span>
+              <div className="mt-1 flex items-center space-x-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a]" />
+                <span className="font-mono text-xs text-zinc-500">{workspace.slug} · {roleLabel}</span>
               </div>
             </div>
 
@@ -227,17 +207,17 @@ export function Sidebar({
               <Link
                 href={`/${workspace.slug}/sites/${primarySiteDomain}/settings`}
                 onClick={() => setProfileOpen(false)}
-                className="flex items-center space-x-2 rounded-md px-2.5 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
+                className="flex items-center space-x-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               >
-                <Settings2 className="h-3.5 w-3.5" />
+                <Settings2 className="h-4 w-4" />
                 <span>Workspace Settings</span>
               </Link>
               <Link
                 href="/onboarding"
                 onClick={() => setProfileOpen(false)}
-                className="flex items-center space-x-2 rounded-md px-2.5 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
+                className="flex items-center space-x-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
                 <span>Create New Workspace</span>
               </Link>
             </div>
@@ -246,9 +226,9 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex w-full items-center space-x-2 rounded-md px-2.5 py-2 text-xs font-medium text-rose-400 transition hover:bg-rose-500/10"
+                className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-xs font-medium text-[#e5484d] transition hover:bg-[#e5484d]/10"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <LogOut className="h-4 w-4" />
                 <span>Sign Out</span>
               </button>
             </div>
@@ -258,15 +238,15 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => setProfileOpen(!profileOpen)}
-          className={`flex w-full items-center rounded-md p-1.5 text-left transition hover:bg-white/[0.04] ${collapsed ? "justify-center" : "space-x-2.5"} ${profileOpen ? "bg-white/[0.06]" : ""}`}
+          className={`flex w-full items-center rounded-md p-2 text-left transition hover:bg-white/[0.04] ${collapsed ? "justify-center" : "space-x-3"} ${profileOpen ? "bg-white/[0.06]" : ""}`}
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold text-zinc-200">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-200">
             {userInitials}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-zinc-200">{user.email}</p>
-              <p className="truncate text-[10px] text-zinc-500">Workspace Owner</p>
+              <p className="truncate text-xs text-zinc-500">Workspace {roleLabel}</p>
             </div>
           )}
         </button>
@@ -279,14 +259,14 @@ export function Sidebar({
       <aside
         className={`hidden lg:block fixed inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out ${collapsed ? "w-16" : "w-60"}`}
       >
-        {sidebarContent}
+        {renderContent(collapsed)}
       </aside>
 
       {mobileOpen && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onMobileClose} />
           <div className="relative h-full w-72 max-w-[85vw] border-r border-white/[0.06] bg-background shadow-float">
-            {sidebarContent}
+            {renderContent(false)}
           </div>
         </div>
       )}

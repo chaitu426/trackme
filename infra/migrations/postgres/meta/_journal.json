@@ -15,6 +15,20 @@
       "when": 1791113440113,
       "tag": "0001_goofy_wind_dancer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791800000000,
+      "tag": "0002_sessions_valid_after",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792000000000,
+      "tag": "0003_site_segments",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,12 @@ func New(rdb *redis.Client) *Checker {
 	return &Checker{rdb: rdb}
 }
 
+// PeriodKey is the Redis counter for a workspace's current month. Exported so the
+// combined admission script addresses the same counter.
+func PeriodKey(workspaceID string) string {
+	return periodKey(workspaceID)
+}
+
 func periodKey(workspaceID string) string {
 	period := time.Now().UTC().Format("2006-01")
 	return fmt.Sprintf("usage:%s:%s", workspaceID, period)

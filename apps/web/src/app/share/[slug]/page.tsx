@@ -1,118 +1,138 @@
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOverviewMetrics, getBreakdown } from "@trackme/analytics";
-import { StatsCard } from "@/components/ui/stats-card";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Activity, ArrowUpRight } from "lucide-react";
+import { GlyphField } from "@trackme/landing";
 import { getPublicSite } from "@/lib/tenancy";
-import { getActiveVisitorCount } from "@/lib/realtime";
-import { buildMetricRequest } from "@/lib/metrics";
-import { resolveDateRange } from "@/lib/date-range";
-import { formatNumber, formatPercent, formatDuration } from "@/lib/format";
+import { parseRangeKey } from "@/lib/date-range";
+import { PageHeader } from "@/components/ui/page-header";
+import { RangeSwitcher } from "@/components/range-switcher";
+import {
+  ChartCardSkeleton,
+  MapCardSkeleton,
+  RankingCardSkeleton,
+  Skeleton,
+  StatsGridSkeleton,
+} from "@/components/ui/skeleton";
+import {
+  OnlineNow,
+  ShareDevices,
+  ShareKpis,
+  ShareLocations,
+  ShareStrip,
+  ShareTopPages,
+  ShareTopSources,
+  ShareTraffic,
+} from "./sections";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const site = await getPublicSite(slug);
+  return {
+    title: site ? `${site.domain} · Public analytics` : "Public analytics",
+    description: site ? `Live, privacy-first traffic for ${site.domain}, shared read-only.` : undefined,
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function PublicShareDashboard({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ range?: string }>;
 }) {
   const { slug } = await params;
+  const { range: rawRange } = await searchParams;
   const site = await getPublicSite(slug);
-  if (!site) {
-    notFound();
-  }
+  if (!site) notFound();
+  const range = parseRangeKey(rawRange);
 
-  const { current } = resolveDateRange("30d");
-  const request = buildMetricRequest(site.workspaceId, site.id, current, { limit: 5 });
-
-  const [metrics, topPages, topReferrers, activeVisitors] = await Promise.all([
-    getOverviewMetrics(request),
-    getBreakdown(request, "path"),
-    getBreakdown(request, "referrer"),
-    getActiveVisitorCount(site.id),
-  ]);
+  const section = { workspaceId: site.workspaceId, siteId: site.id, range };
 
   return (
-    <div className="min-h-screen bg-[#090a0f] text-slate-100 p-6 md:p-12">
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Public Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-6 gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-              G
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-xl font-bold text-white">Public Analytics: {site.domain}</h1>
-                <Badge variant="outline">Read-Only</Badge>
-              </div>
-              <p className="text-xs text-slate-400">Powered by Growth Intelligence Platform (Privacy-First)</p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs text-emerald-400 font-semibold">
-              {formatNumber(activeVisitors)} Active {activeVisitors === 1 ? "Visitor" : "Visitors"}
+    <div className="min-h-screen bg-background text-zinc-100">
+      <div className="border-b border-white/[0.08] bg-background">
+        <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between px-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2 text-base font-medium leading-none text-zinc-50" aria-label="TrackMe home">
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-[#ededed] text-[#141415]">
+              <Activity className="h-4 w-4" />
             </span>
+            TrackMe
+          </Link>
+          <div className="flex items-center gap-4">
+            <span className="hidden font-mono text-xs text-zinc-500 sm:inline">Public · read-only</span>
+            <Link
+              href="/signup"
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/[0.12] bg-raised px-3 text-xs text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-white/[0.24]"
+            >
+              Get your own <ArrowUpRight className="h-4 w-4" />
+            </Link>
           </div>
-        </div>
-
-        {/* High-level KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatsCard title="Visitors (30d)" value={formatNumber(metrics.visitors)} />
-          <StatsCard title="Pageviews (30d)" value={formatNumber(metrics.pageviews)} />
-          <StatsCard title="Avg Duration" value={formatDuration(metrics.avgDurationSeconds)} />
-          <StatsCard title="Bounce Rate" value={formatPercent(metrics.bounceRatePercentage)} />
-        </div>
-
-        {/* Public Breakdown Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Content</CardTitle>
-            </CardHeader>
-            <div className="space-y-3">
-              {topPages.items.length === 0 ? (
-                <p className="text-xs text-slate-500">No pageviews recorded yet.</p>
-              ) : (
-                topPages.items.map((p) => (
-                  <div
-                    key={p.name}
-                    className="flex justify-between items-center py-1.5 border-b border-slate-800/60 text-xs font-mono"
-                  >
-                    <span className="text-slate-300">{p.name}</span>
-                    <span className="text-slate-200 font-sans font-semibold">
-                      {formatNumber(p.pageviews)} ({formatPercent(p.percentage)})
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Channels</CardTitle>
-            </CardHeader>
-            <div className="space-y-3">
-              {topReferrers.items.length === 0 ? (
-                <p className="text-xs text-slate-500">No referrer data recorded yet.</p>
-              ) : (
-                topReferrers.items.map((c) => (
-                  <div
-                    key={c.name}
-                    className="flex justify-between items-center py-1.5 border-b border-slate-800/60 text-xs"
-                  >
-                    <span className="text-slate-300">{c.name}</span>
-                    <span className="text-slate-200 font-semibold">
-                      {formatNumber(c.visitors)} ({formatPercent(c.percentage)})
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
         </div>
       </div>
+
+      <main className="mx-auto w-full max-w-[1200px] space-y-6 px-4 py-8 sm:px-6">
+        <PageHeader
+          title={site.domain}
+          art="ridge"
+          actions={
+            <>
+              <RangeSwitcher range={range} />
+              <Suspense fallback={<Skeleton className="h-8 w-28 rounded-lg" />}>
+                <OnlineNow siteId={site.id} />
+              </Suspense>
+            </>
+          }
+        >
+          Live traffic, shared read-only. Counted without cookies or stored IP addresses.
+        </PageHeader>
+
+        <Suspense key={`kpi:${range}`} fallback={<StatsGridSkeleton count={4} />}>
+          <ShareKpis {...section} />
+        </Suspense>
+
+        <Suspense key={`traffic:${range}`} fallback={<ChartCardSkeleton />}>
+          <ShareTraffic {...section} />
+        </Suspense>
+
+        <Suspense key={`strip:${range}`} fallback={<StatsGridSkeleton count={3} className="grid grid-cols-3 gap-4" />}>
+          <ShareStrip {...section} />
+        </Suspense>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Suspense key={`pages:${range}`} fallback={<RankingCardSkeleton />}>
+            <ShareTopPages {...section} />
+          </Suspense>
+          <Suspense key={`sources:${range}`} fallback={<RankingCardSkeleton />}>
+            <ShareTopSources {...section} />
+          </Suspense>
+        </div>
+
+        <Suspense key={`locations:${range}`} fallback={<MapCardSkeleton height={380} />}>
+          <ShareLocations {...section} />
+        </Suspense>
+
+        <Suspense key={`devices:${range}`} fallback={<RankingCardSkeleton rows={6} />}>
+          <ShareDevices {...section} />
+        </Suspense>
+      </main>
+
+      <footer className="relative mt-16 overflow-hidden border-t border-white/[0.1] bg-sidebar">
+        <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-4 pt-10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <p className="text-sm text-zinc-400">
+            Powered by <span className="text-zinc-100">TrackMe</span>, privacy-first web analytics.
+          </p>
+          <Link href="/" className="inline-flex items-center gap-1 text-sm text-zinc-300 transition-colors hover:text-white">
+            See how it works <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="relative mt-8 h-[120px] sm:h-[170px]" aria-hidden="true">
+          <GlyphField variant="text" text="TrackMe" cell={9} interactive />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-[#0f0f10] to-transparent" />
+        </div>
+      </footer>
     </div>
   );
 }

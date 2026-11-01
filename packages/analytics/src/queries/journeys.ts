@@ -1,5 +1,5 @@
 import { MetricQueryRequest } from "@trackme/contracts";
-import { getClickHouseClient } from "../client.js";
+import { readClient, variantAware, type ReadVariant } from "../read-mode.js";
 import { buildDimensionFilterSql } from "./filters.js";
 
 export interface JourneySummary {
@@ -13,8 +13,8 @@ function toCH(iso: string): string {
 }
 
 /** Top ordered page paths from privacy-safe, per-session event sequences. */
-export async function getTopJourneys(request: MetricQueryRequest): Promise<JourneySummary[]> {
-  const client = getClickHouseClient();
+async function getTopJourneysImpl(request: MetricQueryRequest, variant: ReadVariant): Promise<JourneySummary[]> {
+  const client = readClient(variant);
   const filter = buildDimensionFilterSql(request.filters);
   const resultSet = await client.query({
     query: `
@@ -58,3 +58,5 @@ export async function getTopJourneys(request: MetricQueryRequest): Promise<Journ
   const rows = await resultSet.json<{ journey: string; sessions: string | number; visitors: string | number }>();
   return rows.map((row) => ({ journey: row.journey, sessions: Number(row.sessions || 0), visitors: Number(row.visitors || 0) }));
 }
+
+export const getTopJourneys = variantAware("getTopJourneys", getTopJourneysImpl);

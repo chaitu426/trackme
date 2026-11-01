@@ -63,6 +63,13 @@ export async function GET(
           }
         });
 
+        if (!unsubscribe) {
+          // Listener cap reached on this node; EventSource retries after `retry:`.
+          controller.enqueue(encoder.encode(`retry: 10000\nevent: busy\ndata: {}\n\n`));
+          cleanup();
+          return;
+        }
+
         heartbeat = setInterval(() => {
           if (closed) return;
           try {
@@ -70,7 +77,7 @@ export async function GET(
           } catch {
             cleanup();
           }
-        }, 15_000);
+        }, 25_000);
 
         request.signal.addEventListener("abort", cleanup);
       },

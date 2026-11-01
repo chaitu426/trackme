@@ -51,7 +51,7 @@ export type WebVitalMetric = z.infer<typeof WebVitalMetricSchema>;
 export const TrackerEventSchema = z.object({
   schemaVersion: z.literal(1),
   eventId: z.string().uuid("eventId must be a valid UUIDv4"),
-  type: z.enum(["pageview", "custom", "web_vital", "identify"]),
+  type: z.enum(["pageview", "custom", "web_vital", "identify", "engagement"]),
   occurredAt: z.string().datetime({ message: "occurredAt must be an ISO 8601 UTC timestamp" }),
   siteKey: z.string().min(8).max(64),
   sessionId: z.string().min(8).max(64),

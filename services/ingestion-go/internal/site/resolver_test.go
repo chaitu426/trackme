@@ -63,8 +63,54 @@ func TestHitIsServedFromCacheUntilTTL(t *testing.T) {
 	if _, err := r.Resolve(context.Background(), "key"); err != nil {
 		t.Fatal(err)
 	}
+	// The expired entry answers at once; exactly one background refresh follows.
+	deadline := time.Now().Add(2 * time.Second)
+	for loads.Load() != 2 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
 	if loads.Load() != 2 {
 		t.Fatalf("loads after expiry = %d, want 2", loads.Load())
+	}
+}
+
+func TestExpiredEntryIsServedWithoutWaitingForTheDatabase(t *testing.T) {
+	release := make(chan struct{})
+	var loads atomic.Int32
+	r, clk := newTestResolver(func(context.Context, string) (ResolvedSite, error) {
+		if loads.Add(1) > 1 {
+			<-release // the refresh is slow
+		}
+		return ResolvedSite{ID: "s1"}, nil
+	})
+	if _, err := r.Resolve(context.Background(), "key"); err != nil {
+		t.Fatal(err)
+	}
+	clk.advance(cacheTTL + time.Second)
+
+	done := make(chan error, 1)
+	go func() { _, err := r.Resolve(context.Background(), "key"); done <- err }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Resolve blocked on the refresh instead of serving the stale entry")
+	}
+	close(release)
+}
+
+func TestStaleEntryIsNotServedPastStaleMax(t *testing.T) {
+	r, clk := newTestResolver(found("s1"))
+	if _, err := r.Resolve(context.Background(), "key"); err != nil {
+		t.Fatal(err)
+	}
+	clk.advance(staleMax + time.Second)
+	r.mu.Lock()
+	_, ok := r.staleLocked(HashPublicKey("key"))
+	r.mu.Unlock()
+	if ok {
+		t.Fatal("entry older than staleMax must not be served")
 	}
 }
 

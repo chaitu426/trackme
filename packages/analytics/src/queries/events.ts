@@ -1,5 +1,6 @@
 import { MetricQueryRequest } from "@trackme/contracts";
-import { getClickHouseClient } from "../client.js";
+import { readClient, variantAware, type ReadVariant } from "../read-mode.js";
+import { assertRawScanRange } from "./range-split.js";
 
 export interface CustomEventSummary {
   eventName: string;
@@ -39,10 +40,11 @@ function toCH(iso: string): string {
 /**
  * Summarize tracked custom events over a date range.
  */
-export async function getCustomEventsSummary(
+async function getCustomEventsSummaryImpl(
   request: MetricQueryRequest
-): Promise<CustomEventSummary[]> {
-  const client = getClickHouseClient();
+,
+  variant: ReadVariant): Promise<CustomEventSummary[]> {
+  const client = readClient(variant);
 
   const query = `
     SELECT
@@ -95,17 +97,18 @@ export async function getCustomEventsSummary(
 /**
  * Calculate conversion metrics for a list of defined conversion goals.
  */
-export async function getGoalMetrics(
+async function getGoalMetricsImpl(
   workspaceId: string,
   siteId: string,
   goals: GoalDefinition[],
   dateRange: { from: string; to: string }
-): Promise<GoalMetric[]> {
+,
+  variant: ReadVariant): Promise<GoalMetric[]> {
   if (goals.length === 0) {
     return [];
   }
 
-  const client = getClickHouseClient();
+  const client = readClient(variant);
   const fromCH = toCH(dateRange.from);
   const toCHVal = toCH(dateRange.to);
 
@@ -145,6 +148,8 @@ export async function getGoalMetrics(
     };
 
     if (goal.type === "pageview_rule" && goal.pathPattern) {
+      // Path rules have no aggregate, so they scan raw events; v2 refuses an unbounded scan.
+      if (variant === "v2") assertRawScanRange(dateRange.from, dateRange.to);
       if (goal.pathPattern.includes("%") || goal.pathPattern.includes("*")) {
         params.pattern = goal.pathPattern.replace(/\*/g, "%");
         whereClause = `AND type = 'pageview' AND path LIKE {pattern:String}`;
@@ -216,3 +221,7 @@ export async function getGoalMetrics(
 
   return metrics;
 }
+
+export const getCustomEventsSummary = variantAware("getCustomEventsSummary", getCustomEventsSummaryImpl);
+
+export const getGoalMetrics = variantAware("getGoalMetrics", getGoalMetricsImpl);
