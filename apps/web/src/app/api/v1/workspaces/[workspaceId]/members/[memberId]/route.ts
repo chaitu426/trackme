@@ -6,6 +6,7 @@ import { invalidateMembership } from "@/lib/authz-cache";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { recordAuditLog } from "@/lib/audit";
+import { getClientIp } from "@/lib/client-ip";
 
 const UpdateRoleSchema = z.object({
   role: z.enum(["owner", "admin", "member", "viewer"]),
@@ -43,10 +44,7 @@ export async function PATCH(
       throw new AppError(404, "MEMBER_NOT_FOUND", "Member not found in workspace.");
     }
 
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      null;
+    const ip = getClientIp(request);
 
     // ── Ownership Transfer Flow ──────────────────────────────────────────────
     if (newRole === "owner") {
@@ -185,10 +183,7 @@ export async function DELETE(
 
     await invalidateMembership(memberId, workspaceId);
 
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      null;
+    const ip = getClientIp(request);
 
     await recordAuditLog({
       workspaceId,

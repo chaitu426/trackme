@@ -5,6 +5,7 @@ import { db, goals, eq, and } from "@trackme/db";
 import { requireSiteAccess } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
+import { getClientIp } from "@/lib/client-ip";
 
 const PatchGoalSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
@@ -65,7 +66,7 @@ export async function PATCH(
       targetType: "goal",
       targetId: goalId,
       metadata: { updates },
-      ipAddress: request.headers.get("x-forwarded-for") || null,
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({ goal: updated });
@@ -107,7 +108,7 @@ export async function DELETE(
       targetType: "goal",
       targetId: goalId,
       metadata: { name: existing.name },
-      ipAddress: request.headers.get("x-forwarded-for") || null,
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({ success: true, deletedId: goalId });

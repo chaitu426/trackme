@@ -1,0 +1,14 @@
+import { loadEnv, requireFrom } from "./lib.mjs";
+loadEnv();
+const { createClient } = requireFrom("packages/analytics", "@clickhouse/client");
+const postgres = requireFrom("packages/db", "postgres");
+const e = process.env;
+const ch = createClient({ url: e.CLICKHOUSE_URL, username: e.CLICKHOUSE_USER, password: e.CLICKHOUSE_PASSWORD, database: e.CLICKHOUSE_DB });
+const q = async (query) => (await ch.query({ query, format: "JSONEachRow" })).json();
+const sql = postgres(e.DATABASE_URL, { ssl: "require", max: 1 });
+const names = {}; for (const r of await sql`select s.id, s.domain, w.slug from sites s join workspaces w on w.id=s.workspace_id`) names[r.id] = r.slug + "/" + r.domain;
+const rows = await q("select site_id, event_name, count() c, max(timestamp) mx from events_v2 where timestamp > now() - interval 30 minute group by site_id, event_name order by mx desc");
+for (const r of rows) console.log(names[r.site_id] ?? r.site_id, r.event_name, r.c, r.mx);
+const tabs = await q("select name from system.tables where database=currentDatabase() order by name");
+console.log("tables:", tabs.map(t => t.name).join(", "));
+await sql.end(); await ch.close();

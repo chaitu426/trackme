@@ -13,7 +13,6 @@ import {
   UserPlus,
   Trash2,
   Send,
-  Link2,
   RefreshCw,
   CheckCircle2,
   XCircle,
@@ -27,6 +26,8 @@ type CreatedWorkspace = {
   workspace: { id: string; name: string; slug: string };
   site: { id: string; domain: string; publicKey: string };
   trackerScriptUrl: string;
+  /** SHA-384 Subresource Integrity hash of the pinned tracker file, or null when the build has none. */
+  trackerScriptIntegrity: string | null;
   ingestionUrl: string;
 };
 
@@ -136,19 +137,24 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
     const siteKey = created.site.publicKey;
     const ingestUrl = created.ingestionUrl;
     const trackerUrl = created.trackerScriptUrl;
+    // Pin the exact bytes: the browser refuses to run the script if it is not the file this hash describes.
+    const sri = created.trackerScriptIntegrity;
+    const htmlSri = sri ? `\n  integrity="${sri}"\n  crossorigin="anonymous"` : "";
+    const reactSri = sri ? `\n          integrity="${sri}"\n          crossOrigin="anonymous"` : "";
+    const nuxtSri = sri ? `\n          integrity: "${sri}",\n          crossorigin: "anonymous",` : "";
 
     switch (tab) {
       case "nextjs":
-        return `// app/layout.tsx (Next.js 13/14/15 App Router)\nimport Script from "next/script";\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <head>\n        <Script\n          defer\n          src="${trackerUrl}"\n          data-site="${siteKey}"\n          data-endpoint="${ingestUrl}"\n        />\n      </head>\n      <body>{children}</body>\n    </html>\n  );\n}`;
+        return `// app/layout.tsx (Next.js 13/14/15 App Router)\nimport Script from "next/script";\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <head>\n        <Script\n          defer\n          src="${trackerUrl}"${reactSri}\n          data-site="${siteKey}"\n          data-endpoint="${ingestUrl}"\n        />\n      </head>\n      <body>{children}</body>\n    </html>\n  );\n}`;
       case "react":
-        return `// In your public/index.html or Vite main.tsx entry:\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
+        return `// In your public/index.html or Vite main.tsx entry:\n<script\n  defer\n  src="${trackerUrl}"${htmlSri}\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
       case "vue":
-        return `<!-- Nuxt 3: nuxt.config.ts -->\nexport default defineNuxtConfig({\n  app: {\n    head: {\n      script: [\n        {\n          src: "${trackerUrl}",\n          defer: true,\n          "data-site": "${siteKey}",\n          "data-endpoint": "${ingestUrl}"\n        }\n      ]\n    }\n  }\n});`;
+        return `<!-- Nuxt 3: nuxt.config.ts -->\nexport default defineNuxtConfig({\n  app: {\n    head: {\n      script: [\n        {\n          src: "${trackerUrl}",${nuxtSri}\n          defer: true,\n          "data-site": "${siteKey}",\n          "data-endpoint": "${ingestUrl}"\n        }\n      ]\n    }\n  }\n});`;
       case "gtm":
-        return `<!-- Custom HTML Tag in Google Tag Manager -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>\n<!-- Trigger: All Pages (Page View) -->`;
+        return `<!-- Custom HTML Tag in Google Tag Manager -->\n<script\n  defer\n  src="${trackerUrl}"${htmlSri}\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>\n<!-- Trigger: All Pages (Page View) -->`;
       case "html":
       default:
-        return `<!-- TrackMe Cookieless Telemetry (under 10 KB gzipped, no tracking cookies) -->\n<script\n  defer\n  src="${trackerUrl}"\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
+        return `<!-- TrackMe Cookieless Telemetry (under 10 KB gzipped, no tracking cookies) -->\n<script\n  defer\n  src="${trackerUrl}"${htmlSri}\n  data-site="${siteKey}"\n  data-endpoint="${ingestUrl}"\n></script>`;
     }
   }
 
@@ -222,7 +228,6 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                   state: (result.success ? "sent" : "error") as InviteStatus["state"],
                   ...(result.error !== undefined ? { error: result.error } : {}),
                   ...(result.invite?.id !== undefined ? { inviteId: result.invite.id } : {}),
-                  ...(result.invite?.token !== undefined ? { token: result.invite.token } : {}),
                   ...(result.invite?.expiresAt !== undefined ? { expiresAt: result.invite.expiresAt } : {}),
                 }
               : s
@@ -246,7 +251,6 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
               state: (result.success ? "sent" : "error") as InviteStatus["state"],
               ...(result.error !== undefined ? { error: result.error } : {}),
               ...(result.invite?.id !== undefined ? { inviteId: result.invite.id } : {}),
-              ...(result.invite?.token !== undefined ? { token: result.invite.token } : {}),
               ...(result.invite?.expiresAt !== undefined ? { expiresAt: result.invite.expiresAt } : {}),
             }
           : s
@@ -563,11 +567,6 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                             {s.state === "error" && (
                               <button type="button" onClick={() => handleResend(s)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-100" title="Retry" aria-label="Retry">
                                 <RefreshCw className="h-4 w-4" />
-                              </button>
-                            )}
-                            {s.state === "sent" && (s.token || s.inviteId) && (
-                              <button type="button" onClick={() => inviteManager.copyInviteLink(s.token || s.inviteId!, s.inviteId || s.email)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-100" title="Copy invite link" aria-label="Copy invite link">
-                                {inviteManager.copiedToken === (s.inviteId || s.email) ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Link2 className="h-4 w-4" />}
                               </button>
                             )}
                             <button type="button" onClick={() => handleRemoveInviteStatus(s.email)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-[#e5484d]" title="Remove" aria-label="Remove">

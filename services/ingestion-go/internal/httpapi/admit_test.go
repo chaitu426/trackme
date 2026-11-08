@@ -153,8 +153,29 @@ func TestGateRedisOutageCanFailClosed(t *testing.T) {
 	g := newGateRig(t, 100, 100)
 	g.srv.QuotaFailOpen = false
 	g.mr.Close()
-	if w := post(g.handler, "/v1/batch", batch(withID(1, nil)), nil); w.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 when fail-open is off", w.Code)
+	if w := post(g.handler, "/v1/batch", batch(withID(1, nil)), nil); w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 when fail-open is off", w.Code)
+	}
+}
+
+func TestAdmissionFailClosedOverridesQuotaFailOpen(t *testing.T) {
+	g := newGateRig(t, 100, 100)
+	g.srv.QuotaFailOpen = true
+	g.srv.AdmissionFailClosed = true
+	g.mr.Close()
+	if w := post(g.handler, "/v1/batch", batch(withID(1, nil)), nil); w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 under fail-closed admission", w.Code)
+	}
+}
+
+func TestGateFusesIPLimitIntoTheSameScriptCall(t *testing.T) {
+	g := newGateRig(t, 100, 100)
+	g.srv.IPRateLimitMax = 1
+	if w := post(g.handler, "/v1/batch", batch(withID(1, nil)), nil); w.Code != http.StatusAccepted {
+		t.Fatalf("first status = %d", w.Code)
+	}
+	if w := post(g.handler, "/v1/batch", batch(withID(2, nil)), nil); w.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status = %d, want 429 from the fused IP limit", w.Code)
 	}
 }
 
@@ -166,9 +187,9 @@ func TestGateUsesFewerRedisCommandsThanTheLegacyPath(t *testing.T) {
 	post(g.handler, "/v1/batch", batch(withID(2, nil), withID(3, nil), withID(4, nil)), nil)
 	gateCalls := g.trips.Load() - before
 
-	// IP limit + the gate + confirm. The legacy path adds a site-limit call, a
-	// claim call and a quota call per request.
-	if gateCalls > 3 {
-		t.Fatalf("redis round trips per request = %d, want <= 3", gateCalls)
+	// The fused gate (IP + site + claims + quota) plus the claim confirm. The
+	// legacy path adds a site-limit call, a claim call and a quota call.
+	if gateCalls > 2 {
+		t.Fatalf("redis round trips per request = %d, want <= 2", gateCalls)
 	}
 }

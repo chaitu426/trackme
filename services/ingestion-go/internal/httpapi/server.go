@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	mrand "math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,8 +20,10 @@ import (
 	"github.com/trackme/ingestion-go/internal/enrich"
 	"github.com/trackme/ingestion-go/internal/gate"
 	"github.com/trackme/ingestion-go/internal/geo"
+	"github.com/trackme/ingestion-go/internal/limit"
 	"github.com/trackme/ingestion-go/internal/metrics"
 	"github.com/trackme/ingestion-go/internal/origin"
+	"github.com/trackme/ingestion-go/internal/queue"
 	"github.com/trackme/ingestion-go/internal/sign"
 	"github.com/trackme/ingestion-go/internal/site"
 	"github.com/trackme/ingestion-go/internal/validate"
@@ -81,6 +85,16 @@ type Server struct {
 	// real count from ClickHouse, so the cost is briefly looser enforcement.
 	QuotaFailOpen bool
 
+	// AdmissionFailClosed refuses the batch (503) when the gate or quota counter
+	// cannot be reached. It takes precedence over QuotaFailOpen and is the
+	// production policy: silently bypassing rate limit, dedupe and quota is the
+	// failure mode that produced the load-test incident.
+	AdmissionFailClosed bool
+
+	// IPRateLimitMax is the per-client-IP budget applied inside the fused gate
+	// script. Zero keeps the separate Limiter call.
+	IPRateLimitMax int
+
 	// AsyncConfirm confirms event claims after the 202 is sent instead of before it.
 	// The confirm only extends a dedupe marker's lifetime (a failure is already just
 	// logged), so the client need not wait a Redis round trip for it.
@@ -92,6 +106,21 @@ type Server struct {
 
 	// HideMetrics removes /metrics from this listener because it is served on a private port.
 	HideMetrics bool
+
+	// Concurrency, when set, caps requests in flight adaptively and refuses the excess at once
+	// (503 + jittered Retry-After) before any body is read or Redis is touched.
+	Concurrency *limit.Limiter
+
+	// RequireSignedTimestamp refuses signed requests that do not carry X-GI-Timestamp, closing the replay window
+	// of the legacy body-only signature. Turn it on once every SDK and proxy sends the timestamp.
+	RequireSignedTimestamp bool
+
+	// Pressure, when set, reports 0-1 how close the edge is to refusing work. Above 0.5 the edge
+	// keeps only 1 in N web-vital events (N grows to about 11 at 1.0), stamps the kept ones with
+	// sampleWeight=N, and tells SDKs to slow down (X-GI-Backoff). Pageviews, conversions and
+	// custom events are never sampled. Uniform sampling keeps quantiles and rating shares
+	// unbiased; only absolute web-vital counts under-report.
+	Pressure func() float64
 
 	warnMu   sync.Mutex
 	warnLast map[string]time.Time
@@ -177,9 +206,40 @@ func (s *Server) Handler() http.Handler {
 	if !s.HideMetrics {
 		mux.HandleFunc("GET /metrics", s.handleMetrics)
 	}
-	mux.HandleFunc("POST /v1/batch", s.handleBatch)
-	mux.HandleFunc("POST /v1/e", s.handleSingle)
+	mux.HandleFunc("POST /v1/batch", s.limited(s.handleBatch))
+	mux.HandleFunc("POST /v1/e", s.limited(s.handleSingle))
 	return withCORS(withRequestTracing(mux))
+}
+
+func (s *Server) limited(next http.HandlerFunc) http.HandlerFunc {
+	if s.Concurrency == nil {
+		return next
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		done, ok := s.Concurrency.Acquire()
+		if !ok {
+			metrics.Default.Shed.WithLabelValues("concurrency").Inc()
+			setRetryAfter(w)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Overloaded, retry shortly"})
+			return
+		}
+		defer done()
+		next(w, r)
+	}
+}
+
+// signatureOK verifies X-GI-Signature. With X-GI-Timestamp the signature covers the timestamp and stale requests
+// are refused (replay protection); without it the legacy body-only signature is accepted unless
+// RequireSignedTimestamp says otherwise.
+func (s *Server) signatureOK(secret string, body []byte, r *http.Request) bool {
+	if secret == "" {
+		return false
+	}
+	signature := r.Header.Get("X-GI-Signature")
+	if ts := r.Header.Get("X-GI-Timestamp"); ts != "" {
+		return sign.ValidTimestamped(secret, body, ts, signature, time.Now(), sign.MaxSkew)
+	}
+	return !s.RequireSignedTimestamp && sign.Valid(secret, body, signature)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -207,17 +267,34 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !s.allowIP(r) {
+	// The fused gate applies the per-IP limit inside its single script; only the
+	// legacy path needs this separate round trip.
+	if s.Gate == nil && !s.allowIP(r) {
+		setRetryAfter(w)
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "Rate limit exceeded"})
 		return
 	}
 
 	res, status, message := s.processEvents(r, body, req.Events)
 	if status != http.StatusAccepted {
+		if status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable {
+			setRetryAfter(w)
+		}
 		writeJSON(w, status, map[string]string{"error": message})
 		return
 	}
+	s.hint(w)
 	writeJSON(w, http.StatusAccepted, res.body())
+}
+
+// hint asks SDKs to space out their next flush while the edge is under pressure: up to 5 s at full.
+func (s *Server) hint(w http.ResponseWriter) {
+	if s.Pressure == nil {
+		return
+	}
+	if p := s.Pressure(); p > 0.5 {
+		w.Header().Set("X-GI-Backoff", strconv.Itoa(int((p-0.5)*10_000)))
+	}
 }
 
 func (s *Server) handleSingle(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +310,8 @@ func (s *Server) handleSingle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !s.allowIP(r) {
+	if s.Gate == nil && !s.allowIP(r) {
+		setRetryAfter(w)
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "Rate limit exceeded"})
 		return
 	}
@@ -241,9 +319,13 @@ func (s *Server) handleSingle(w http.ResponseWriter, r *http.Request) {
 	// Wrap single event as a synthetic batch for signature over raw body.
 	res, status, message := s.processEvents(r, body, []enrich.TrackerEvent{ev})
 	if status != http.StatusAccepted {
+		if status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable {
+			setRetryAfter(w)
+		}
 		writeJSON(w, status, map[string]string{"error": message})
 		return
 	}
+	s.hint(w)
 	writeJSON(w, http.StatusAccepted, res.body())
 }
 
@@ -254,7 +336,7 @@ func (s *Server) handleSingle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) allowIP(r *http.Request) bool {
 	ok, err := s.Limiter.Allow(r.Context(), "ip:"+s.clientIP(r))
 	if err != nil {
-		metrics.Default.RedisErrors.WithLabelValues("gate").Inc()
+		metrics.Default.RedisErrors.WithLabelValues("ip").Inc()
 		s.warn("ratelimit-ip", "rate limiter unavailable, allowing traffic: %v", err)
 		return true
 	}
@@ -282,6 +364,7 @@ func (r ingestResult) body() map[string]any {
 
 func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.TrackerEvent) (res ingestResult, status int, message string) {
 	now := time.Now().UTC()
+	stages := stageTimer{start: time.Now()}
 
 	// Contract check first: a malformed event is dropped on its own so it can
 	// neither block the rest of the batch nor reach Kafka, where the worker
@@ -315,8 +398,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 		return ingestResult{}, http.StatusBadRequest, "No valid events in batch"
 	}
 	events = valid
-
-	stages := stageTimer{start: time.Now()}
+	stages.mark("validate")
 	resolved := map[string]*site.ResolvedSite{}
 	for _, ev := range events {
 		if _, ok := resolved[ev.SiteKey]; ok {
@@ -370,7 +452,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 
 		if siteRow.Settings.SigningRequired {
 			secret := siteRow.Settings.SigningSecret
-			if secret == "" || !sign.Valid(secret, rawBody, r.Header.Get("X-GI-Signature")) {
+			if !s.signatureOK(secret, rawBody, r) {
 				return ingestResult{}, http.StatusUnauthorized, "Valid X-GI-Signature required"
 			}
 		}
@@ -398,6 +480,12 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 
 	receivedAt := now.Format(time.RFC3339Nano)
 	dnt := r.Header.Get("DNT") == "1"
+	vitalKeep := 1
+	if s.Pressure != nil {
+		if p := s.Pressure(); p > 0.5 {
+			vitalKeep = 1 + int((p-0.5)*20)
+		}
+	}
 
 	enriched := make([]enrich.EnrichedEvent, 0, len(events))
 	quotaByWorkspace := map[string]int{}
@@ -427,6 +515,15 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 			continue
 		}
 
+		weight := 0
+		if ev.Type == "web_vital" && vitalKeep > 1 {
+			if mrand.Intn(vitalKeep) != 0 {
+				metrics.Default.Shed.WithLabelValues("sampled_web_vital").Inc()
+				continue
+			}
+			weight = vitalKeep
+		}
+
 		// URL and path were reduced to the allowed query parameters by validate.Normalize.
 		ev.Referrer = enrich.StripSelfReferrer(ev.Referrer, siteRow.Domain)
 
@@ -442,6 +539,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 			Device:       classification.Device,
 			IsBot:        classification.IsBot,
 			BotStatus:    classification.BotStatus,
+			SampleWeight: weight,
 		}
 		enriched = append(enriched, out)
 		quotaByWorkspace[siteRow.WorkspaceID] = siteRow.MonthlyEventQuota
@@ -461,7 +559,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 			rejection int
 			message   string
 		)
-		claimedIDs, claimedEvents, reserved, rejection, message = s.admitWithGate(r.Context(), enriched, quotaByWorkspace, &res)
+		claimedIDs, claimedEvents, reserved, rejection, message = s.admitWithGate(r.Context(), enriched, quotaByWorkspace, ip, &res)
 		if rejection != 0 {
 			return ingestResult{}, rejection, message
 		}
@@ -522,11 +620,12 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 			allowed, err := s.Quota.TryReserve(r.Context(), workspaceID, quotaByWorkspace[workspaceID], delta)
 			if err != nil {
 				metrics.Default.RedisErrors.WithLabelValues("gate").Inc()
-				if s.QuotaFailOpen {
+				if s.QuotaFailOpen && !s.AdmissionFailClosed {
 					s.warn("quota", "quota counter unavailable, accepting events without reserving: %v", err)
 					continue
 				}
 				s.warn("quota", "quota reserve error: %v", err)
+				metrics.Default.AdmissionFailClosed.WithLabelValues("quota").Inc()
 				if len(reserved) > 0 {
 					if releaseErr := s.Quota.Release(r.Context(), reserved); releaseErr != nil {
 						s.warn("quota-release", "failed to roll back quota after reserve error: %v", releaseErr)
@@ -535,7 +634,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 				if err := s.releaseClaims(r.Context(), claimedIDs); err != nil {
 					s.warn("dedupe-release", "failed to release event claims after quota error: %v", err)
 				}
-				return ingestResult{}, http.StatusInternalServerError, "Quota check failed"
+				return ingestResult{}, http.StatusServiceUnavailable, "Admission unavailable"
 			}
 			if !allowed {
 				if len(reserved) > 0 {
@@ -602,6 +701,12 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 			metrics.Default.RedisErrors.WithLabelValues("dedupe").Inc()
 			s.warn("dedupe-confirm", "failed to confirm claims for published events: %v", err)
 		}
+		if errors.Is(publishErr, queue.ErrFull) {
+			return ingestResult{}, http.StatusTooManyRequests, "Ingest queue is full, retry shortly"
+		}
+		if errors.Is(publishErr, queue.ErrClosed) {
+			return ingestResult{}, http.StatusServiceUnavailable, "Ingest is shutting down"
+		}
 		return ingestResult{}, http.StatusInternalServerError, "Failed to enqueue events"
 	}
 
@@ -639,8 +744,10 @@ func (t *stageTimer) mark(name string) {
 	if t.last.IsZero() {
 		t.last = t.start
 	}
+	d := now.Sub(t.last)
 	t.names = append(t.names, name)
-	t.durs = append(t.durs, now.Sub(t.last))
+	t.durs = append(t.durs, d)
+	metrics.Default.EdgeStage.WithLabelValues(name).Observe(d.Seconds())
 	t.last = now
 }
 
@@ -700,6 +807,12 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
+// setRetryAfter tells the SDK to back off instead of hammering a shedding edge. The value is
+// jittered per response (1-3 s): a constant would bring every rejected client back in the same second.
+func setRetryAfter(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", strconv.Itoa(1+mrand.Intn(3)))
+}
+
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
@@ -709,7 +822,9 @@ func withCORS(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Vary", "Origin")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, DNT, X-GI-Signature, X-GI-Consent")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, DNT, X-GI-Signature, X-GI-Timestamp, X-GI-Consent")
+		// Without this the browser hides the back-off hints from the tracker's fetch().
+		w.Header().Set("Access-Control-Expose-Headers", "Retry-After, X-GI-Backoff")
 		if r.Method == http.MethodOptions {
 			// Without this the browser repeats the preflight every few seconds.
 			w.Header().Set("Access-Control-Max-Age", "86400")

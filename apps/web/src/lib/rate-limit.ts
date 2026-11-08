@@ -1,6 +1,26 @@
 import { getRedis } from "./redis";
 import { AppError } from "@trackme/contracts";
 
+/**
+ * Count a hit and (re)arm the window in ONE atomic call. As separate INCR / EXPIRE / TTL calls, a
+ * process dying between the first two left a counter with no expiry that blocked its key forever
+ * (for the failed-login counter: a permanent lockout). Also one round trip instead of three.
+ */
+const HIT = `
+local n = redis.call('INCR', KEYS[1])
+local ttl = redis.call('TTL', KEYS[1])
+if n == 1 or ttl < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+  ttl = tonumber(ARGV[1])
+end
+return {n, ttl}
+`;
+
+async function hit(key: string, windowSeconds: number): Promise<{ count: number; ttl: number }> {
+  const [count, ttl] = (await getRedis("ratelimit").eval(HIT, 1, key, windowSeconds)) as [number, number];
+  return { count, ttl };
+}
+
 // In-memory fallback map if Redis is temporarily unreachable
 const memStore = new Map<string, { count: number; resetAt: number }>();
 
@@ -14,15 +34,7 @@ export async function checkRateLimit(
   errorMessage = "Too many requests. Please try again later."
 ): Promise<{ remaining: number; resetInSeconds: number }> {
   try {
-    const redis = getRedis("ratelimit");
-    const redisKey = `rl:${key}`;
-    const count = await redis.incr(redisKey);
-
-    if (count === 1) {
-      await redis.expire(redisKey, windowSeconds);
-    }
-
-    const ttl = await redis.ttl(redisKey);
+    const { count, ttl } = await hit(`rl:${key}`, windowSeconds);
     const resetInSeconds = ttl > 0 ? ttl : windowSeconds;
 
     if (count > limit) {
@@ -71,13 +83,7 @@ export async function recordFailedLoginAttempt(
   lockoutSeconds = 15 * 60
 ): Promise<{ attempts: number; isLocked: boolean; remainingAttempts: number }> {
   try {
-    const redis = getRedis("ratelimit");
-    const key = `auth_failures:${identifier.toLowerCase()}`;
-    const attempts = await redis.incr(key);
-
-    if (attempts === 1) {
-      await redis.expire(key, lockoutSeconds);
-    }
+    const { count: attempts } = await hit(`auth_failures:${identifier.toLowerCase()}`, lockoutSeconds);
 
     const isLocked = attempts >= maxAttempts;
     return {

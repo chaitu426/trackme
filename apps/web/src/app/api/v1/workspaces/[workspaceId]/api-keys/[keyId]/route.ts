@@ -4,6 +4,7 @@ import { db, apiKeys, eq, and } from "@trackme/db";
 import { requireWorkspaceMember } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
+import { getClientIp } from "@/lib/client-ip";
 
 export async function DELETE(
   request: NextRequest,
@@ -39,7 +40,7 @@ export async function DELETE(
       targetType: "api_key",
       targetId: keyId,
       metadata: { name: existing.name, prefix: existing.prefix },
-      ipAddress: request.headers.get("x-forwarded-for") || null,
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({ success: true, revokedId: keyId });

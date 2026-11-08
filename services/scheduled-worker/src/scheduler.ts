@@ -4,6 +4,7 @@ import { env } from "@trackme/config";
 import { runHourlyRollups } from "./jobs/hourly-rollups.js";
 import { runDailyRollups } from "./jobs/daily-rollups.js";
 import { runUsageMetering } from "./jobs/usage-metering.js";
+import { reclaimDeadEdgeQuota } from "./jobs/quota-reclaim.js";
 import { runRetentionCleanup } from "./jobs/retention.js";
 import { runReconciliation } from "./jobs/reconciliation.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
@@ -46,6 +47,21 @@ cron.schedule("2,17,32,47 * * * *", async () => {
     );
   } catch (err) {
     console.error("Failed running daily rollups:", err);
+  }
+});
+
+// 2b. Give back quota held by crashed ingestion edges: every 5 minutes.
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:quota_reclaim",
+      120,
+      "Quota Reclaim",
+      instrumentJob("quota_reclaim", () => reclaimDeadEdgeQuota().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed reclaiming dead-edge quota:", err);
   }
 });
 

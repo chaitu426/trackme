@@ -12,6 +12,8 @@
 
 import crypto from "crypto";
 import { sendEmail } from "./email";
+import { safePost } from "./safe-fetch";
+import { decryptChannelConfig } from "./channel-config";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -106,15 +108,15 @@ export async function dispatchToSlack(
       ],
     };
 
-    const res = await fetch(webhookUrl, {
-      method: "POST",
+    const res = await safePost(webhookUrl, {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
+    // Only the status is reported. The remote reply is never read, so this can not be used to read back what
+    // an internal service answers.
     if (!res.ok) {
-      const text = await res.text();
-      return { ok: false, error: `Slack responded ${res.status}: ${text}`, provider: "slack" };
+      return { ok: false, error: `Slack responded ${res.status}`, provider: "slack" };
     }
 
     return { ok: true, provider: "slack" };
@@ -154,15 +156,15 @@ export async function dispatchToDiscord(
       ],
     };
 
-    const res = await fetch(webhookUrl, {
-      method: "POST",
+    const res = await safePost(webhookUrl, {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
+    // Only the status is reported. The remote reply is never read, so this can not be used to read back what
+    // an internal service answers.
     if (!res.ok) {
-      const text = await res.text();
-      return { ok: false, error: `Discord responded ${res.status}: ${text}`, provider: "discord" };
+      return { ok: false, error: `Discord responded ${res.status}`, provider: "discord" };
     }
 
     return { ok: true, provider: "discord" };
@@ -267,11 +269,10 @@ export async function dispatchToWebhook(
       headers["X-TrackMe-Timestamp"] = Date.now().toString();
     }
 
-    const res = await fetch(url, { method: "POST", headers, body });
+    const res = await safePost(url, { headers, body });
 
     if (!res.ok) {
-      const text = await res.text();
-      return { ok: false, error: `Webhook responded ${res.status}: ${text}`, provider: "webhook" };
+      return { ok: false, error: `Webhook responded ${res.status}`, provider: "webhook" };
     }
 
     return { ok: true, provider: "webhook" };
@@ -291,26 +292,28 @@ export async function dispatchAlert(
   channel: ChannelConfig,
   payload: AlertPayload
 ): Promise<DispatchResult> {
+  // Secrets are stored encrypted; they exist in plaintext only here, for the duration of one send.
+  const config = decryptChannelConfig(channel.config);
   switch (channel.type) {
     case "slack": {
-      const webhookUrl = channel.config.webhookUrl as string;
+      const webhookUrl = config.webhookUrl as string;
       if (!webhookUrl) return { ok: false, error: "Missing webhookUrl", provider: "slack" };
       return dispatchToSlack(webhookUrl, payload);
     }
     case "discord": {
-      const webhookUrl = channel.config.webhookUrl as string;
+      const webhookUrl = config.webhookUrl as string;
       if (!webhookUrl) return { ok: false, error: "Missing webhookUrl", provider: "discord" };
       return dispatchToDiscord(webhookUrl, payload);
     }
     case "email": {
-      const addresses = channel.config.addresses as string[];
+      const addresses = config.addresses as string[];
       if (!addresses?.length) return { ok: false, error: "Missing email addresses", provider: "email" };
       return dispatchToEmail(addresses, payload);
     }
     case "webhook": {
-      const url = channel.config.url as string;
+      const url = config.url as string;
       if (!url) return { ok: false, error: "Missing webhook url", provider: "webhook" };
-      return dispatchToWebhook(url, channel.config.secret as string | undefined, payload);
+      return dispatchToWebhook(url, config.secret as string | undefined, payload);
     }
     default:
       return { ok: false, error: `Unknown channel type: ${channel.type}`, provider: "webhook" };

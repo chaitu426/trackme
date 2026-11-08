@@ -35,6 +35,9 @@ export interface UsageMeteringDeps {
   period?: string;
 }
 
+/** Rows per upsert statement; 5,000 x 4 parameters stays far below PostgreSQL's 65,535 limit. */
+const UPSERT_CHUNK = 5_000;
+
 export const USAGE_METERING_SQL = `
   SELECT
     workspace_id,
@@ -80,7 +83,9 @@ export async function runUsageMetering(deps: UsageMeteringDeps = {}): Promise<vo
   const client = deps.client ?? (getClickHouseClient() as unknown as UsageMeteringClient);
   const redis =
     deps.redis ??
-    new Redis(env.REDIS_STATE_URL, {
+    // The counters it reconciles are written by the ingestion edge, which uses REDIS_URL; reconciling
+    // on a different instance (REDIS_STATE_URL) would silently update a counter the edge never reads.
+    new Redis(env.REDIS_URL, {
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
     }) as UsageMeteringRedis;
@@ -109,16 +114,20 @@ export async function runUsageMetering(deps: UsageMeteringDeps = {}): Promise<vo
         eventCount: Number(row.event_count || 0),
       }));
 
-      await dbClient
-        .insert(usageCounters)
-        .values(values)
-        .onConflictDoUpdate({
-          target: [usageCounters.workspaceId, usageCounters.siteId, usageCounters.period],
-          set: {
-            eventCount: sql`excluded.event_count`,
-            updatedAt: new Date(),
-          },
-        });
+      // PostgreSQL accepts at most 65,535 bind parameters per statement and each row binds 4, so one
+      // statement for every (workspace, site) pair fails outright past about 16,000 of them.
+      for (let i = 0; i < values.length; i += UPSERT_CHUNK) {
+        await dbClient
+          .insert(usageCounters)
+          .values(values.slice(i, i + UPSERT_CHUNK))
+          .onConflictDoUpdate({
+            target: [usageCounters.workspaceId, usageCounters.siteId, usageCounters.period],
+            set: {
+              eventCount: sql`excluded.event_count`,
+              updatedAt: new Date(),
+            },
+          });
+      }
     }
 
     const workspaceTotals = new Map<string, number>();

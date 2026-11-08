@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-failure-20261101-205225\\failure.json",
+    "sha256": "5229a6df8f44ea693a0fc3551cd7dcb3e1eda89db2f67dbd39dcb5453aea3160",
+    "bytes": 8304
+  },
+  "artifact": {
+    "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-failure-20261101-205225\\ingestion-failure.html",
+    "sha256": "ab552d30c9e2ddc28b1ee4acdaafac9420c0d419c9731cfff70ff2a7785d9628",
+    "bytes": 767047
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-failure-20261101-205225\\review-2\\ingestion-failure.finalize.json",
+    "summaryReceipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-failure-20261101-205225\\review-2\\ingestion-failure.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-failure-20261101-205225\\review-2\\ingestion-failure.browser-check.json"
+  },
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "timeout"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 30705
+}

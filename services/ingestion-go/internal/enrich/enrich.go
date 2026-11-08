@@ -38,6 +38,9 @@ type EnrichedEvent struct {
 	Device      string `json:"device"`
 	IsBot       bool   `json:"isBot"`
 	BotStatus   string `json:"botStatus"`
+	// SampleWeight is N when this event stands for N like it: the edge kept 1 in N under load
+	// (see Server.Pressure). Absent means 1. Carried so the stream stays auditable.
+	SampleWeight int `json:"sampleWeight,omitempty"`
 }
 
 type Classification struct {

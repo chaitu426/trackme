@@ -21,23 +21,18 @@ async function getProducer() {
 }
 
 /**
- * Publish a rejected message to the dead-letter topic.
+ * Publish rejected messages to the dead-letter topic in one request.
  *
  * Throws if the publish fails. The caller has not resolved the offset yet, so
  * the batch is redelivered instead of the message being lost.
  */
-export async function sendToDLQ(failedPayload: string, errorMessage: string): Promise<void> {
+export async function sendToDLQ(letters: { raw: string; reason: string }[]): Promise<void> {
+  if (letters.length === 0) return;
+  const failedAt = new Date().toISOString();
   const producer = await getProducer();
+  // One produce request for the whole batch, not one round trip per message.
   await producer.send({
     topic: env.KAFKA_DLQ_TOPIC,
-    messages: [
-      {
-        value: JSON.stringify({
-          payload: failedPayload,
-          error: errorMessage,
-          failedAt: new Date().toISOString(),
-        }),
-      },
-    ],
+    messages: letters.map((l) => ({ value: JSON.stringify({ payload: l.raw, error: l.reason, failedAt }) })),
   });
 }

@@ -8,8 +8,10 @@ query editor (or `clickhouse-client`); replace `growth_analytics` with your `CLI
 **Means:** the edge (`ingestion-go`) is returning 5xx on `/v1/batch`; events from browsers are being lost or retried.
 **Look first:** `edge_kafka_publish_errors_total` (Kafka), `edge_redis_errors_total` (Redis), then the edge log for
 `quota`/`gate` lines. `GET :3001/health` tells you the process is alive, not that its dependencies are.
-**Mitigate:** if only Redis is failing, the edge already fails open (`QUOTA_FAIL_OPEN=true`); fix Redis. If it is
-Kafka, see below. Scale edge replicas only if latency, not errors, is the symptom.
+**Mitigate:** the edge now fails closed by default (`ADMISSION_FAIL_CLOSED=true`, `QUOTA_FAIL_OPEN=false`), so a
+Redis failure returns `503` instead of silently skipping limits; restore Redis and the SDK retries. Setting
+`ADMISSION_FAIL_CLOSED=false` restores the old fail-open behaviour and should only be a deliberate, alerted choice.
+If it is Kafka, see below. Scale edge replicas only if latency, not errors, is the symptom.
 
 ## Kafka publish errors
 **Means:** the edge cannot write to Kafka. Senders get 500 and retry, so nothing is lost until their retry budget ends.
@@ -19,18 +21,30 @@ TLS or SASL errors mean `KAFKA_*` credentials or the CA file changed.
 **Mitigate:** restore the broker or credentials. Do not raise `KAFKA_COMPRESSION` to a codec the worker cannot read
 (the worker decodes zstd and gzip only).
 
-## Redis fail-open
-**Means:** Redis errors at the edge. Quota, dedupe and site rate limits are skipped while it lasts, so duplicates and
-over-quota events can get through.
-**Look first:** Valkey service health and memory; `valkey_maxmemory_policy` must be `noeviction`.
-**Mitigate:** restore Redis. Duplicates admitted meanwhile are collapsed by the dedupe token on insert and by the
-nightly reconciliation; over-quota usage is corrected by the metering job.
+## Admission fail-closed (Redis outage)
+**Means:** Redis errors at the edge. With `ADMISSION_FAIL_CLOSED=true` (default), quota, dedupe and the fused
+IP/site gate cannot be verified, so `/v1/batch` returns `503` and the tracker retries. No duplicates or over-quota
+events are admitted. `edge_admission_fail_closed_total{stage}` shows whether the gate or the quota call failed.
+**Look first:** Valkey service health and memory; `valkey_maxmemory_policy` must be `noeviction`. Check
+`edge_redis_errors_total{op="gate"|"ip"}` and the per-op latency; the edge uses a 2 s Redis timeout.
+**Mitigate:** restore Redis; retries resume automatically. Only if the outage is prolonged and losing events is
+worse than unbounded usage, temporarily set `ADMISSION_FAIL_CLOSED=false` (old fail-open behaviour). Duplicates
+admitted that way are collapsed by the dedupe token on insert and by nightly reconciliation.
+
+## Queue backpressure (429)
+**Means:** the edge's in-process publish queue is full (`EDGE_ASYNC_PRODUCE=true`) and Kafka is not draining it.
+Clients receive `429` with `Retry-After`.
+**Look first:** `edge_publish_queue_depth`, `edge_publish_queue_overflows_total`, and
+`edge_publish_outcomes_total{outcome="retried"|"dropped"}`. Then check Kafka broker health and partitions.
+**Mitigate:** restore Kafka throughput or add partitions (≥6, RF 3). Do not raise the queue cap without fixing
+the drain rate, or memory grows while latency stays bad.
 
 ## Consumer lag
 **Means:** the event worker is behind Kafka. The dashboard shows data later than it happened.
-**Look first:** `worker_insert_duration_seconds` (slow ClickHouse inserts), `worker_batch_rows`, worker logs for
-`Crash` or `Connection timeout`. Lag with healthy inserts means too few consumers: partitions are 2 on the free plan, so
-`WORKER_PARTITION_CONCURRENCY x replicas` above 2 buys nothing.
+**Look first:** `worker_consumer_lag` (sampled every `WORKER_LAG_SAMPLE_MS`, default 5 s, independent of batch
+completion) and the backlog age; `worker_insert_duration_seconds` (slow ClickHouse inserts), `worker_batch_rows`,
+worker logs for `Crash` or `Connection timeout`. Lag with healthy inserts means too few consumers: partitions are 2
+on the free plan, so `WORKER_PARTITION_CONCURRENCY x replicas` above 2 buys nothing. Raise the topic to ≥6 partitions.
 **Mitigate:** restart a stuck worker (offsets are only committed after a durable insert, so nothing is lost). If
 ClickHouse is slow, check parts (below) and `async_insert` settings. Do not skip offsets.
 
@@ -79,11 +93,19 @@ midnight) are tolerated by design. Anything else means the aggregates are missin
 below and the backfill dry run. Stay on `v1` until a week is clean.
 
 ## Scheduled job stale
-**Means:** a scheduled job (`hourly_rollups`, `daily_rollups`, `usage_metering`, `retention`) has not succeeded for an hour.
+**Means:** a scheduled job (`hourly_rollups`, `daily_rollups`, `usage_metering`, `quota_reclaim`) has not succeeded for an hour. (`retention` and `reconciliation` run daily and have their own alerts.)
 **Look first:** scheduler logs for the task; `scheduled_job_runs_total{result="failure"}`; Redis keys `lock:scheduled:*`
 (a lock left by a crashed run expires on its own).
 **Mitigate:** fix the cause (ClickHouse reachable? migrations applied?) and the next tick catches up: daily rollups resume
 from where the table ends.
+
+## Retention not run
+**Means:** the nightly retention job has not succeeded in 36 hours. Table TTLs are only a 60-month ceiling, so until it
+runs again sites keep data longer than they configured.
+**Look first:** scheduler log for `Retention:`. A failure message starts with the count of failed statements and the first
+error (for example `too many mutations`); `Retention skipped: N ClickHouse mutations are still pending` means a backlog,
+check `SELECT * FROM system.mutations WHERE is_done = 0` and let it drain or kill stuck ones.
+**Mitigate:** fix the cause and re-run; it is idempotent (deleting rows that are already gone is a no-op).
 
 ## Reconciliation
 **Means:** the nightly check found aggregate tables that disagree with raw events (beyond 0.5 % pageviews, 2 % visitors),

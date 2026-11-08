@@ -1,5 +1,7 @@
-import { Landing } from "@trackme/landing";
+import { Landing, type LandingViewer } from "@trackme/landing";
 import { env } from "@trackme/config";
+import { getCurrentUser } from "@/lib/auth";
+import { listUserWorkspaces } from "@/lib/tenancy";
 import { resolveTrackerScriptUrl } from "@/lib/tracker-url";
 
 /**
@@ -22,9 +24,29 @@ const scriptUrl = resolveTrackerScriptUrl();
 const endpoint = `${env.INGESTION_URL.replace(/\/+$/, "")}/v1/batch`;
 const isLocal = (url: string) => /localhost|127\.0\.0\.1/.test(url);
 
-export default function MarketingPage() {
+async function resolveViewer(): Promise<LandingViewer | undefined> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return undefined;
+
+    const [workspace] = await listUserWorkspaces(user.id);
+    return {
+      name: user.name?.trim() || user.email.split("@")[0] || "there",
+      href: workspace ? `/${workspace.slug}/overview` : "/onboarding",
+      cta: workspace ? "Go to workspace" : "Finish setup",
+    };
+  } catch {
+    // The public page still renders if the session store or database is briefly down.
+    return undefined;
+  }
+}
+
+export default async function MarketingPage() {
+  const viewer = await resolveViewer();
+
   return (
     <Landing
+      viewer={viewer}
       {...(isLocal(scriptUrl) || isLocal(endpoint) ? {} : { snippet: { scriptUrl, endpoint } })}
       links={{
         docs: `${docsOrigin}/docs`,

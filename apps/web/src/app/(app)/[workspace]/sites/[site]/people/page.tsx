@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { db, siteUserProfiles, eq, desc, sql } from "@trackme/db";
+import { listProfiles, profileStats } from "@trackme/analytics";
+import { overlayServerProfiles } from "@/lib/profiles";
 import { requireUser } from "@/lib/auth";
 import { requireDashboardSite } from "@/lib/tenancy";
 import { PeopleClient, type UserProfileItem } from "./people-client";
@@ -20,35 +21,14 @@ export default async function SitePeoplePage({
   }
   const { site } = context;
 
-  // Load identified user profiles
-  const [profileRows, [stats]] = await Promise.all([
-    db
-      .select()
-      .from(siteUserProfiles)
-      .where(eq(siteUserProfiles.siteId, site.id))
-      .orderBy(desc(siteUserProfiles.lastSeenAt))
-      .limit(50),
-
-    db
-      .select({
-        total: sql<number>`count(*)::int`,
-        active7d: sql<number>`count(*) filter (where ${siteUserProfiles.lastSeenAt} >= now() - interval '7 days')::int`,
-      })
-      .from(siteUserProfiles)
-      .where(eq(siteUserProfiles.siteId, site.id)),
+  // Identified people come from the event stream (ClickHouse); a backend's POST /people adds name/email on top.
+  const [page, stats] = await Promise.all([
+    listProfiles({ workspaceId: site.workspaceId, siteId: site.id, limit: 50, offset: 0 }),
+    profileStats(site.workspaceId, site.id),
   ]);
-
-  const initialProfiles: UserProfileItem[] = profileRows.map((p) => ({
-    id: p.id,
-    distinctId: p.distinctId,
-    anonymousId: p.anonymousId,
-    name: p.name,
-    email: p.email,
-    traits: (p.traits as Record<string, unknown>) || {},
-    totalSessions: p.totalSessions,
-    totalEvents: p.totalEvents,
-    firstSeenAt: p.firstSeenAt.toISOString(),
-    lastSeenAt: p.lastSeenAt.toISOString(),
+  const initialProfiles: UserProfileItem[] = (await overlayServerProfiles(site.id, page.profiles)).map((p) => ({
+    ...p,
+    anonymousId: null,
   }));
 
   return (
@@ -56,8 +36,8 @@ export default async function SitePeoplePage({
       site={{ id: site.id, domain: site.domain }}
       initialProfiles={initialProfiles}
       stats={{
-        total: stats?.total || 0,
-        active7d: stats?.active7d || 0,
+        total: stats.total,
+        active7d: stats.active7d,
       }}
     />
   );

@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
-import { db, siteUserProfiles, sites, eq, and, desc, sql, ilike, or } from "@trackme/db";
+import { db, siteUserProfiles, sites, eq, and, sql } from "@trackme/db";
+import { listProfiles, profileStats } from "@trackme/analytics";
+import { overlayServerProfiles } from "@/lib/profiles";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { timedRoute } from "@/lib/metrics-registry";
@@ -36,57 +38,19 @@ async function handleGet(
 
     const search = request.nextUrl.searchParams.get("query")?.trim() || "";
     const limit = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("limit") || 50)));
-
     const offset = Math.max(0, Number(request.nextUrl.searchParams.get("offset") || 0) || 0);
 
-    // One extra row tells the client whether another page exists.
-    let query = db
-      .select()
-      .from(siteUserProfiles)
-      .where(eq(siteUserProfiles.siteId, siteId))
-      .orderBy(desc(siteUserProfiles.lastSeenAt))
-      .limit(limit + 1)
-      .offset(offset);
-
-    if (search) {
-      query = db
-        .select()
-        .from(siteUserProfiles)
-        .where(
-          and(
-            eq(siteUserProfiles.siteId, siteId),
-            or(
-              ilike(siteUserProfiles.distinctId, `%${search}%`),
-              ilike(siteUserProfiles.name, `%${search}%`),
-              ilike(siteUserProfiles.email, `%${search}%`)
-            )
-          )
-        )
-        .orderBy(desc(siteUserProfiles.lastSeenAt))
-        .limit(limit + 1)
-        .offset(offset) as typeof query;
-    }
-
-    const fetched = await query;
-    const hasMore = fetched.length > limit;
-    const profiles = hasMore ? fetched.slice(0, limit) : fetched;
-
-    // Summary stats
-    const [stats] = await db
-      .select({
-        totalProfiles: sql<number>`count(*)::int`,
-        activePast7Days: sql<number>`count(*) filter (where ${siteUserProfiles.lastSeenAt} >= now() - interval '7 days')::int`,
-      })
-      .from(siteUserProfiles)
-      .where(eq(siteUserProfiles.siteId, siteId));
+    // People are derived from the event stream in ClickHouse; a backend's POST /people adds name/email on top.
+    const [page, stats] = await Promise.all([
+      listProfiles({ workspaceId: siteRow.workspaceId, siteId, search, limit, offset }),
+      profileStats(siteRow.workspaceId, siteId),
+    ]);
+    const profiles = (await overlayServerProfiles(siteId, page.profiles)).map((p) => ({ ...p, anonymousId: null }));
 
     return NextResponse.json({
       profiles,
-      hasMore,
-      stats: {
-        totalProfiles: stats?.totalProfiles || 0,
-        activePast7Days: stats?.activePast7Days || 0,
-      },
+      hasMore: page.hasMore,
+      stats: { totalProfiles: stats.total, activePast7Days: stats.active7d },
     });
   } catch (error) {
     return jsonError(error);
@@ -109,6 +73,10 @@ export async function POST(
     if (!siteRow) {
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
+
+    // This endpoint had no authorization check beyond "has a session", so any signed-in user of any workspace
+    // could write profiles into any site. Require update rights on THIS site's workspace.
+    await authenticateRequest(request, siteRow.workspaceId, "sites:update");
 
     const body = await request.json().catch(() => ({}));
     const parsed = IdentifyRequestSchema.safeParse(body);

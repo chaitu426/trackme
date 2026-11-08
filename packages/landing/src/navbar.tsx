@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SmartLink } from "./smart-link";
 import { openDemoView, type DemoViewId } from "./demo-bus";
+import type { LandingViewer } from "./landing";
 
 export interface NavLinks {
   docs: string;
@@ -53,7 +54,7 @@ const SECTIONS = [
   { id: "faq", label: "FAQ" },
 ];
 
-export function Navbar({ product, links }: { product: string; links: NavLinks }) {
+export function Navbar({ product, links, viewer }: { product: string; links: NavLinks; viewer?: LandingViewer | undefined }) {
   const [scrolled, setScrolled] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [menu, setMenu] = React.useState(false);
@@ -145,16 +146,25 @@ export function Navbar({ product, links }: { product: string; links: NavLinks })
           </nav>
 
           <div className="ml-auto flex items-center gap-4">
-            {links.signIn && (
-              <SmartLink href={links.signIn} className="hidden text-sm text-zinc-400 transition-colors duration-150 hover:text-zinc-100 sm:inline">
-                Sign in
+            {viewer ? (
+              <SmartLink
+                href={viewer.href}
+                className="hidden max-w-[180px] truncate text-sm text-zinc-400 transition-colors duration-150 hover:text-zinc-100 sm:inline"
+              >
+                Welcome, {viewer.name}
               </SmartLink>
+            ) : (
+              links.signIn && (
+                <SmartLink href={links.signIn} className="hidden text-sm text-zinc-400 transition-colors duration-150 hover:text-zinc-100 sm:inline">
+                  Sign in
+                </SmartLink>
+              )
             )}
             <SmartLink
-              href={links.getStarted}
+              href={viewer?.href ?? links.getStarted}
               className="inline-flex h-9 items-center rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-colors duration-150 hover:bg-white"
             >
-              Get started
+              {viewer ? (viewer.cta ?? "Go to workspace") : "Get started"}
             </SmartLink>
             <button
               type="button"

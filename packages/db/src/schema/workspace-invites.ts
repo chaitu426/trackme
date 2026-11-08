@@ -20,7 +20,6 @@ export const workspaceInvites = pgTable(
   (table) => [
     index("idx_workspace_invites_workspace_id").on(table.workspaceId),
     index("idx_workspace_invites_email").on(table.email),
-    index("idx_workspace_invites_token").on(table.token),
   ]
 );
 

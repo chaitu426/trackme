@@ -6,6 +6,7 @@ import { db, apiKeys, eq, desc } from "@trackme/db";
 import { requireWorkspaceMember } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
+import { getClientIp } from "@/lib/client-ip";
 
 const CreateApiKeySchema = z.object({
   name: z.string().trim().min(2).max(64),
@@ -84,7 +85,7 @@ export async function POST(
       targetType: "api_key",
       targetId: key.id,
       metadata: { name: key.name, prefix: key.prefix, scopes: key.scopes },
-      ipAddress: request.headers.get("x-forwarded-for") || null,
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({ key: { ...key, plaintext: generated.plaintext } });

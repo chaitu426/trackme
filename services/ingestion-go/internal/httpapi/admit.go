@@ -19,13 +19,14 @@ import (
 // status means the batch is refused; everything this call claimed or reserved
 // has been rolled back first, so the SDK retry is not dropped as a duplicate.
 //
-// Redis failure follows the existing policy: with QuotaFailOpen the events are
-// accepted without claims or reservation (the worker/storage backstop and usage
-// metering bound the damage); otherwise the batch is refused.
+// Redis failure follows the admission policy: fail closed (503) unless fail-open
+// is explicitly configured. Silently accepting without claims or quota bypasses
+// rate limit, dedupe and billing, which is worse than shedding the request.
 func (s *Server) admitWithGate(
 	ctx context.Context,
 	enriched []enrich.EnrichedEvent,
 	quotaByWorkspace map[string]int,
+	clientIP string,
 	res *ingestResult,
 ) (claimedIDs []string, claimed []enrich.EnrichedEvent, reserved map[string]int, status int, message string) {
 	reserved = map[string]int{}
@@ -51,7 +52,7 @@ func (s *Server) admitWithGate(
 		}
 	}
 
-	for _, siteID := range order {
+	for i, siteID := range order {
 		events := bySite[siteID]
 		workspaceID := events[0].WorkspaceID
 		req := gate.Request{
@@ -62,25 +63,34 @@ func (s *Server) admitWithGate(
 			Billable:    make([]bool, len(events)),
 			Claim:       s.EdgeDedupe,
 		}
-		for i, ev := range events {
-			req.EventIDs[i] = ev.EventID
-			req.Billable[i] = ev.BotStatus == "human"
+		// The IP limit is per request, so charge it on the first site only.
+		if i == 0 && clientIP != "" && s.IPRateLimitMax > 0 {
+			req.ClientIP = clientIP
+			req.IPLimit = s.IPRateLimitMax
+		}
+		for j, ev := range events {
+			req.EventIDs[j] = ev.EventID
+			req.Billable[j] = ev.BotStatus == "human"
 		}
 
 		result, err := s.Gate.Admit(ctx, req)
 		if err != nil {
 			metrics.Default.RedisErrors.WithLabelValues("gate").Inc()
-			if s.QuotaFailOpen {
-				s.warn("gate", "admission gate unavailable, accepting without claims or quota: %v", err)
-				claimed = append(claimed, events...)
-				continue
+			if s.AdmissionFailClosed || !s.QuotaFailOpen {
+				metrics.Default.AdmissionFailClosed.WithLabelValues("gate").Inc()
+				s.warn("gate", "admission gate error: %v", err)
+				rollback()
+				return nil, nil, nil, http.StatusServiceUnavailable, "Admission unavailable"
 			}
-			s.warn("gate", "admission gate error: %v", err)
-			rollback()
-			return nil, nil, nil, http.StatusInternalServerError, "Quota check failed"
+			s.warn("gate", "admission gate unavailable, accepting without claims or quota: %v", err)
+			claimed = append(claimed, events...)
+			continue
 		}
 
 		switch result.Status {
+		case gate.IPLimited:
+			rollback()
+			return nil, nil, nil, http.StatusTooManyRequests, "Rate limit exceeded"
 		case gate.SiteLimited:
 			rollback()
 			return nil, nil, nil, http.StatusTooManyRequests, "Site rate limit exceeded"
@@ -92,8 +102,8 @@ func (s *Server) admitWithGate(
 		if result.Reserved > 0 {
 			reserved[workspaceID] += result.Reserved
 		}
-		for i, ev := range events {
-			if !result.Claimed[i] {
+		for j, ev := range events {
+			if !result.Claimed[j] {
 				res.Duplicates++
 				metrics.Default.EdgeEvents.WithLabelValues("duplicate").Inc()
 				continue

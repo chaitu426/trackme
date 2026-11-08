@@ -114,6 +114,8 @@ export class Transport {
   private buffer: Entry[] = [];
   private timer: number | null = null;
   private retryTimer: number | null = null;
+  /** The edge asked us to stay quiet until then (X-GI-Backoff on any answer, Retry-After on 429/503). */
+  private holdUntil = 0;
   private readonly endpoint: string;
   private readonly batchSize: number;
   private readonly flushIntervalMs: number;
@@ -219,7 +221,7 @@ export class Transport {
     if (this.timer !== null || typeof window === "undefined") return;
     // Leading edge: an idle transport sends on the next tick (still batching
     // events queued in the same tick); a busy one waits out the rest of the window.
-    const wait = Math.max(0, this.lastFlushAt + this.flushIntervalMs - Date.now());
+    const wait = Math.max(0, this.lastFlushAt + this.flushIntervalMs - Date.now(), this.holdUntil - Date.now());
     this.timer = window.setTimeout(() => {
       this.timer = null;
       void this.flush();
@@ -273,7 +275,11 @@ export class Transport {
     const headers: Record<string, string> = {};
     if (this.consent === "granted") headers["X-GI-Consent"] = "granted";
     if (this.signingSecret && typeof crypto !== "undefined" && crypto.subtle) {
-      headers["X-GI-Signature"] = await hmacSha256Hex(this.signingSecret, payload);
+      // The signature covers a timestamp, so a captured request cannot be replayed later (the edge refuses
+      // requests more than a few minutes old). Deploy the edge first: an older edge verifies the body alone.
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      headers["X-GI-Timestamp"] = timestamp;
+      headers["X-GI-Signature"] = await hmacSha256Hex(this.signingSecret, `${timestamp}.${payload}`);
     }
     const custom = Object.keys(headers).length > 0;
     // text/plain is a CORS-safelisted type, so with no custom headers the
@@ -295,10 +301,20 @@ export class Transport {
         body: payload,
         keepalive: true,
       });
+      this.noteHold(res);
       return classifyStatus(res.status);
     } catch {
       return "offline";
     }
+  }
+
+  /** Honour the server's pacing hints, capped at a minute so a bad header cannot silence the SDK. */
+  private noteHold(res: Response): void {
+    const header = (name: string) => Number(res.headers?.get(name));
+    const backoff = header("X-GI-Backoff");
+    const retryAfter = res.status === 429 || res.status === 503 ? header("Retry-After") * 1000 : 0;
+    const ms = Math.max(backoff || 0, retryAfter || 0);
+    if (ms > 0) this.holdUntil = Date.now() + Math.min(ms, 60_000);
   }
 
   private beacon(payload: string): boolean {
@@ -401,7 +417,7 @@ export class Transport {
     if (this.retryTimer !== null || typeof window === "undefined") return;
     // +-25% jitter, so clients that failed together (an outage, a 429) do not all come back together.
     const backoff = Math.min(RETRY_BASE_MS * 3 ** (this.consecutiveFailures - 1), RETRY_MAX_MS);
-    const delay = Math.round(backoff * (0.75 + 0.5 * this.random()));
+    const delay = Math.max(Math.round(backoff * (0.75 + 0.5 * this.random())), this.holdUntil - Date.now());
     this.retryTimer = window.setTimeout(() => {
       this.retryTimer = null;
       this.replayPersisted();

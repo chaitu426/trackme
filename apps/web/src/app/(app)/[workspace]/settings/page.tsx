@@ -38,7 +38,6 @@ export default async function OrganizationSettingsPage(props: {
         email: workspaceInvites.email,
         role: workspaceInvites.role,
         status: workspaceInvites.status,
-        token: workspaceInvites.token,
         expiresAt: workspaceInvites.expiresAt,
         createdAt: workspaceInvites.createdAt,
       })

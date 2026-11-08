@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSiteAccess, rotateIngestSigningSecret } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
+import { getClientIp } from "@/lib/client-ip";
 
 /**
  * POST — rotate the ingest HMAC secret.
@@ -23,7 +24,7 @@ export async function POST(
       targetType: "site",
       targetId: site.id,
       metadata: { siteDomain: site.domain },
-      ipAddress: request.headers.get("x-forwarded-for") || null,
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({

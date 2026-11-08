@@ -115,11 +115,15 @@ export async function verifySessionToken(
 }
 
 export function sessionCookieOptions(maxAge = SESSION_TTL_SECONDS) {
+  // Without a shared parent domain the cookie stays host-only, which is what single-host
+  // development wants; a docs subdomain sets SESSION_COOKIE_DOMAIN to read the session.
+  const domain = process.env.SESSION_COOKIE_DOMAIN?.trim();
   return {
     httpOnly: true,
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    ...(domain ? { domain } : {}),
     maxAge,
   };
 }

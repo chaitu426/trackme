@@ -1,0 +1,24 @@
+# Keeps dependencies current so that a published fix reaches this repository as a pull request within days,
+# instead of waiting for someone to run an audit. Security updates are opened immediately and separately.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: gomod
+    directory: /services/ingestion-go
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /services/ingest-proxy
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

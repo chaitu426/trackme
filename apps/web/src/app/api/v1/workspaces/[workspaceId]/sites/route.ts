@@ -8,7 +8,7 @@ import { env } from "@trackme/config";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { invalidateIngestSiteCache } from "@/lib/ingest-cache";
-import { resolveTrackerScriptUrl } from "@/lib/tracker-url";
+import { resolveTrackerScriptUrl, trackerIntegrityAttrs } from "@/lib/tracker-url";
 
 const AddSiteSchema = z.object({
   domain: z
@@ -106,7 +106,7 @@ export async function POST(
 
     return NextResponse.json({
       site: newSite,
-      snippet: `<script defer src="${resolveTrackerScriptUrl()}" data-site="${newSite.publicKey}" data-endpoint="${env.INGESTION_URL}/v1/batch"></script>`,
+      snippet: `<script defer src="${resolveTrackerScriptUrl()}"${trackerIntegrityAttrs()} data-site="${newSite.publicKey}" data-endpoint="${env.INGESTION_URL}/v1/batch"></script>`,
     });
   } catch (error) {
     return jsonError(error);

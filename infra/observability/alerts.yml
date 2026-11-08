@@ -37,13 +37,13 @@ groups:
           summary: "The edge cannot publish to Kafka; senders get 500 and retry"
           runbook: "docs/RUNBOOK.md#kafka-publish-errors"
 
-      - alert: EdgeRedisFailOpen
-        expr: sum(rate(edge_redis_errors_total{job="edge"}[5m])) > 0
-        for: 5m
+      - alert: EdgeAdmissionFailClosed
+        expr: sum(rate(edge_admission_fail_closed_total{job="edge"}[5m])) > 0
+        for: 2m
         labels: { severity: warn }
         annotations:
-          summary: "Redis errors at the edge: quota, dedupe and rate limits are failing open"
-          runbook: "docs/RUNBOOK.md#redis-fail-open"
+          summary: "Admission cannot be verified (Redis): clients get 503 instead of bypassing limits"
+          runbook: "docs/RUNBOOK.md#admission-fail-closed-redis-outage"
 
   - name: worker
     rules:
@@ -123,12 +123,23 @@ groups:
     rules:
       - alert: ScheduledJobStale
         expr: |
-          time() - scheduled_job_last_success_timestamp_seconds{job="scheduler",task!="reconciliation"} > 3600
+          time() - scheduled_job_last_success_timestamp_seconds{job="scheduler",task!~"reconciliation|retention"} > 3600
         for: 5m
         labels: { severity: page }
         annotations:
           summary: "Scheduled job {{ $labels.task }} has not succeeded for over an hour"
           runbook: "docs/RUNBOOK.md#scheduled-job-stale"
+
+      # Retention runs once a day, so the one-hour rule above would page every night. It matters more than most
+      # jobs: table TTLs are only a 60-month ceiling (migration 012), so if this stops, data outlives what each
+      # site was promised.
+      - alert: RetentionNotRun
+        expr: time() - scheduled_job_last_success_timestamp_seconds{job="scheduler",task="retention"} > 129600
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "Data retention has not succeeded in 36 hours; sites may be keeping data longer than configured"
+          runbook: "docs/RUNBOOK.md#retention-not-run"
 
       - alert: ReconciliationNotRun
         expr: time() - scheduled_job_last_success_timestamp_seconds{job="scheduler",task="reconciliation"} > 129600

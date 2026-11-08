@@ -58,6 +58,12 @@ const EnvironmentSchema = z.object({
    */
   CLICKHOUSE_DASHBOARD_USER: z.string().optional(),
   CLICKHOUSE_DASHBOARD_PASSWORD: z.string().optional(),
+  /**
+   * Dashboard queries one workspace may run at once on one web node; more wait, up to the queue size, then get
+   * 429. With N nodes a workspace can hold N x this many of the profile's max_concurrent_queries_for_user slots.
+   */
+  DASHBOARD_TENANT_CONCURRENCY: z.coerce.number().int().positive().default(4),
+  DASHBOARD_TENANT_QUEUE: z.coerce.number().int().min(0).default(64),
 
   // Redis (shared default for development; production should split by failure domain)
   REDIS_URL: z.string().default(DEV_DEFAULTS.REDIS_URL),
@@ -65,6 +71,18 @@ const EnvironmentSchema = z.object({
   REDIS_CACHE_URL: z.string().default(DEV_DEFAULTS.REDIS_CACHE_URL),
   REDIS_STATE_URL: z.string().default(DEV_DEFAULTS.REDIS_STATE_URL),
   REDIS_COORD_URL: z.string().default(DEV_DEFAULTS.REDIS_COORD_URL),
+
+  /**
+   * Share the session cookie with every subdomain of this domain (for example so a docs site can read the
+   * session). Every subdomain then becomes part of the session's trust boundary: an XSS or a takeover on any
+   * one of them acts as the user. Leave unset to keep the cookie host-only. In production it needs
+   * SESSION_COOKIE_SHARED_ACK=true, to make it an explicit decision.
+   */
+  SESSION_COOKIE_DOMAIN: z.string().optional(),
+  SESSION_COOKIE_SHARED_ACK: z
+    .string()
+    .transform((val) => val === "true" || val === "1")
+    .default("false"),
 
   // Auth
   NEXTAUTH_SECRET: z.string().min(16).default(DEV_DEFAULTS.NEXTAUTH_SECRET),
@@ -90,14 +108,18 @@ const EnvironmentSchema = z.object({
   /** Analytics read source: v1 (legacy tables), v2 (events_v2 + aggregates), shadow (run both, return v1, log differences). */
   ANALYTICS_READ: z.enum(["v1", "v2", "shadow"]).default("v1"),
   /** Event worker write target: off (legacy tables), shadow (legacy + events_ingest), only (events_ingest). */
-  WORKER_WRITE_V2: z.enum(["off", "shadow", "only"]).default("off"),
+  WORKER_WRITE_V2: z.enum(["off", "shadow", "only"]).default("shadow"),
+  /** How often the worker samples consumer-group lag from the Kafka admin API. */
+  WORKER_LAG_SAMPLE_MS: z.coerce.number().int().positive().default(5_000),
   /**
-   * Fetch tuning. Defaults favour freshness: return as soon as any data is available (measured
-   * p50 event-to-dashboard notify 795 ms -> 498 ms vs. 1 MB / 500 ms). Under load batches still
-   * fill on their own; raise both to trade latency for larger ClickHouse blocks at low traffic.
+   * Writer fetch tuning: big, infrequent ClickHouse blocks (about 1 MB, never waiting past 500 ms)
+   * keep part creation under merge capacity. The live view no longer waits on this: it has its
+   * own consumer group with a 100 ms fetch (WORKER_ROLES).
    */
-  WORKER_FETCH_MIN_BYTES: z.coerce.number().int().positive().default(2048),
-  WORKER_FETCH_MAX_WAIT_MS: z.coerce.number().int().positive().default(100),
+  WORKER_FETCH_MIN_BYTES: z.coerce.number().int().positive().default(1_000_000),
+  WORKER_FETCH_MAX_WAIT_MS: z.coerce.number().int().positive().default(500),
+  /** Comma-separated: `writer` (Kafka -> ClickHouse), `realtime` (Kafka -> Redis live view). Split across deployments to scale separately. */
+  WORKER_ROLES: z.string().default("writer,realtime"),
   WORKER_FETCH_MAX_BYTES_PER_PARTITION: z.coerce.number().int().positive().default(8_000_000),
   /** Partitions processed in parallel by one worker. Replicas x this should not exceed partitions. */
   WORKER_PARTITION_CONCURRENCY: z.coerce.number().int().positive().default(4),
@@ -161,6 +183,11 @@ export function productionProblems(candidate: Environment): string[] {
   }
   if (candidate.SITE_SIGNING_SECRET_KEY !== DEV_DEFAULTS.SITE_SIGNING_SECRET_KEY && candidate.SITE_SIGNING_SECRET_KEY.length < 32) {
     problems.push("SITE_SIGNING_SECRET_KEY must be at least 32 characters in production");
+  }
+  if (candidate.SESSION_COOKIE_DOMAIN?.trim() && !candidate.SESSION_COOKIE_SHARED_ACK) {
+    problems.push(
+      "SESSION_COOKIE_DOMAIN shares the session cookie with every subdomain; set SESSION_COOKIE_SHARED_ACK=true to accept that, or unset it"
+    );
   }
   return problems;
 }

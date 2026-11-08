@@ -14,7 +14,7 @@ import {
 import { requireApiUser } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
 import { invalidateIngestSiteCache } from "@/lib/ingest-cache";
-import { resolveTrackerScriptUrl } from "@/lib/tracker-url";
+import { resolveTrackerIntegrity, resolveTrackerScriptUrl } from "@/lib/tracker-url";
 
 const CreateWorkspaceSchema = z.object({
   name: z.string().trim().min(2).max(64),
@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
         publicKey,
       },
       trackerScriptUrl: resolveTrackerScriptUrl(),
+      trackerScriptIntegrity: resolveTrackerIntegrity(),
       ingestionUrl: `${env.INGESTION_URL}/v1/batch`,
     });
   } catch (error) {

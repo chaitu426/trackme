@@ -10,7 +10,7 @@ test("encrypts site signing secrets before they are persisted", () => {
   const encrypted = encryptSiteSigningSecret(secret);
 
   assert.notEqual(encrypted, secret);
-  assert.ok(encrypted.startsWith("enc:v1:"));
+  assert.ok(encrypted.startsWith("enc:v2:"));
   assert.equal(decryptSiteSigningSecret(encrypted), secret);
 });
 

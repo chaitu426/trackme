@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/trackme/ingestion-go/internal/enrich"
+	"github.com/trackme/ingestion-go/internal/queue"
 	"github.com/trackme/ingestion-go/internal/site"
 )
 
@@ -260,6 +261,22 @@ func TestMetricsEndpointAndTraceHeader(t *testing.T) {
 		!strings.Contains(body, `http_request_duration_seconds_bucket{route="GET /health",status_class="2xx"`) ||
 		!strings.Contains(body, "# TYPE edge_events_total counter") {
 		t.Fatalf("metrics output missing expected values: %s", body)
+	}
+}
+
+func TestQueueFullIs429WithRetryAfter(t *testing.T) {
+	r := newRig(t)
+	r.pub.err = queue.ErrFull
+
+	w := post(r.handler, "/v1/batch", batch(goodEvent(nil)), nil)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429", w.Code)
+	}
+	if got := w.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After = %q, want 1", got)
+	}
+	if len(r.quota.released) == 0 {
+		t.Fatal("a shed request must release its quota reservation")
 	}
 }
 
@@ -599,8 +616,8 @@ func TestQuotaStoreDownCanFailClosed(t *testing.T) {
 	r.srv.QuotaFailOpen = false
 	r.quota.err = errors.New("redis: connection refused")
 	w := post(r.handler, "/v1/batch", batch(withID(1, nil)), nil)
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 so the SDK retries once admission recovers", w.Code)
 	}
 	if len(r.pub.published) != 0 {
 		t.Fatal("nothing should be published when quota cannot be verified and fail-open is off")

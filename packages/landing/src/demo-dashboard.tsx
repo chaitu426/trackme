@@ -668,7 +668,7 @@ function Overview({ onOpen, filters }: { onOpen: (view: DemoViewId) => void; fil
 
 /* ---------------------------------------------------------------- Preview */
 
-function Preview({ view, getStarted, onBack }: { view: Exclude<DemoViewId, "overview">; getStarted: string; onBack: () => void }) {
+function Preview({ view, getStarted, startLabel, onBack }: { view: Exclude<DemoViewId, "overview">; getStarted: string; startLabel: string; onBack: () => void }) {
   const p = PREVIEWS[view];
   return (
     <>
@@ -696,7 +696,7 @@ function Preview({ view, getStarted, onBack }: { view: Exclude<DemoViewId, "over
               href={getStarted}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-colors hover:bg-white"
             >
-              Create workspace
+              {startLabel}
             </a>
             <button
               type="button"
@@ -717,7 +717,7 @@ function Preview({ view, getStarted, onBack }: { view: Exclude<DemoViewId, "over
 
 /* ------------------------------------------------------------------ Shell */
 
-export function DemoDashboard({ getStarted = "/signup" }: { getStarted?: string }) {
+export function DemoDashboard({ getStarted = "/signup", startLabel = "Create workspace" }: { getStarted?: string; startLabel?: string }) {
   const [view, setView] = React.useState<DemoViewId>("overview");
   const [collapsed, setCollapsed] = React.useState(false);
   const [range, setRange] = React.useState<RangeKey>("7d");
@@ -831,7 +831,7 @@ export function DemoDashboard({ getStarted = "/signup" }: { getStarted?: string 
           </header>
 
           <div className="min-h-0 flex-1 p-4 sm:p-6 md:overflow-y-auto md:p-8">
-            {view === "overview" ? <Overview onOpen={setView} filters={{ range, setRange, country, setCountry, device, setDevice }} /> : <Preview view={view} getStarted={getStarted} onBack={() => setView("overview")} />}
+            {view === "overview" ? <Overview onOpen={setView} filters={{ range, setRange, country, setCountry, device, setDevice }} /> : <Preview view={view} getStarted={getStarted} startLabel={startLabel} onBack={() => setView("overview")} />}
           </div>
         </div>
       </div>

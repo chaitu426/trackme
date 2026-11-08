@@ -27,9 +27,19 @@ export interface LandingLinks {
   privacy?: string;
 }
 
+/** The signed-in visitor, so the page greets them instead of asking them to sign in. */
+export interface LandingViewer {
+  name: string;
+  /** Where the primary call to action goes: the user's workspace or the dashboard. */
+  href: string;
+  /** Primary call to action label while signed in. */
+  cta?: string;
+}
+
 export interface LandingProps {
   product?: string;
   links: LandingLinks;
+  viewer?: LandingViewer | undefined;
   /** The real tracker and ingest URLs for the install snippet. Without them the page shows placeholders. */
   snippet?: { scriptUrl: string; endpoint: string };
 }
@@ -108,10 +118,12 @@ function Mark() {
   );
 }
 
-export function Landing({ product = "TrackMe", links, snippet }: LandingProps) {
+export function Landing({ product = "TrackMe", links, viewer, snippet }: LandingProps) {
   const scriptUrl = snippet?.scriptUrl ?? "https://your-app.com/t/v1/tracker.js";
   const endpoint = snippet?.endpoint ?? "https://ingest.your-app.com/v1/batch";
   const SNIPPET = `<script defer src="${scriptUrl}" data-site="YOUR_SITE_KEY" data-endpoint="${endpoint}"></script>`;
+  const primaryHref = viewer?.href ?? links.getStarted;
+  const primaryLabel = viewer ? (viewer.cta ?? "Go to workspace") : "Create workspace";
 
   return (
     <div className="min-h-screen bg-[#141415] text-zinc-100 antialiased [scroll-behavior:smooth]">
@@ -130,7 +142,7 @@ export function Landing({ product = "TrackMe", links, snippet }: LandingProps) {
         @media (prefers-reduced-motion: reduce) { .hero-tag, .rise { animation: none; opacity: 1; } .rise, line.hero-tag { transform: none; } }
       `}</style>
 
-      <Navbar product={product} links={{ docs: links.docs, signIn: links.signIn, getStarted: links.getStarted }} />
+      <Navbar product={product} links={{ docs: links.docs, signIn: links.signIn, getStarted: links.getStarted }} viewer={viewer} />
 
       {/* ------------------------------------------------------------ Hero */}
       <section id="product" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
@@ -151,8 +163,8 @@ export function Landing({ product = "TrackMe", links, snippet }: LandingProps) {
               {product} gives product and engineering teams live traffic, funnels, user journeys and Web Vitals from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.
             </p>
             <div className="rise mt-8 flex flex-wrap gap-3 [animation-delay:180ms]">
-              <SmartLink href={links.getStarted} className={primaryButton}>
-                Create workspace <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.5} />
+              <SmartLink href={primaryHref} className={primaryButton}>
+                {primaryLabel} <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.5} />
               </SmartLink>
               <SmartLink href={links.docs} className={secondaryButton}>
                 Read the docs
@@ -168,7 +180,7 @@ export function Landing({ product = "TrackMe", links, snippet }: LandingProps) {
             <div className="mb-4 px-1">
               <TryChips />
             </div>
-            <DemoDashboard getStarted={links.getStarted} />
+            <DemoDashboard getStarted={primaryHref} startLabel={primaryLabel} />
           </div>
         </Container>
       </section>
@@ -357,8 +369,8 @@ export function Landing({ product = "TrackMe", links, snippet }: LandingProps) {
                   Your first pageview is one tag away.
                 </h2>
                 <div className="mt-8 flex flex-wrap gap-3">
-                  <SmartLink href={links.getStarted} className={primaryButton}>
-                    Create workspace <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.5} />
+                  <SmartLink href={primaryHref} className={primaryButton}>
+                    {primaryLabel} <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.5} />
                   </SmartLink>
                   <SmartLink href={links.docs} className={secondaryButton}>
                     Read the docs
@@ -419,8 +431,14 @@ export function Landing({ product = "TrackMe", links, snippet }: LandingProps) {
             </FooterColumn>
 
             <FooterColumn title="Account">
-              {links.signIn && <FooterLink href={links.signIn}>Sign in</FooterLink>}
-              <FooterLink href={links.getStarted}>Create workspace</FooterLink>
+              {viewer ? (
+                <FooterLink href={viewer.href}>{viewer.cta ?? "Go to workspace"}</FooterLink>
+              ) : (
+                <>
+                  {links.signIn && <FooterLink href={links.signIn}>Sign in</FooterLink>}
+                  <FooterLink href={links.getStarted}>Create workspace</FooterLink>
+                </>
+              )}
               {links.privacy && <FooterLink href={links.privacy}>Privacy overview</FooterLink>}
             </FooterColumn>
           </div>
