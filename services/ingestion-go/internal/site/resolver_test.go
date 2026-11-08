@@ -306,7 +306,7 @@ func TestDecryptStoredSecret(t *testing.T) {
 		iv[i] = byte(i + 1)
 	}
 	ciphertext := gcm.Seal(nil, iv, []byte(plaintext), nil)
-	stored := encryptedSecretPrefix + base64.RawURLEncoding.EncodeToString(append(iv, ciphertext...))
+	stored := encryptedSecretPrefixV1 + base64.RawURLEncoding.EncodeToString(append(iv, ciphertext...))
 
 	got, err := decryptStoredSecret(stored)
 	if err != nil {

@@ -125,17 +125,19 @@ interface Envelope<T> {
   swr: 1;
   /** Epoch ms until which the value is fresh. */
   fresh: number;
+  /** How long computing `data` took, ms; drives early refresh (see cached()). */
+  cost?: number;
   data: T;
 }
 
-function readEnvelope<T>(raw: string): { data: T; fresh: number } {
+function readEnvelope<T>(raw: string): { data: T; fresh: number; cost: number } {
   const parsed = JSON.parse(raw) as Envelope<T> | T;
   if (parsed && typeof parsed === "object" && (parsed as Envelope<T>).swr === 1) {
     const envelope = parsed as Envelope<T>;
-    return { data: envelope.data, fresh: envelope.fresh };
+    return { data: envelope.data, fresh: envelope.fresh, cost: envelope.cost ?? 0 };
   }
   // Entry written before envelopes existed: treat as fresh, it expires by its own TTL.
-  return { data: parsed as T, fresh: Number.POSITIVE_INFINITY };
+  return { data: parsed as T, fresh: Number.POSITIVE_INFINITY, cost: 0 };
 }
 
 function load<T>(key: string, ttlSeconds: number, fn: () => Promise<T>, store: CacheStore): Promise<T> {
@@ -146,10 +148,11 @@ function load<T>(key: string, ttlSeconds: number, fn: () => Promise<T>, store: C
   }
   recordCache(key, "miss");
 
+  const startedAt = Date.now();
   const promise = fn()
     .then(async (value) => {
       try {
-        const envelope: Envelope<T> = { swr: 1, fresh: Date.now() + ttlSeconds * 1000, data: value };
+        const envelope: Envelope<T> = { swr: 1, fresh: Date.now() + ttlSeconds * 1000, cost: Date.now() - startedAt, data: value };
         await store.set(key, JSON.stringify(envelope), ttlSeconds + STALE_GRACE_SECONDS);
       } catch {
         // best effort
@@ -178,8 +181,19 @@ export async function cached<T>(
   try {
     const hit = await store.get(key);
     if (hit !== null) {
-      const { data, fresh } = readEnvelope<T>(hit);
-      if (Date.now() < fresh) {
+      const { data, fresh, cost } = readEnvelope<T>(hit);
+      const now = Date.now();
+      if (now < fresh) {
+        // XFetch (Vattani et al., VLDB 2015): refresh a little BEFORE expiry, with a probability
+        // that rises as expiry nears and with how costly the value is to recompute. A hot key is
+        // then rebuilt by one lucky reader in advance, not by every node at the instant it
+        // expires, and no lock or coordination is needed. Entries without a cost never refresh early.
+        if (cost > 0 && now - cost * Math.log(1 - Math.random()) >= fresh) {
+          recordCache(key, "early");
+          void load(key, ttlSeconds, fn, store).catch(() => {
+            // the cached value still answers; the next reader retries
+          });
+        }
         recordCache(key, "hit");
         return data;
       }

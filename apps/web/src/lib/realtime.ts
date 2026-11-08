@@ -43,23 +43,16 @@ async function activeSessionIds(siteId: string): Promise<string[]> {
 }
 
 /**
- * Live snapshot of active sessions for a site.
- * Prefers the ZSET index written by the event worker; falls back to SCAN
- * for sessions written before the index existed.
+ * Live snapshot of active sessions for a site, from the ZSET index the event worker maintains.
+ *
+ * There is deliberately no SCAN fallback: it walked the WHOLE keyspace (MATCH filters after the
+ * scan) every time a site had no visitors, which is the normal state of most sites. The keys it
+ * covered were written before the index existed and expire within 5 minutes.
  */
 export async function getRealtimeSnapshot(siteId: string): Promise<RealtimeSnapshot> {
   const redis = getRedis();
-  let sessionIds = await activeSessionIds(siteId);
-
-  // Legacy fallback while old keys without an index still expire naturally.
-  if (sessionIds.length === 0) {
-    const keys = await scanActiveKeys(siteId);
-    if (keys.length === 0) {
-      return { activeVisitors: 0, pages: [] };
-    }
-    const values = await redis.mget(...keys);
-    return buildSnapshotFromValues(values);
-  }
+  const sessionIds = await activeSessionIds(siteId);
+  if (sessionIds.length === 0) return { activeVisitors: 0, pages: [] };
 
   const keys = sessionIds.map((sid) => `active:${siteId}:${sid}`);
   const values = await redis.mget(...keys);
@@ -98,32 +91,13 @@ function buildSnapshotFromValues(values: (string | null)[]): RealtimeSnapshot {
   return { activeVisitors: active, pages };
 }
 
-async function scanActiveKeys(siteId: string): Promise<string[]> {
-  const redis = getRedis();
-  const pattern = `active:${siteId}:*`;
-  const keys: string[] = [];
-  let cursor = "0";
-
-  do {
-    const [nextCursor, batch] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 500);
-    keys.push(...batch);
-    cursor = nextCursor;
-  } while (cursor !== "0");
-
-  return keys;
-}
-
 export async function getActiveVisitorCount(siteId: string): Promise<number> {
   try {
     const redis = getRedis();
     const indexKey = `rt:active:${siteId}`;
     const now = Math.floor(Date.now() / 1000);
     await redis.zremrangebyscore(indexKey, "-inf", now);
-    const count = await redis.zcount(indexKey, now, "+inf");
-    if (count > 0) return count;
-
-    const keys = await scanActiveKeys(siteId);
-    return keys.length;
+    return await redis.zcount(indexKey, now, "+inf");
   } catch (err) {
     console.warn(`[Realtime:getActiveVisitorCount] Failed to query Redis for site ${siteId}:`, err);
     return 0;

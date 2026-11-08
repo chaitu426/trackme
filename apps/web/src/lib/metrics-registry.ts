@@ -50,7 +50,7 @@ setShadowReporter((diff) => {
   console.warn(`[analytics-shadow] ${diff.query} differs: ${diff.differences.slice(0, 5).join("; ")}`);
 });
 
-export type CacheResult = "hit" | "stale" | "miss" | "coalesced" | "error";
+export type CacheResult = "hit" | "stale" | "miss" | "coalesced" | "error" | "early";
 
 /** `q:v1:{endpoint}:{siteId}:{digest}` -> endpoint, so labels stay bounded. */
 export function endpointOf(key: string): string {

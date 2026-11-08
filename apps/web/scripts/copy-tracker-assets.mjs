@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -31,4 +31,15 @@ mkdirSync(destDir, { recursive: true });
 mkdirSync(v1Dir, { recursive: true });
 copyFileSync(source, path.join(destDir, "tracker.js"));
 copyFileSync(source, path.join(v1Dir, "tracker.js"));
+
+// The immutable, content-hashed file. Its name changes whenever its bytes do, so a page that references it
+// (with the integrity hash below) gets exactly this code or nothing: a later change to /tracker.js, or to this
+// server, cannot silently alter what an existing install runs. Snippets use this by default (lib/tracker-url.ts).
+const pinnedDir = path.join(destDir, "t", manifest.latest);
+mkdirSync(pinnedDir, { recursive: true });
+copyFileSync(source, path.join(pinnedDir, manifest.file));
+writeFileSync(
+  path.join(destDir, "t", "manifest.json"),
+  JSON.stringify({ version: manifest.latest, path: `/t/${manifest.latest}/${manifest.file}`, integrity: manifest.sri }, null, 2)
+);
 console.log(`[copy-tracker-assets] Copied tracker bundle -> ${path.join(destDir, "tracker.js")}`);

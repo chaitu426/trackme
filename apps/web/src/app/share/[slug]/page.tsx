@@ -1,10 +1,13 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Activity, ArrowUpRight } from "lucide-react";
 import { GlyphField } from "@trackme/landing";
 import { getPublicSite } from "@/lib/tenancy";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 import { parseRangeKey } from "@/lib/date-range";
 import { PageHeader } from "@/components/ui/page-header";
 import { RangeSwitcher } from "@/components/range-switcher";
@@ -45,6 +48,12 @@ export default async function PublicShareDashboard({
 }) {
   const { slug } = await params;
   const { range: rawRange } = await searchParams;
+  // The one unauthenticated page that reads the database and ClickHouse: limit it per caller address.
+  try {
+    await checkRateLimit(`share:${getClientIp({ headers: (await headers()) as unknown as Headers })}`, 120, 60);
+  } catch {
+    notFound();
+  }
   const site = await getPublicSite(slug);
   if (!site) notFound();
   const range = parseRangeKey(rawRange);

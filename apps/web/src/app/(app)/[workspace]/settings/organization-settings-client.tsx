@@ -14,8 +14,6 @@ import {
   CheckCircle2,
   Loader2,
   RefreshCw,
-  Link2,
-  Check,
   Crown,
   Eye,
   Send,
@@ -347,7 +345,6 @@ export function OrganizationSettingsClient({
                 {invites.map((invite) => {
                   const expiry = inviteManager.getExpiryMeta(invite.expiresAt);
                   const isResending = inviteManager.busy[`resend:${invite.id}`];
-                  const hasToken = !!invite.token;
                   return (
                     <div key={invite.id} className="flex items-center justify-between py-3 text-xs">
                       <div className="min-w-0">
@@ -372,16 +369,6 @@ export function OrganizationSettingsClient({
                           title="Resend invite"
                         >
                           {isResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        </button>
-                        {/* Copy link */}
-                        <button
-                          onClick={() => inviteManager.copyInviteLink(invite.token || invite.id, invite.id)}
-                          className="text-zinc-500 hover:text-zinc-300 transition p-2 rounded-lg hover:bg-white/[0.04]"
-                          title={hasToken ? "Copy invite link" : "Invite link unavailable"}
-                        >
-                          {inviteManager.copiedToken === invite.id
-                            ? <Check className="w-3.5 h-3.5 text-[#4cc38a]" />
-                            : <Link2 className="w-3.5 h-3.5" />}
                         </button>
                         {/* Revoke */}
                         <button

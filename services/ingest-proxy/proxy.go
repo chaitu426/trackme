@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -176,7 +177,11 @@ func newHandler(cfg config, client *http.Client) http.Handler {
 			return
 		}
 
+		// The signature covers a timestamp, so a captured request cannot be replayed later: the edge refuses
+		// anything more than a few minutes old, and the timestamp cannot be changed without breaking the signature.
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 		mac := hmac.New(sha256.New, []byte(cfg.SigningSecret))
+		_, _ = mac.Write([]byte(timestamp + "."))
 		_, _ = mac.Write(body)
 
 		out, err := http.NewRequestWithContext(r.Context(), http.MethodPost, cfg.IngestURL+"/v1/batch", bytes.NewReader(body))
@@ -186,6 +191,7 @@ func newHandler(cfg config, client *http.Client) http.Handler {
 		}
 		// The SDK sends text/plain to avoid a CORS preflight; the edge expects JSON.
 		out.Header.Set("Content-Type", "application/json")
+		out.Header.Set("X-GI-Timestamp", timestamp)
 		out.Header.Set("X-GI-Signature", hex.EncodeToString(mac.Sum(nil)))
 		for _, h := range []string{"X-GI-Consent", "Origin", "Referer", "User-Agent", "DNT"} {
 			if v := r.Header.Get(h); v != "" {

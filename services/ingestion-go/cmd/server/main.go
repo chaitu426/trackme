@@ -11,12 +11,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/trackme/ingestion-go/internal/config"
 	"github.com/trackme/ingestion-go/internal/dedupe"
 	"github.com/trackme/ingestion-go/internal/gate"
 	"github.com/trackme/ingestion-go/internal/geo"
 	"github.com/trackme/ingestion-go/internal/httpapi"
+	"github.com/trackme/ingestion-go/internal/lease"
+	"github.com/trackme/ingestion-go/internal/limit"
 	"github.com/trackme/ingestion-go/internal/metrics"
 	"github.com/trackme/ingestion-go/internal/queue"
 	"github.com/trackme/ingestion-go/internal/quota"
@@ -56,8 +59,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("redis url parse failed: %v", err)
 	}
+	redisTimeout := time.Duration(cfg.RedisTimeoutMs) * time.Millisecond
+	if redisTimeout <= 0 {
+		redisTimeout = 2 * time.Second
+	}
+	// A slow counter store must fail the admission call quickly; queueing
+	// requests behind it is what turned a remote Redis into a 4 s request path.
+	opt.DialTimeout = redisTimeout
+	opt.ReadTimeout = redisTimeout
+	opt.WriteTimeout = redisTimeout
+	opt.MaxRetries = 1
+	if cfg.RedisPoolSize > 0 {
+		opt.PoolSize = cfg.RedisPoolSize
+	}
 	if opt.MinIdleConns < 4 {
 		opt.MinIdleConns = 4 // pre-dialed, so a burst never waits on connection setup
+	}
+	if opt.MinIdleConns > opt.PoolSize {
+		opt.MinIdleConns = opt.PoolSize
 	}
 	rdb := redis.NewClient(opt)
 	defer rdb.Close()
@@ -81,8 +100,36 @@ func main() {
 	}
 	publisher := queue.NewPublisher(cfg.KafkaBrokers, cfg.KafkaTopic, compression).
 		WithTransport(kafkaTransport).
+		WithShuffle(cfg.KafkaShuffleK).
 		WithTimeout(time.Duration(cfg.KafkaPublishTimeoutMs) * time.Millisecond)
 	defer publisher.Close()
+
+	var eventPublisher httpapi.EventPublisher = publisher
+	var pressure func() float64
+	if cfg.AsyncProduce {
+		var wal *queue.WAL
+		if cfg.WALDir != "" {
+			if wal, err = queue.OpenWAL(cfg.WALDir, cfg.WALMaxBytes); err != nil {
+				log.Fatalf("wal: %v", err)
+			}
+			defer wal.Close() // deferred before the publisher's Close, so the publisher drains into it first
+			log.Printf("produce: wal spill enabled dir=%s max=%dMB resume=%dKB", cfg.WALDir, cfg.WALMaxBytes>>20, wal.Bytes()>>10)
+		}
+		asyncPublisher := queue.NewAsyncPublisher(publisher, queue.AsyncOptions{
+			WAL:            wal,
+			MaxEvents:      cfg.QueueMaxEvents,
+			MinBatch:       cfg.ProduceBatchMin,
+			MaxBatch:       cfg.ProduceBatchMax,
+			FlushInterval:  time.Duration(cfg.ProduceFlushMs) * time.Millisecond,
+			MaxAttempts:    cfg.ProduceMaxAttempts,
+			RetryBackoff:   time.Duration(cfg.ProduceRetryBackoffMs) * time.Millisecond,
+			PublishTimeout: time.Duration(cfg.KafkaPublishTimeoutMs) * time.Millisecond,
+		})
+		eventPublisher = asyncPublisher
+		pressure = asyncPublisher.Pressure
+		defer asyncPublisher.Close()
+		log.Printf("produce: async queue enabled max=%d batch=%d-%d flush=%dms", cfg.QueueMaxEvents, cfg.ProduceBatchMin, cfg.ProduceBatchMax, cfg.ProduceFlushMs)
+	}
 
 	geoResolver := geo.New(cfg.GeoIPMMDBPath).WithLoopbackIP(cfg.GeoLoopbackIP)
 	defer geoResolver.Close()
@@ -92,7 +139,7 @@ func main() {
 
 	srv := &httpapi.Server{
 		Sites:       sitesResolver,
-		Publisher:   publisher,
+		Publisher:   eventPublisher,
 		Limiter:     ratelimit.New(rdb, cfg.RateLimitMax, cfg.RateLimitWindowMs),
 		SiteLimiter: ratelimit.New(rdb, cfg.SiteRateLimitMax, cfg.RateLimitWindowMs),
 		Quota:       quota.New(rdb),
@@ -108,13 +155,39 @@ func main() {
 			{Name: "kafka", Check: publisher.Ping},
 		},
 
-		TrustedProxyHops: cfg.TrustedProxyHops,
-		QuotaFailOpen:    cfg.QuotaFailOpen,
-		AsyncConfirm:     cfg.AsyncConfirm,
+		TrustedProxyHops:    cfg.TrustedProxyHops,
+		QuotaFailOpen:       cfg.QuotaFailOpen,
+		AdmissionFailClosed: cfg.AdmissionFailClosed,
+		IPRateLimitMax:      cfg.RateLimitMax,
+		AsyncConfirm:        cfg.AsyncConfirm,
+
+		RequireSignedTimestamp: cfg.SigningRequireTimestamp,
 	}
-	if cfg.EdgeGateScript {
+	if cfg.Shed {
+		srv.Pressure = pressure
+	}
+	if cfg.AdaptiveLimit {
+		srv.Concurrency = limit.New(cfg.LimitInitial, cfg.LimitMin, cfg.LimitMax)
+		metrics.Default.Registry.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: "edge_concurrency_limit",
+			Help: "Current adaptive cap on in-flight ingest requests.",
+		}, srv.Concurrency.Limit))
+	}
+	var drainLeases func(context.Context) error
+	if cfg.EdgeLeases {
+		host, _ := os.Hostname()
+		la := lease.New(ctx, rdb, lease.Config{
+			EdgeID:   fmt.Sprintf("%s-%d-%d", host, os.Getpid(), time.Now().UnixNano()%1_000_000),
+			SiteRate: cfg.SiteEventsPerSec,
+			Fleet:    cfg.EdgeFleetSize,
+			Window:   time.Duration(cfg.RateLimitWindowMs) * time.Millisecond,
+		})
+		srv.Gate, srv.Deduper = la, la
+		drainLeases = la.Drain
+		log.Printf("admission: leases enabled (site budget %.0f events/s over %d edge(s)); no per-request Redis calls", cfg.SiteEventsPerSec, cfg.EdgeFleetSize)
+	} else if cfg.EdgeGateScript {
 		srv.Gate = gate.New(rdb, cfg.SiteRateLimitMax, cfg.RateLimitWindowMs)
-		log.Printf("admission: single-script gate enabled (site limit + dedupe claims + quota in one Redis call)")
+		log.Printf("admission: single-script gate enabled (IP + site limit + dedupe claims + quota in one Redis call)")
 	}
 
 	if cfg.TrustedProxyHops <= 0 {
@@ -149,6 +222,9 @@ func main() {
 		if !cfg.EdgeDedupe {
 			log.Printf("warning: EDGE_DEDUPE is off, so a client retry after a lost response is stored twice until ClickHouse merges the duplicates")
 		}
+		if !cfg.AdmissionFailClosed {
+			log.Printf("warning: ADMISSION_FAIL_CLOSED is off; a Redis outage will bypass rate limit, dedupe and quota")
+		}
 		if cfg.QuotaFailOpen {
 			log.Printf("warning: QUOTA_FAIL_OPEN is on, so quota and rate limits are not enforced while Redis is unreachable")
 		}
@@ -168,5 +244,10 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+	if drainLeases != nil {
+		if err := drainLeases(shutdownCtx); err != nil {
+			log.Printf("lease drain failed, unspent quota stays charged until the month rolls over: %v", err)
+		}
+	}
 	log.Println("ingestion-go shut down cleanly")
 }

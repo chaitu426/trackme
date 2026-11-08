@@ -9,6 +9,7 @@ import {
 } from "@/lib/session-store";
 import { getCurrentUser } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
+import { getClientIp } from "@/lib/client-ip";
 
 export async function GET() {
   try {
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
-    const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const clientIp = getClientIp(request);
     const userAgent = request.headers.get("user-agent") || undefined;
 
     // Revoke old session and issue fresh extended session

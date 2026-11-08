@@ -1,0 +1,355 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Trackme ingestion - why the load test failed",
+    "output": ".archify/architecture-ingest-failure-20261101-205225/ingestion-failure.html",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/chaitu426/trackme.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "f7371fcfc8ae9975968bef18f71435cc41c3a0bd"
+    }
+  },
+  "components": [
+    {
+      "id": "tracker",
+      "type": "external",
+      "label": "Site visitors",
+      "sublabel": "Tracker SDK",
+      "pos": [
+        30,
+        200
+      ],
+      "size": [
+        110,
+        60
+      ],
+      "sources": [
+        {
+          "path": "packages/tracker/src/transport.ts",
+          "line": 292,
+          "label": "SDK batch fetch"
+        }
+      ]
+    },
+    {
+      "id": "edge",
+      "type": "backend",
+      "label": "Ingestion Edge",
+      "sublabel": "Go :3001 - sync handler",
+      "tag": "2 EVALs / request",
+      "pos": [
+        190,
+        200
+      ],
+      "size": [
+        170,
+        66
+      ],
+      "sources": [
+        {
+          "path": "services/ingestion-go/internal/httpapi/server.go",
+          "line": 193,
+          "label": "batch handler"
+        },
+        {
+          "path": "services/ingestion-go/internal/httpapi/server.go",
+          "line": 254,
+          "label": "IP limiter"
+        },
+        {
+          "path": "services/ingestion-go/internal/httpapi/server.go",
+          "line": 557,
+          "label": "sync publish"
+        }
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Valkey (Aiven)",
+      "sublabel": "3 s timeout > fail-open",
+      "tag": "7,041 gate errors",
+      "pos": [
+        180,
+        40
+      ],
+      "size": [
+        190,
+        60
+      ],
+      "sources": [
+        {
+          "path": "services/ingestion-go/internal/ratelimit/limiter.go",
+          "line": 49,
+          "label": "IP limit EVAL"
+        },
+        {
+          "path": "services/ingestion-go/internal/gate/gate.go",
+          "line": 132,
+          "label": "gate EVAL"
+        }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL (Aiven)",
+      "sublabel": "sites - quota",
+      "tag": "47-86 ms warm",
+      "pos": [
+        180,
+        380
+      ],
+      "size": [
+        190,
+        60
+      ],
+      "sources": [
+        {
+          "path": "services/ingestion-go/internal/site/resolver.go",
+          "line": 187,
+          "label": "site lookup SQL"
+        },
+        {
+          "path": "services/ingestion-go/internal/site/resolver.go",
+          "line": 217,
+          "label": "cached resolve"
+        }
+      ]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka growth_events",
+      "sublabel": "Aiven - 2 partitions",
+      "tag": "p50 4 s @10",
+      "pos": [
+        430,
+        200
+      ],
+      "size": [
+        170,
+        66
+      ],
+      "sources": [
+        {
+          "path": "services/ingestion-go/internal/queue/kafka.go",
+          "line": 52,
+          "label": "writer config"
+        },
+        {
+          "path": "services/ingestion-go/internal/queue/kafka.go",
+          "line": 57,
+          "label": "acks=all"
+        },
+        {
+          "path": "services/ingestion-go/internal/queue/kafka.go",
+          "line": 65,
+          "label": "3 s write timeout"
+        }
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Event Worker",
+      "sublabel": "batch > ClickHouse",
+      "tag": "6,252 backlog",
+      "pos": [
+        670,
+        200
+      ],
+      "size": [
+        170,
+        66
+      ],
+      "sources": [
+        {
+          "path": "services/event-worker/src/worker.ts",
+          "line": 201,
+          "label": "eachBatch consumer"
+        },
+        {
+          "path": "services/event-worker/src/worker.ts",
+          "line": 144,
+          "label": "insert timer"
+        }
+      ]
+    },
+    {
+      "id": "clickhouse",
+      "type": "database",
+      "label": "ClickHouse (Aiven)",
+      "sublabel": "events_raw",
+      "tag": "323 ms / insert",
+      "pos": [
+        910,
+        200
+      ],
+      "size": [
+        180,
+        66
+      ],
+      "sources": [
+        {
+          "path": "services/event-worker/src/writers/clickhouse.ts",
+          "line": 116,
+          "label": "async insert"
+        }
+      ]
+    },
+    {
+      "id": "events_v2",
+      "type": "database",
+      "label": "events_v2 / aggregates",
+      "sublabel": "WORKER_WRITE_V2 = off",
+      "tag": "0 rows",
+      "pos": [
+        910,
+        40
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "sources": [
+        {
+          "path": "packages/config/src/index.ts",
+          "line": 93,
+          "label": "write mode default"
+        }
+      ]
+    },
+    {
+      "id": "obs",
+      "type": "external",
+      "label": "Metrics :9464",
+      "sublabel": "lag only after a batch",
+      "tag": "lag reads 0",
+      "pos": [
+        665,
+        40
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "sources": [
+        {
+          "path": "services/event-worker/src/metrics.ts",
+          "line": 48,
+          "label": "lag gauge"
+        },
+        {
+          "path": "services/event-worker/src/worker.ts",
+          "line": 176,
+          "label": "lag set per batch"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "tracker-edge",
+      "from": "tracker",
+      "to": "edge",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge-redis",
+      "from": "edge",
+      "to": "redis",
+      "label": "EVAL x2",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "edge-postgres",
+      "from": "edge",
+      "to": "postgres",
+      "label": "site lookup",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "edge-kafka",
+      "from": "edge",
+      "to": "kafka",
+      "label": "acks=all",
+      "variant": "emphasis"
+    },
+    {
+      "id": "kafka-worker",
+      "from": "kafka",
+      "to": "worker",
+      "label": "consume"
+    },
+    {
+      "id": "worker-clickhouse",
+      "from": "worker",
+      "to": "clickhouse",
+      "label": "insert"
+    },
+    {
+      "id": "worker-obs",
+      "from": "worker",
+      "to": "obs",
+      "label": "lag 0 (stale)",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "clickhouse-v2",
+      "from": "clickhouse",
+      "to": "events_v2",
+      "label": "V2 off",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Admission failed open",
+      "items": [
+        "97% of requests: Redis EVAL exceeded the 3 s read timeout",
+        "Rate limit, edge dedupe and quota were bypassed silently",
+        "One metric label op=gate covers both the IP limiter and the gate"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Producer lost and mis-counted events",
+      "items": [
+        "About 27% of offered events never reached Kafka",
+        "Only 1,714 of 14,412 landed messages were acked",
+        "Ambiguous acks=all timeouts released claims and quota"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Throughput collapsed",
+      "items": [
+        "Produce p50 4 s at 10 concurrent, 11 s at 50",
+        "Delivered about 30 events/s; 2 partitions cap the worker",
+        "Sync acks=all keeps Kafka in the request path"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Backlog went dark",
+      "items": [
+        "6,252 messages were unconsumed when the run stopped",
+        "Lag gauge updates only per batch, so it read 0",
+        "WORKER_WRITE_V2=off leaves events_v2 aggregates empty"
+      ]
+    }
+  ]
+}

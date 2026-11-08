@@ -74,3 +74,14 @@ test("role Redis URLs follow REDIS_URL unless set explicitly", () => {
   assert.equal(e.REDIS_COORD_URL, "rediss://h:1");
   assert.equal(e.REDIS_CACHE_URL, "redis://cache:2");
 });
+
+test("production refuses to start with a session cookie shared across subdomains unless that is acknowledged", () => {
+  assert.throws(
+    () => quiet(() => loadEnvironment({ ...prod, SESSION_COOKIE_DOMAIN: ".example.com" } as NodeJS.ProcessEnv)),
+    /Unsafe production configuration/
+  );
+  const acknowledged = loadEnvironment({ ...prod, SESSION_COOKIE_DOMAIN: ".example.com", SESSION_COOKIE_SHARED_ACK: "true" } as NodeJS.ProcessEnv);
+  assert.equal(acknowledged.SESSION_COOKIE_DOMAIN, ".example.com");
+  const hostOnly = loadEnvironment(prod as NodeJS.ProcessEnv);
+  assert.equal(hostOnly.SESSION_COOKIE_DOMAIN, undefined);
+});

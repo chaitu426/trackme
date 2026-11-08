@@ -23,7 +23,7 @@
   "dependencies": {
     "@trackme/config": "workspace:*",
     "@trackme/contracts": "workspace:*",
-    "drizzle-orm": "^0.39.3",
+    "drizzle-orm": "^0.45.4",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
@@ -33,4 +33,3 @@
     "typescript": "^5.7.3"
   }
 }
-

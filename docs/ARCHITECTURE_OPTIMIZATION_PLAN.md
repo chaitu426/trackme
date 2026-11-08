@@ -674,12 +674,13 @@ accepted for older brokers, unknown values fail at startup), `BatchTimeout` 2 ms
 and marshals through a pooled buffer. 6.1 (single Redis round trip) and the 6.2 bot-billing items are not part of
 this change.
 
-**Progress (6.1):** `internal/gate` runs the site rate limit, event-ID claims and quota reservation as one atomic
-script (flag `EDGE_GATE_SCRIPT`, default off). The per-IP limit deliberately stays a separate early call so abusive
-IPs are refused before any parsing or site lookup; a request therefore costs 3 Redis round trips (IP, gate, confirm)
-instead of 4+ (IP, site limit, claim, one quota call per workspace, confirm). Quota is reserved for claimed, human
-events only, and a quota rejection undoes the claims the same script made, so a retry is never dropped as a
-duplicate. Redis errors follow `QUOTA_FAIL_OPEN`. Tested on an in-memory Redis at script and handler level.
+**Progress (6.1):** `internal/gate` runs the IP limit, site rate limit, event-ID claims and quota reservation as one
+atomic script (flag `EDGE_GATE_SCRIPT`, now default on). A request therefore costs 2 Redis round trips (fused gate,
+confirm) instead of 4+ (IP, site limit, claim, one quota call per workspace, confirm), and the IP counter is keyed
+the same way as before so limits are unchanged. Quota is reserved for claimed, human events only, and a quota
+rejection undoes the claims the same script made, so a retry is never dropped as a duplicate. Redis errors follow
+`ADMISSION_FAIL_CLOSED` (default on: `503`), with `QUOTA_FAIL_OPEN=false` as the compatible fallback. Tested on an
+in-memory Redis at script and handler level.
 
 ### Done when
 - Load test (vegeta/k6, 50-event batches at the per-site limit): p99 ≤ 50 ms with Redis RTT 1 ms.
@@ -821,8 +822,8 @@ rate, reconciliation diff. Every phase in §11 has a go/no-go criterion on this 
 
 ## 11. Migration and rollout (zero downtime, reversible)
 
-Feature flags (all in `@trackme/config`, default off): `WORKER_WRITE_V2`, `ANALYTICS_READ=v1|v2|shadow`,
-`EDGE_DEDUPE`, `EDGE_GATE_SCRIPT`, `AUTH_STRICT_REVOCATION`.
+Feature flags (all in `@trackme/config`): `WORKER_WRITE_V2` (default `shadow`), `ANALYTICS_READ=v1|v2|shadow`
+(default `v1`), `EDGE_DEDUPE` (default on), `EDGE_GATE_SCRIPT` (default on), `AUTH_STRICT_REVOCATION` (default off).
 
 | Phase | Work | Go criterion | Rollback |
 |---|---|---|---|
@@ -882,7 +883,7 @@ Postgres queries per dashboard load (`pg_stat_statements`), and consumer lag.
 | 2 | Known bots: drop at edge vs store | Drop at edge, not billed; heuristic bots stored and not billed |
 | 3 | `web_vital` events counted in visitors/pageviews? | Keep current behavior now; exclude later as a separate, announced change |
 | 4 | Edge dedupe window | 25 h (SDK retry cap is 23 h) |
-| 5 | Redis fail policy for dedupe/gate | Fail open with metric and alert |
+| 5 | Redis fail policy for dedupe/gate | Fail closed with `503` + metric and alert (`ADMISSION_FAIL_CLOSED=true`); fail-open remains a deliberate override |
 | 6 | Per-site retention (P2-6) | Out of scope here. If needed: per-tier tables (e.g. 3/12/24 months) chosen at insert, not row deletes |
 | 7 | Single Redis vs split (P2-10) | Split before launch at scale: (a) rate/quota/dedupe, (b) sessions/authz, (c) cache/realtime. All code already takes a role in `getRedisURLForRole` |
 | 8 | `/tracker.js` CDN (P2-11) | The versioned asset publishing commit exists; finish by serving `/t/v1/*` with `Cache-Control: public, max-age=31536000, immutable` for versioned files and a short TTL for the alias |
@@ -950,7 +951,7 @@ before/after number.
 ## Progress: WS2/WS3 write path (phase 3)
 
 - `008`/`009` applied on Aiven ClickHouse (found and fixed two bugs: multi-table `RENAME` in `006` is refused by Replicated databases; `session_day_agg.pageviews` must be `UInt64`).
-- Worker flag `WORKER_WRITE_V2=off|shadow|only` (default `off`). `shadow` keeps legacy authoritative and also writes `events_ingest`; a v2 failure only increments `worker_v2_write_errors_total`. `only` writes `events_ingest` alone (also replaces the second `web_vitals` insert).
+- Worker flag `WORKER_WRITE_V2=off|shadow|only` (default `shadow`). `shadow` keeps legacy authoritative and also writes `events_ingest`; a v2 failure only increments `worker_v2_write_errors_total`. `only` writes `events_ingest` alone (also replaces the second `web_vitals` insert).
 - v2 inserts are synchronous with `insert_deduplication_token` (sha1 of the batch's event ids) and `deduplicate_blocks_in_dependent_materialized_views=1`.
 - Verified on the live service: inserting the same batch twice stored 4 rows (not 8); `site_daily_agg` = 3 pageviews / 2 visitors / 2 sessions; `web_vitals_agg` = 1 sample; `referrer_domain` and `country` derived correctly.
 - Still to do: shadow-read flag `ANALYTICS_READ` and the read-path rewrite, backfill script, reconciliation job, then cutover and decommission.

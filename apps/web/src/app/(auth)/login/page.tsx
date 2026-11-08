@@ -6,13 +6,8 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, KeyRound, Lock, Mail } from "lucide-react";
 import { AuthShell, AuthTitle, Field, FormError, authPrimary } from "@/components/auth/auth-ui";
 import { OtpVerificationModal } from "@/components/auth/otp-input";
+import { safeNextPath } from "@/lib/safe-redirect";
 
-function safeNextPath(candidate: string | null): string | null {
-  if (!candidate || !candidate.startsWith("/") || candidate.startsWith("//")) {
-    return null;
-  }
-  return candidate;
-}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,6 +23,7 @@ export default function LoginPage() {
   const [otpMode, setOtpMode] = useState(false);
   const [otpEmail, setOtpEmail] = useState("");
   const [devCode, setDevCode] = useState<string | undefined>(undefined);
+  const [challenge, setChallenge] = useState<string | undefined>(undefined);
 
   // State for email code request
   const [emailCodeInput, setEmailCodeInput] = useState("");
@@ -65,6 +61,7 @@ export default function LoginPage() {
       if (payload.requiresOtp) {
         setOtpEmail(payload.email || email);
         setDevCode(payload.devCode);
+        setChallenge(payload.challenge);
         setOtpMode(true);
         return;
       }
@@ -125,7 +122,8 @@ export default function LoginPage() {
           purpose="login_otp"
           devCode={devCode}
           rememberMe={rememberMe}
-          onCancel={() => setOtpMode(false)}
+          challenge={challenge}
+          onCancel={() => { setOtpMode(false); setChallenge(undefined); }}
           onSuccess={(data) => {
             const nextPath = safeNextPath(new URLSearchParams(window.location.search).get("next"));
             router.push(nextPath ?? (data as { redirectTo?: string }).redirectTo ?? "/onboarding");

@@ -1,0 +1,341 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Trackme ingestion - target architecture",
+    "output": ".archify/architecture-ingest-fixed-20261101-205225/ingestion-fix.html",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "tracker",
+      "type": "external",
+      "label": "Site visitors",
+      "sublabel": "Tracker SDK",
+      "pos": [
+        30,
+        280
+      ],
+      "size": [
+        110,
+        60
+      ]
+    },
+    {
+      "id": "edge",
+      "type": "backend",
+      "label": "Ingestion Edge",
+      "sublabel": "admit > enqueue > 202",
+      "tag": "429 on full",
+      "pos": [
+        190,
+        280
+      ],
+      "size": [
+        160,
+        66
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "Bounded Queue",
+      "sublabel": "in-process - bounded",
+      "tag": "cap 10k",
+      "pos": [
+        410,
+        280
+      ],
+      "size": [
+        150,
+        66
+      ]
+    },
+    {
+      "id": "producer",
+      "type": "backend",
+      "label": "Batch Producer",
+      "sublabel": "500-5,000 / flush",
+      "tag": "acks=all batched",
+      "pos": [
+        630,
+        280
+      ],
+      "size": [
+        160,
+        66
+      ]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka growth_events",
+      "sublabel": "RF 3 - same region",
+      "tag": ">=6 partitions",
+      "pos": [
+        870,
+        280
+      ],
+      "size": [
+        160,
+        66
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Event Worker",
+      "sublabel": "retries + periodic lag",
+      "tag": "periodic lag",
+      "pos": [
+        1110,
+        280
+      ],
+      "size": [
+        160,
+        66
+      ]
+    },
+    {
+      "id": "clickhouse",
+      "type": "database",
+      "label": "ClickHouse",
+      "sublabel": "events_raw + events_v2",
+      "tag": "V2 shadow ON",
+      "pos": [
+        1350,
+        280
+      ],
+      "size": [
+        180,
+        66
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Valkey (same region)",
+      "sublabel": "fused admission EVAL",
+      "tag": "<5 ms RTT",
+      "pos": [
+        175,
+        100
+      ],
+      "size": [
+        190,
+        60
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "sites - quota",
+      "tag": "site cache",
+      "pos": [
+        175,
+        460
+      ],
+      "size": [
+        190,
+        60
+      ]
+    },
+    {
+      "id": "obs",
+      "type": "external",
+      "label": "Observability",
+      "sublabel": "e2e SLO - queue - lag",
+      "tag": "SLO + backlog",
+      "pos": [
+        620,
+        460
+      ],
+      "size": [
+        180,
+        60
+      ]
+    },
+    {
+      "id": "dlq",
+      "type": "messagebus",
+      "label": "Dead-letter topic",
+      "sublabel": "bad events + alert",
+      "tag": "replay + alert",
+      "pos": [
+        1110,
+        460
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "agg",
+      "type": "database",
+      "label": "Daily aggregates",
+      "sublabel": "site_daily_agg ...",
+      "tag": "fed by events_v2",
+      "pos": [
+        1350,
+        100
+      ],
+      "size": [
+        180,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Same region / AZ - RTT < 10 ms",
+      "wraps": [
+        "edge",
+        "queue",
+        "producer",
+        "kafka",
+        "worker",
+        "clickhouse",
+        "redis",
+        "postgres",
+        "obs",
+        "dlq",
+        "agg"
+      ],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "tracker-edge",
+      "from": "tracker",
+      "to": "edge",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge-redis",
+      "from": "edge",
+      "to": "redis",
+      "label": "admission",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "edge-postgres",
+      "from": "edge",
+      "to": "postgres",
+      "label": "site lookup",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "edge-queue",
+      "from": "edge",
+      "to": "queue",
+      "label": "enqueue",
+      "variant": "emphasis"
+    },
+    {
+      "id": "queue-producer",
+      "from": "queue",
+      "to": "producer",
+      "label": "drain"
+    },
+    {
+      "id": "producer-kafka",
+      "from": "producer",
+      "to": "kafka",
+      "label": "acks=all"
+    },
+    {
+      "id": "kafka-worker",
+      "from": "kafka",
+      "to": "worker",
+      "label": "consume"
+    },
+    {
+      "id": "worker-clickhouse",
+      "from": "worker",
+      "to": "clickhouse",
+      "label": "insert"
+    },
+    {
+      "id": "worker-dlq",
+      "from": "worker",
+      "to": "dlq",
+      "label": "reject",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "clickhouse-agg",
+      "from": "clickhouse",
+      "to": "agg",
+      "label": "MVs",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "producer-obs",
+      "from": "producer",
+      "to": "obs",
+      "label": "queue depth",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "worker-obs",
+      "from": "worker",
+      "to": "obs",
+      "label": "lag + p95",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Request path",
+      "items": [
+        "One fused EVAL to a same-region Valkey (<5 ms)",
+        "HTTP 202 after enqueue; Kafka is off the request path",
+        "Queue full returns 429 + Retry-After instead of a multi-second request"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Delivery path",
+      "items": [
+        "Background producer batches 500-5,000 events",
+        "acks=all; event-ID claims make retries safe",
+        "At least 6 partitions spread sites across consumers"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Correctness",
+      "items": [
+        "Ack only known outcomes; ambiguous timeouts are retried, never refunded",
+        "Event-ID dedupe plus the ClickHouse insert dedup token",
+        "Admission fails closed and alerts instead of bypassing limits"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Observability and data",
+      "items": [
+        "E2E SLO: edge receipt > ClickHouse insert",
+        "Periodic consumer lag, queue depth and insert p95",
+        "WORKER_WRITE_V2=shadow feeds the daily aggregates"
+      ]
+    }
+  ]
+}

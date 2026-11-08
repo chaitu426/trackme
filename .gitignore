@@ -13,6 +13,8 @@ infra/geoip/*.mmdb.gz
 
 # Copied from packages/tracker/dist at build time (see apps/web/scripts/copy-tracker-assets.mjs)
 apps/web/public/tracker.js
+apps/web/public/t/manifest.json
+apps/web/public/t/*/tracker.*.js
 
 # Turborepo
 .turbo/

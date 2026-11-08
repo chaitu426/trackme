@@ -4,6 +4,7 @@ import { db, workspaceInvites, eq, and } from "@trackme/db";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { recordAuditLog } from "@/lib/audit";
+import { getClientIp } from "@/lib/client-ip";
 
 export async function DELETE(
   request: NextRequest,
@@ -27,10 +28,7 @@ export async function DELETE(
       throw new AppError(404, "INVITE_NOT_FOUND", "Invite not found.");
     }
 
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      null;
+    const ip = getClientIp(request);
 
     await recordAuditLog({
       workspaceId,

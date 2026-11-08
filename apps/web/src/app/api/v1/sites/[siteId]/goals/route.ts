@@ -6,6 +6,7 @@ import { requireSiteAccess } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
 import { timedRoute } from "@/lib/metrics-registry";
+import { getClientIp } from "@/lib/client-ip";
 
 const CreateGoalSchema = z.object({
   name: z.string().trim().min(2).max(64),
@@ -92,7 +93,7 @@ export async function POST(
         pathPattern: created.pathPattern,
         eventName: created.eventName,
       },
-      ipAddress: request.headers.get("x-forwarded-for") || null,
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({ goal: created }, { status: 201 });

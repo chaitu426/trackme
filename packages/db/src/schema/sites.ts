@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, uuid, jsonb, index } from "drizzle-orm/pg-core";
 import { workspaces } from "./workspaces.js";
 
@@ -19,6 +20,8 @@ export const sites = pgTable(
   (table) => [
     index("idx_sites_workspace_id").on(table.workspaceId),
     index("idx_sites_public_key_hash").on(table.publicKeyHash),
+    // The unauthenticated /share/{slug} lookup filters on this expression.
+    index("idx_sites_public_dashboard_slug").on(sql`(${table.settings} ->> 'publicDashboardSlug')`),
   ]
 );
 

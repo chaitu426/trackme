@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "d4b9fc4d-a23e-4483-8b05-fdb7c09f61f8",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-failure-20261101-205225\\failure.json",
+  "output": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-failure-20261101-205225\\ingestion-failure.html",
+  "specification": {
+    "sha256": "5229a6df8f44ea693a0fc3551cd7dcb3e1eda89db2f67dbd39dcb5453aea3160",
+    "bytes": 8304
+  },
+  "artifact": {
+    "sha256": "ab552d30c9e2ddc28b1ee4acdaafac9420c0d419c9731cfff70ff2a7785d9628",
+    "bytes": 767047
+  }
+}

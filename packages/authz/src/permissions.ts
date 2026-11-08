@@ -10,7 +10,8 @@ export type Permission =
   | "goals:manage"
   | "analytics:read"
   | "api_keys:manage"
-  | "exports:create";
+  | "exports:create"
+  | "data:erase";
 
 const ROLE_PERMISSIONS: Record<WorkspaceRole, Set<Permission>> = {
   owner: new Set<Permission>([
@@ -24,6 +25,7 @@ const ROLE_PERMISSIONS: Record<WorkspaceRole, Set<Permission>> = {
     "analytics:read",
     "api_keys:manage",
     "exports:create",
+    "data:erase",
   ]),
   admin: new Set<Permission>([
     "workspace:manage",
@@ -35,6 +37,7 @@ const ROLE_PERMISSIONS: Record<WorkspaceRole, Set<Permission>> = {
     "analytics:read",
     "api_keys:manage",
     "exports:create",
+    "data:erase",
   ]),
   member: new Set<Permission>([
     "sites:create",

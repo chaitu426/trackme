@@ -1,7 +1,7 @@
-// Package gate admits a batch with ONE Redis round trip: per-site rate limit,
-// event-ID claims (edge dedupe) and monthly quota reservation run in a single
-// atomic script. Three separate calls cost three round trips on every request,
-// and a failure between them could leave a claim or a reservation behind.
+// Package gate admits a batch with ONE Redis round trip: per-IP and per-site
+// rate limits, event-ID claims (edge dedupe) and monthly quota reservation run
+// in a single atomic script. Separate calls cost separate round trips on every
+// request, and a failure between them could leave a claim or a reservation behind.
 package gate
 
 import (
@@ -21,6 +21,7 @@ const (
 	Admitted Status = iota
 	SiteLimited
 	QuotaExceeded
+	IPLimited
 )
 
 const (
@@ -32,6 +33,10 @@ const (
 type Request struct {
 	SiteID      string
 	WorkspaceID string
+	// ClientIP and IPLimit fuse the per-IP limit into the same script. Empty
+	// ClientIP or non-positive IPLimit skips the IP check.
+	ClientIP string
+	IPLimit  int
 	// Quota is the workspace monthly quota; <= 0 means unlimited.
 	Quota    int
 	EventIDs []string
@@ -75,51 +80,61 @@ func New(rdb *redis.Client, siteLimit, windowMs int) *Gate {
 	}
 }
 
-// KEYS: [1] site rate counter, [2] quota counter, [3..] event claim keys
-// ARGV: [1] site limit, [2] window ms, [3] quota, [4] quota ttl, [5] pending ttl,
+// KEYS: [1] IP rate counter, [2] site rate counter, [3] quota counter, [4..] event claim keys
+// ARGV: [1] IP limit, [2] site limit, [3] window ms, [4] quota, [5] quota ttl, [6] pending ttl,
 //
-//	[6] claim 0|1, [7..] billable flag per event (0|1)
+//	[7] check IP 0|1, [8] claim 0|1, [9..] billable flag per event (0|1)
 //
-// Reply: {2} site limited | {3} quota exceeded (claims undone) | {0, reserved, claimed...}
+// Reply: {4} IP limited | {2} site limited | {3} quota exceeded (claims undone) | {0, reserved, claimed...}
 var admitScript = redis.NewScript(`
-local n = redis.call('INCR', KEYS[1])
-if n == 1 or redis.call('PTTL', KEYS[1]) < 0 then
-  redis.call('PEXPIRE', KEYS[1], ARGV[2])
+if ARGV[7] == '1' then
+  local ipn = redis.call('INCR', KEYS[1])
+  if ipn == 1 or redis.call('PTTL', KEYS[1]) < 0 then
+    redis.call('PEXPIRE', KEYS[1], ARGV[3])
+  end
+  if ipn > tonumber(ARGV[1]) then
+    return {4}
+  end
 end
-if n > tonumber(ARGV[1]) then
+
+local n = redis.call('INCR', KEYS[2])
+if n == 1 or redis.call('PTTL', KEYS[2]) < 0 then
+  redis.call('PEXPIRE', KEYS[2], ARGV[3])
+end
+if n > tonumber(ARGV[2]) then
   return {2}
 end
 
-local count = #KEYS - 2
-local claim = ARGV[6] == '1'
+local count = #KEYS - 3
+local claim = ARGV[8] == '1'
 local claimed = {}
 local billable = 0
 for i = 1, count do
   local ok = true
   if claim then
-    ok = redis.call('SET', KEYS[i + 2], 'p', 'NX', 'EX', ARGV[5])
+    ok = redis.call('SET', KEYS[i + 3], 'p', 'NX', 'EX', ARGV[6])
   end
   if ok then
     claimed[i] = 1
-    if ARGV[6 + i] == '1' then billable = billable + 1 end
+    if ARGV[8 + i] == '1' then billable = billable + 1 end
   else
     claimed[i] = 0
   end
 end
 
 if billable > 0 then
-  local quota = tonumber(ARGV[3])
-  local current = tonumber(redis.call('GET', KEYS[2]) or '0')
+  local quota = tonumber(ARGV[4])
+  local current = tonumber(redis.call('GET', KEYS[3]) or '0')
   if quota > 0 and (current + billable) > quota then
     if claim then
       for i = 1, count do
-        if claimed[i] == 1 then redis.call('DEL', KEYS[i + 2]) end
+        if claimed[i] == 1 then redis.call('DEL', KEYS[i + 3]) end
       end
     end
     return {3}
   end
-  redis.call('INCRBY', KEYS[2], billable)
-  redis.call('EXPIRE', KEYS[2], ARGV[4])
+  redis.call('INCRBY', KEYS[3], billable)
+  redis.call('EXPIRE', KEYS[3], ARGV[5])
 end
 
 local out = {0, billable}
@@ -127,15 +142,26 @@ for i = 1, count do out[i + 2] = claimed[i] end
 return out
 `)
 
-// Admit applies the site limit, claims event IDs and reserves quota atomically.
-// The error is Redis being unreachable; the caller decides whether to fail open.
+// Admit applies the IP limit, site limit, claims event IDs and reserves quota
+// atomically. The error is Redis being unreachable; the caller decides whether
+// to fail closed.
 func (g *Gate) Admit(ctx context.Context, req Request) (Result, error) {
 	if len(req.Billable) != len(req.EventIDs) {
 		return Result{}, fmt.Errorf("gate: %d billable flags for %d events", len(req.Billable), len(req.EventIDs))
 	}
-	keys := make([]string, 0, len(req.EventIDs)+2)
+	keys := make([]string, 0, len(req.EventIDs)+3)
+	now := g.nowFunc()
+	checkIP, ipLimit := 0, req.IPLimit
+	ipKey := ratelimit.WindowKey("ip:unchecked", g.windowMs, now)
+	if req.ClientIP != "" && req.IPLimit > 0 {
+		ipKey = ratelimit.WindowKey("ip:"+req.ClientIP, g.windowMs, now)
+		checkIP = 1
+	} else {
+		ipLimit = 0
+	}
 	keys = append(keys,
-		ratelimit.WindowKey("site:"+req.SiteID, g.windowMs, g.nowFunc()),
+		ipKey,
+		ratelimit.WindowKey("site:"+req.SiteID, g.windowMs, now),
 		quota.PeriodKey(req.WorkspaceID),
 	)
 	for _, id := range req.EventIDs {
@@ -145,8 +171,8 @@ func (g *Gate) Admit(ctx context.Context, req Request) (Result, error) {
 	if req.Claim {
 		claim = 1
 	}
-	args := make([]any, 0, 6+len(req.EventIDs))
-	args = append(args, g.siteLimit, g.windowMs, req.Quota, g.quotaTTL, g.pendingTTL, claim)
+	args := make([]any, 0, 8+len(req.EventIDs))
+	args = append(args, ipLimit, g.siteLimit, g.windowMs, req.Quota, g.quotaTTL, g.pendingTTL, checkIP, claim)
 	for _, b := range req.Billable {
 		if b {
 			args = append(args, 1)
@@ -163,6 +189,8 @@ func (g *Gate) Admit(ctx context.Context, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("admit: empty reply")
 	}
 	switch reply[0] {
+	case 4:
+		return Result{Status: IPLimited}, nil
 	case 2:
 		return Result{Status: SiteLimited}, nil
 	case 3:

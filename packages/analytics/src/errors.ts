@@ -7,6 +7,20 @@ export class AnalyticsQueryError extends Error {
   }
 }
 
+/**
+ * A workspace already has its share of dashboard queries running (see tenant-gate.ts). It extends
+ * AnalyticsQueryError so the many `catch` blocks that rethrow that class pass it through unchanged;
+ * the web layer tells it apart and answers 429 instead of 502.
+ */
+export class AnalyticsOverloadedError extends AnalyticsQueryError {
+  readonly busy = true;
+
+  constructor() {
+    super("Too many analytics queries are running for this workspace. Retry in a moment.");
+    this.name = "AnalyticsOverloadedError";
+  }
+}
+
 export class AnalyticsRangeTooWideError extends Error {
   readonly code = "RANGE_TOO_WIDE";
   readonly maxDays: number;

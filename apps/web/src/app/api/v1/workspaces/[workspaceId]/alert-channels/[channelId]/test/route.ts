@@ -9,6 +9,7 @@ import { AppError } from "@trackme/contracts";
 import { db, eq, and, alertChannels, workspaces } from "@trackme/db";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { dispatchAlert } from "@/lib/alerts";
 import { env } from "@trackme/config";
 
@@ -19,6 +20,8 @@ export async function POST(
   try {
     const { workspaceId, channelId } = await props.params;
     await authenticateRequest(req, workspaceId, "admin:workspace");
+    // A test sends a real outbound request, so it is limited like any other way of making this server call out.
+    await checkRateLimit(`channel_test:${workspaceId}`, 10, 60, "Too many test notifications. Wait a minute and try again.");
 
     // Load channel and workspace in parallel
     const [channelRows, workspaceRows] = await Promise.all([

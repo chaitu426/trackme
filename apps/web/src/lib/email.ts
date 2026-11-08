@@ -79,8 +79,8 @@ async function sendViaSmtp(
     // Gmail STARTTLS on port 587 requires explicit upgrade
     requireTLS: !secure && port === 587,
     tls: {
-      // Allow self-signed certs in dev; in prod set SMTP_REJECT_UNAUTHORIZED=true
-      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === "true",
+      // Verify the server certificate by default; set SMTP_REJECT_UNAUTHORIZED=false only for a self-signed dev server
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== "false",
       minVersion: "TLSv1.2",
     },
     // Connection timeout (ms)
@@ -157,11 +157,12 @@ export async function sendTransactionalEmail(
   }
 
   // ── 3. Dev console logger ──────────────────────────────────────────────────
+  // The console fallback prints the whole message, which carries one-time codes and invite links. It exists
+  // for local development only. In production a missing or failing provider is an error the caller must see:
+  // nothing is printed, and nobody is told that a message was sent when it was not.
   if (process.env.NODE_ENV === "production") {
-    console.error(
-      "[Email] CRITICAL: No email provider configured in production! " +
-        "Set RESEND_API_KEY or SMTP_USER + SMTP_PASS."
-    );
+    console.error("[Email] No working email provider in production. Set RESEND_API_KEY or SMTP_USER + SMTP_PASS.");
+    throw new Error("Email delivery is not available");
   }
 
   return sendViaConsole(params);
@@ -324,6 +325,21 @@ export interface InviteEmailParams {
   expiresAt: Date;
 }
 
+/** Escapes text for use inside HTML element content or a quoted attribute. */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** One line, bounded: for subject lines and names, where a line break would inject mail headers. */
+export function oneLine(value: string, max = 80): string {
+  return value.replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, " ").trim().slice(0, max);
+}
+
 export async function sendInviteEmail({
   to,
   inviterName,
@@ -345,7 +361,14 @@ export async function sendInviteEmail({
   const roleBadgeColor =
     role === "admin" ? "#f59e0b" : role === "viewer" ? "#adadad" : "#bcbcbc";
 
-  const subject = `${inviterName} invited you to join ${workspaceName} on TrackMe`;
+  // Workspace and inviter names are chosen by users and can say anything. Text copies are single-line for the
+  // subject and plain-text body; HTML copies are escaped, so a name cannot add links, markup or headers.
+  const inviterText = oneLine(inviterName);
+  const workspaceText = oneLine(workspaceName);
+  const inviterHtml = escapeHtml(inviterText);
+  const workspaceHtml = escapeHtml(workspaceText);
+
+  const subject = `${inviterText} invited you to join ${workspaceText} on TrackMe`;
 
   const html = `
     <!DOCTYPE html>
@@ -353,7 +376,7 @@ export async function sendInviteEmail({
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>${subject}</title>
+        <title>${escapeHtml(subject)}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
@@ -468,18 +491,18 @@ export async function sendInviteEmail({
           <div class="card">
             <div class="header">
               <div class="logo"><span class="logo-dot"></span>TrackMe</div>
-              <div class="avatar">${inviterName.slice(0, 1).toUpperCase()}</div>
+              <div class="avatar">${escapeHtml(inviterText.slice(0, 1).toUpperCase())}</div>
             </div>
             <div class="body">
-              <h1>You're invited to join ${workspaceName}</h1>
+              <h1>You're invited to join ${workspaceHtml}</h1>
               <p class="subtitle">
-                <strong style="color:#e4e4e7">${inviterName}</strong> has invited you to collaborate on
-                <strong style="color:#e4e4e7">${workspaceName}</strong> — a privacy-first analytics workspace on TrackMe.
+                <strong style="color:#e4e4e7">${inviterHtml}</strong> has invited you to collaborate on
+                <strong style="color:#e4e4e7">${workspaceHtml}</strong> — a privacy-first analytics workspace on TrackMe.
               </p>
 
               <div class="workspace-card">
                 <div>
-                  <div class="workspace-name">${workspaceName}</div>
+                  <div class="workspace-name">${workspaceHtml}</div>
                   <div style="font-size:12px;color:#71717a;margin-top:2px">TrackMe Workspace</div>
                 </div>
                 <span class="role-badge">${roleLabel}</span>
@@ -511,9 +534,9 @@ export async function sendInviteEmail({
   `;
 
   const text = [
-    `${inviterName} invited you to join ${workspaceName} on TrackMe`,
+    `${inviterText} invited you to join ${workspaceText} on TrackMe`,
     "",
-    `You've been invited as a ${roleLabel} to the workspace "${workspaceName}".`,
+    `You've been invited as a ${roleLabel} to the workspace "${workspaceText}".`,
     "",
     `Accept the invitation here:`,
     acceptUrl,
@@ -527,3 +550,24 @@ export async function sendInviteEmail({
 }
 
 export { sendTransactionalEmail as sendEmail };
+
+/**
+ * Sent instead of a verification code when someone starts a sign-up with an address that already has an
+ * account. The sign-up page answers exactly as it does for a new address, so this email is the only place the
+ * difference shows, and only the mailbox owner sees it.
+ */
+export async function sendAccountExistsEmail(to: string): Promise<EmailResult> {
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  const subject = "You already have a TrackMe account";
+  const text = [
+    "Someone tried to create a TrackMe account with this email address, but an account already exists.",
+    "",
+    `Sign in here: ${appUrl}/login`,
+    "",
+    "If it was not you, you can ignore this email; nothing was changed.",
+  ].join("\n");
+  const html = `<p>Someone tried to create a TrackMe account with this email address, but an account already exists.</p>
+<p><a href="${escapeHtml(appUrl)}/login">Sign in</a></p>
+<p>If it was not you, you can ignore this email; nothing was changed.</p>`;
+  return sendTransactionalEmail({ to, subject, text, html });
+}

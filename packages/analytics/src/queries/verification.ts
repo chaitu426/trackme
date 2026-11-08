@@ -1,5 +1,8 @@
 import { readClient, variantAware, type ReadVariant } from "../read-mode.js";
 
+/** `totalEvents` never reports more than this: "1000" means "at least 1000". */
+export const FIRST_EVENT_SCAN_CAP = 1000;
+
 export type FirstEventStatus = {
   received: boolean;
   firstEventAt: string | null;
@@ -17,14 +20,23 @@ async function getFirstEventStatusImpl(
   variant: ReadVariant): Promise<FirstEventStatus> {
   const client = readClient(variant);
 
+  // The onboarding page polls this until the first event lands. Counting every row the site has ever
+  // sent made each poll scan its whole history. Read at most FIRST_EVENT_SCAN_CAP rows from the start of
+  // the sort key (workspace, site, date) instead: "received" is exact, `totalEvents` saturates at the
+  // cap, and `firstEventAt` is exact unless the first day alone holds more rows than the cap.
   const resultSet = await client.query({
     query: `
       SELECT
         count() AS total_events,
         min(timestamp) AS first_event_at
-      FROM events_raw
-      WHERE workspace_id = {workspaceId:UUID}
-        AND site_id = {siteId:UUID}
+      FROM (
+        SELECT timestamp
+        FROM events_raw
+        WHERE workspace_id = {workspaceId:UUID}
+          AND site_id = {siteId:UUID}
+        ORDER BY toDate(timestamp)
+        LIMIT ${FIRST_EVENT_SCAN_CAP}
+      )
     `,
     query_params: { workspaceId, siteId },
     format: "JSONEachRow",

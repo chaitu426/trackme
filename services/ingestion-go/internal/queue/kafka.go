@@ -46,9 +46,12 @@ func ParseCompression(name string) (kafka.Compression, error) {
 	return 0, fmt.Errorf("unsupported KAFKA_COMPRESSION %q", name)
 }
 
-// newWriter builds the producer. The handler is synchronous, so BatchTimeout is
-// latency paid on every request: 2 ms still lets concurrent requests share a
-// batch without adding the 10 ms floor the old setting imposed.
+// newWriter builds the producer. The HTTP handler no longer waits on it: the
+// async queue flushes large batches in the background, so a linger here costs
+// no request latency and lets one WriteMessages call carry up to BatchSize
+// events. kafka-go v0.4.47 has no idempotent producer, so retries of ambiguous
+// timeouts rely on event-ID claims at the edge and the ClickHouse insert dedupe
+// token for exactly-once storage.
 func newWriter(brokers []string, topic string, compression kafka.Compression) *kafka.Writer {
 	return &kafka.Writer{
 		Addr:         kafka.TCP(brokers...),
@@ -56,26 +59,35 @@ func newWriter(brokers []string, topic string, compression kafka.Compression) *k
 		Balancer:     &kafka.Hash{},
 		RequiredAcks: kafka.RequireAll,
 		Async:        false,
-		BatchSize:    500,
-		BatchBytes:   4 << 20,
-		BatchTimeout: 2 * time.Millisecond,
+		BatchSize:    5000,
+		BatchBytes:   16 << 20,
+		BatchTimeout: 10 * time.Millisecond,
 		Compression:  compression,
-		// Without these a stalled broker holds the call for kafka-go's defaults (10 s
-		// per attempt, ten attempts), far past what the client is still waiting for.
-		WriteTimeout: 3 * time.Second,
-		ReadTimeout:  3 * time.Second,
-		MaxAttempts:  3,
+		// These bound one background attempt. The queue retries with backoff, so
+		// they can be longer than the old in-request budget.
+		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		MaxAttempts:  5,
 	}
 }
 
 func NewPublisher(brokers []string, topic string, compression kafka.Compression) *Publisher {
-	return &Publisher{topic: topic, brokers: brokers, writer: newWriter(brokers, topic, compression), timeout: 4 * time.Second}
+	return &Publisher{topic: topic, brokers: brokers, writer: newWriter(brokers, topic, compression), timeout: 10 * time.Second}
 }
 
 // WithTimeout sets the longest a Publish may take. Zero or negative keeps the default.
 func (p *Publisher) WithTimeout(d time.Duration) *Publisher {
 	if d > 0 {
 		p.timeout = d
+	}
+	return p
+}
+
+// WithShuffle spreads each site over a stable subset of k partitions instead of all of them (see
+// Shuffle). k <= 0 keeps plain key hashing.
+func (p *Publisher) WithShuffle(k int) *Publisher {
+	if k > 0 {
+		p.writer.Balancer = &Shuffle{K: k}
 	}
 	return p
 }

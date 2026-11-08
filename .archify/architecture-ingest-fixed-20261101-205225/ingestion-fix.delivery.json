@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "b74b6817-1fb1-4454-b79d-0207c18ee753",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-fixed-20261101-205225\\fix.json",
+  "output": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-fixed-20261101-205225\\ingestion-fix.html",
+  "specification": {
+    "sha256": "bdeca587abe1832c5fe849eb21f8767a5d9940d4ed89ca00a3a1e2b1cb913a1a",
+    "bytes": 7087
+  },
+  "artifact": {
+    "sha256": "b18bca179842a179d4d4ad2e2cda0e09dba53135a63b45873623e4154bddbef7",
+    "bytes": 772371
+  }
+}

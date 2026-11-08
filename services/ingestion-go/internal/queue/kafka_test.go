@@ -44,8 +44,11 @@ func TestParseCompression(t *testing.T) {
 
 func TestWriterSettings(t *testing.T) {
 	w := newWriter([]string{"localhost:9092"}, "t", kafka.Zstd)
-	if w.BatchTimeout != 2*time.Millisecond || w.Compression != kafka.Zstd || w.RequiredAcks != kafka.RequireAll || w.Async {
+	if w.BatchTimeout != 10*time.Millisecond || w.Compression != kafka.Zstd || w.RequiredAcks != kafka.RequireAll || w.Async {
 		t.Fatalf("unexpected writer settings: %+v", w)
+	}
+	if w.BatchSize != 5000 || w.MaxAttempts != 5 {
+		t.Fatalf("batch/attempt settings = %d/%d, want 5000/5", w.BatchSize, w.MaxAttempts)
 	}
 }
 

@@ -1,7 +1,7 @@
-import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
+import { hasPermission } from "@trackme/authz";
 import {
   db,
   workspaceMembers,
@@ -10,11 +10,15 @@ import {
   users,
   eq,
   and,
+  sql,
 } from "@trackme/db";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { sendInviteEmail } from "@/lib/email";
 import { recordAuditLog } from "@/lib/audit";
+import { getClientIp } from "@/lib/client-ip";
+import { newInviteToken } from "@/lib/invite-token";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const InviteMemberSchema = z.object({
   email: z.string().trim().email(),
@@ -27,7 +31,7 @@ export async function GET(
 ) {
   try {
     const { workspaceId } = await props.params;
-    await authenticateRequest(request, workspaceId, "read:analytics");
+    const ctx = await authenticateRequest(request, workspaceId, "read:analytics");
 
     const members = await db
       .select({
@@ -47,7 +51,6 @@ export async function GET(
         email: workspaceInvites.email,
         role: workspaceInvites.role,
         status: workspaceInvites.status,
-        token: workspaceInvites.token,
         expiresAt: workspaceInvites.expiresAt,
         createdAt: workspaceInvites.createdAt,
       })
@@ -59,7 +62,8 @@ export async function GET(
         )
       );
 
-    return NextResponse.json({ members, invites });
+    // Pending invitations (who is being invited, with which role) are for people who manage members.
+    return NextResponse.json({ members, invites: hasPermission(ctx.role, "workspace:members") ? invites : [] });
   } catch (error) {
     return jsonError(error);
   }
@@ -81,6 +85,22 @@ export async function POST(
 
     const email = parsed.data.email.toLowerCase();
     const role = parsed.data.role;
+
+    // Invitations send mail from our domain to any address, so they are limited per inviter and per
+    // workspace, capped while pending, and only a verified account may send them.
+    await checkRateLimit(`invite_user:${ctx.userId}`, 20, 60 * 60, "Too many invitations sent. Try again later.");
+    await checkRateLimit(`invite_ws:${workspaceId}`, 50, 60 * 60, "This workspace has sent too many invitations. Try again later.");
+    const [pending] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(workspaceInvites)
+      .where(and(eq(workspaceInvites.workspaceId, workspaceId), eq(workspaceInvites.status, "pending")));
+    if ((pending?.n ?? 0) >= 100) {
+      throw new AppError(429, "TOO_MANY_PENDING_INVITES", "Revoke some pending invitations before sending more.");
+    }
+    if (ctx.userId && !ctx.userId.startsWith("api-key:")) {
+      const [inviterRow] = await db.select({ ok: users.emailVerified }).from(users).where(eq(users.id, ctx.userId)).limit(1);
+      if (!inviterRow?.ok) throw new AppError(403, "EMAIL_NOT_VERIFIED", "Verify your email address before inviting others.");
+    }
 
     // Check if user is already a member
     const existingMember = await db
@@ -106,8 +126,8 @@ export async function POST(
         )
       );
 
-    // 32-byte hex token = 256-bit entropy, safe for URL use
-    const token = randomBytes(32).toString("hex");
+    // Only the hash is stored; the plaintext goes into the email and nowhere else (see invite-token.ts).
+    const { token, tokenHash } = newInviteToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     const [created] = await db
@@ -116,7 +136,7 @@ export async function POST(
         workspaceId,
         email,
         role,
-        token,
+        token: tokenHash,
         invitedBy: ctx.userId ?? null,
         status: "pending",
         expiresAt,
@@ -127,10 +147,7 @@ export async function POST(
       throw new AppError(500, "INVITE_CREATE_FAILED", "Failed to create invitation.");
     }
 
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      null;
+    const ip = getClientIp(request);
 
     await recordAuditLog({
       workspaceId,
@@ -176,7 +193,8 @@ export async function POST(
     );
 
     return NextResponse.json({
-      invite: created,
+      // The token is deliberately not part of the response.
+      invite: { id: created.id, email: created.email, role: created.role, status: created.status, expiresAt: created.expiresAt },
       message: `Invitation sent to ${email}.`,
     });
   } catch (error) {

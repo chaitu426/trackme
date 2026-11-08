@@ -3,11 +3,30 @@ import { z } from "zod";
 export const GranularitySchema = z.enum(["minute", "hour", "day", "month"]);
 export type Granularity = z.infer<typeof GranularitySchema>;
 
-export const DateRangeSchema = z.object({
-  from: z.string().datetime(),
-  to: z.string().datetime(),
-  granularity: GranularitySchema.default("day"),
-});
+/** Longest span one request may cover, and the most points one series may return. */
+export const MAX_RANGE_DAYS = 366;
+export const MAX_SERIES_POINTS = 5_000;
+const BUCKET_MS: Record<Granularity, number> = { minute: 60_000, hour: 3_600_000, day: 86_400_000, month: 31 * 86_400_000 };
+
+/**
+ * An unbounded range let any API-key caller ask for ten years of minute-level data: one request that
+ * either reads hundreds of millions of rows or is thrown out by ClickHouse after taking a query slot.
+ * Reject it at the door instead: from <= to, at most MAX_RANGE_DAYS, and at most MAX_SERIES_POINTS
+ * buckets at the requested granularity (so "minute" is limited to a few days, "hour" to about 7 months).
+ */
+export const DateRangeSchema = z
+  .object({
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+    granularity: GranularitySchema.default("day"),
+  })
+  .refine((r) => Date.parse(r.to) >= Date.parse(r.from), { message: "`to` must not be before `from`" })
+  .refine((r) => Date.parse(r.to) - Date.parse(r.from) <= MAX_RANGE_DAYS * 86_400_000, {
+    message: `Date range cannot exceed ${MAX_RANGE_DAYS} days`,
+  })
+  .refine((r) => (Date.parse(r.to) - Date.parse(r.from)) / BUCKET_MS[r.granularity] <= MAX_SERIES_POINTS, {
+    message: `Too many data points for this granularity; use a coarser granularity or a shorter range`,
+  });
 export type DateRange = z.infer<typeof DateRangeSchema>;
 
 export const DimensionFilterSchema = z.object({

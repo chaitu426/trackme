@@ -37,7 +37,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           newHandler(cfg, &http.Client{Timeout: cfg.UpstreamTimeout}),
+		Handler:           newHandler(cfg, upstreamClient(cfg.UpstreamTimeout)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      cfg.UpstreamTimeout + 5*time.Second,
@@ -61,4 +61,14 @@ func envInt(k string, d int64) int64 {
 		}
 	}
 	return d
+}
+
+// upstreamClient reuses connections to the edge. The default transport keeps only 2 idle
+// connections per host, so under load nearly every request paid a TCP (and TLS) handshake and left
+// a TIME_WAIT socket behind until the proxy ran out of ephemeral ports.
+func upstreamClient(timeout time.Duration) *http.Client {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.MaxIdleConns = 512
+	t.MaxIdleConnsPerHost = 512
+	return &http.Client{Timeout: timeout, Transport: t}
 }

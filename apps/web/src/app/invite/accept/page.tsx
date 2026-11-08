@@ -107,6 +107,12 @@ export default function InviteAcceptPage() {
       });
       const data = await res.json();
 
+      // 401 + requiresLogin = the invited address already has an account: sign in as it, then come back.
+      if (res.status === 401 && data.requiresLogin) {
+        window.location.href = `/login?next=${encodeURIComponent(`/invite/accept?token=${token}`)}`;
+        return;
+      }
+
       // 202 = new user who needs to fill signup form first
       if (res.status === 202 && data.requiresSignup) {
         setState("signup-form");
@@ -138,8 +144,8 @@ export default function InviteAcceptPage() {
       setFormError("Please enter your name.");
       return;
     }
-    if (password.length < 8) {
-      setFormError("Password must be at least 8 characters.");
+    if (password.length < 12) {
+      setFormError("Password must be at least 12 characters.");
       return;
     }
     if (password !== confirmPassword) {
@@ -351,7 +357,7 @@ export default function InviteAcceptPage() {
                   <input
                     type={showPassword ? "text" : "password"}
                     required
-                    placeholder="Min. 8 characters"
+                    placeholder="Min. 12 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-white/[0.25] focus:outline-none transition pr-10"

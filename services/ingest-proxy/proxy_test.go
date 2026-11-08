@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -86,8 +87,13 @@ func TestSignsTheExactBodyAndForwardsIt(t *testing.T) {
 		t.Fatalf("status = %d, want 202", w.Code)
 	}
 
+	// The signature covers "<unix seconds>." + body, and the timestamp travels in X-GI-Timestamp.
+	ts := up.last.headers.Get("X-GI-Timestamp")
+	if seconds, err := strconv.ParseInt(ts, 10, 64); err != nil || time.Since(time.Unix(seconds, 0)) > time.Minute {
+		t.Fatalf("X-GI-Timestamp = %q, want a current unix time", ts)
+	}
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(body))
+	mac.Write([]byte(ts + "." + body))
 	want := hex.EncodeToString(mac.Sum(nil))
 	if got := up.last.headers.Get("X-GI-Signature"); got != want {
 		t.Fatalf("signature = %q, want %q", got, want)

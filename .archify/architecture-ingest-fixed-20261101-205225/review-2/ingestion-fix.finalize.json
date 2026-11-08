@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "running",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-11-01T15:28:18.304Z",
+  "specification": {
+    "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-fixed-20261101-205225\\fix.json",
+    "sha256": "3ae3e5caab748b87e76101eb1cb03247d4fd067a0011ee7022467c9048244164",
+    "bytes": 7079
+  },
+  "artifact": {
+    "path": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-fixed-20261101-205225\\ingestion-fix.html"
+  },
+  "stages": {},
+  "diagnostics": [],
+  "evidence": {
+    "receipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-fixed-20261101-205225\\review-2\\ingestion-fix.finalize.json",
+    "summaryReceipt": "C:\\Users\\chaitanya.abhade\\Documents\\java\\trackme\\.archify\\architecture-ingest-fixed-20261101-205225\\review-2\\ingestion-fix.finalize-summary.json"
+  },
+  "visualReview": "not-requested"
+}

@@ -30,6 +30,8 @@ import {
   workspaces,
 } from "@trackme/db";
 import { requireApiUser } from "./auth";
+import { checkRateLimit } from "./rate-limit";
+import { getRedis } from "./redis";
 import { cachedMembershipRole, cachedSiteInWorkspace } from "./authz-cache";
 import { decryptSiteSigningSecret, encryptSiteSigningSecret } from "./tenancy-secrets";
 
@@ -113,6 +115,28 @@ async function queryMembership(userId: string, workspaceId: string): Promise<Ten
   };
 }
 
+/** Per caller (a signed-in user, or one API key) per minute, across every authenticated endpoint. */
+const API_CALLS_PER_MINUTE = Number(process.env.API_RATE_LIMIT_PER_MINUTE ?? 600);
+
+/**
+ * Meters every authenticated call. Before this only the sign-in routes were limited, so invitations, alert
+ * tests, previews, search and all analytics endpoints could be hammered without bound. Doing it here, where
+ * identity is established, means a new endpoint cannot forget it.
+ */
+async function enforceCallerLimit(ctx: TenantContext): Promise<void> {
+  await checkRateLimit(`api_caller:${ctx.userId}`, API_CALLS_PER_MINUTE, 60, "Too many requests. Slow down and retry shortly.");
+}
+
+/** Records when an API key was last used (at most once per 10 minutes per key). Never fails a request. */
+async function touchApiKey(id: string): Promise<void> {
+  try {
+    const first = await getRedis("ratelimit").set(`apikey_touch:${id}`, "1", "EX", 600, "NX");
+    if (first) await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, id));
+  } catch {
+    // usage tracking is best effort
+  }
+}
+
 async function authenticateApiKey(
   request: NextRequest,
   workspaceId: string
@@ -147,6 +171,7 @@ async function authenticateApiKey(
     throw new AppError(401, "UNAUTHENTICATED", "API key has expired");
   }
 
+  void touchApiKey(apiKey.id);
   const scopes = parseScopes(apiKey.scopes);
   const ctx: TenantContext = {
     userId: `api-key:${apiKey.id}`,
@@ -179,6 +204,7 @@ export async function authenticateRequest(
       : (requiredScopeOrPermission as Permission);
 
   assertPermission(ctx, permission);
+  await enforceCallerLimit(ctx);
   return ctx;
 }
 
@@ -396,6 +422,7 @@ export async function requireSiteAccess(
   const user = await requireApiUser(request);
   const ctx = await loadMembershipContext(user.id, site.workspaceId);
   assertPermission(ctx, permission);
+  await enforceCallerLimit(ctx);
 
   return { ctx, site };
 }
@@ -506,7 +533,7 @@ export async function listApiKeys(workspaceId: string) {
     .orderBy(desc(apiKeys.createdAt));
 }
 
-export async function getPublicSite(slug: string): Promise<DashboardSite | null> {
+export const getPublicSite = cache(async (slug: string): Promise<DashboardSite | null> => {
   const rows = await db
     .select(SITE_COLUMNS)
     .from(sites)
@@ -520,7 +547,7 @@ export async function getPublicSite(slug: string): Promise<DashboardSite | null>
 
   const site = rows[0];
   return site ? toDashboardSite(site) : null;
-}
+});
 
 export type WorkspaceUsage = {
   plan: string;

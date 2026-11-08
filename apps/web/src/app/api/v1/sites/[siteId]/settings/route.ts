@@ -5,6 +5,7 @@ import { AppError, type SiteSettings } from "@trackme/contracts";
 import { requireSiteAccess, updateSiteSettings } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
+import { getClientIp } from "@/lib/client-ip";
 
 function omitUndefined<T extends Record<string, unknown>>(
   obj: T
@@ -73,7 +74,7 @@ export async function PATCH(
       targetType: "site",
       targetId: site.id,
       metadata: patch as Record<string, unknown>,
-      ipAddress: request.headers.get("x-forwarded-for") || null,
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({ settings: updated.settings });

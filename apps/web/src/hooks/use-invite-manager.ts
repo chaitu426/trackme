@@ -29,7 +29,6 @@ export interface InviteResult {
 export function useInviteManager(workspaceId: string | null) {
   const [invites, setInvites] = React.useState<Invite[]>([]);
   const [busy, setBusy] = React.useState<Record<string, boolean>>({});
-  const [copiedToken, setCopiedToken] = React.useState<string | null>(null);
 
   // ── Send / Re-invite ───────────────────────────────────────────────────────
   async function sendInvite(
@@ -106,16 +105,6 @@ export function useInviteManager(workspaceId: string | null) {
     }
   }
 
-  // ── Copy invite link ───────────────────────────────────────────────────────
-  async function copyInviteLink(tokenOrId: string, trackKey?: string): Promise<void> {
-    const appUrl = window.location.origin;
-    const url = `${appUrl}/invite/accept?token=${tokenOrId}`;
-    await navigator.clipboard.writeText(url);
-    const key = trackKey ?? tokenOrId;
-    setCopiedToken(key);
-    setTimeout(() => setCopiedToken(null), 2000);
-  }
-
   // ── Expiry helpers ─────────────────────────────────────────────────────────
   function getExpiryMeta(expiresAt: string): {
     label: string;
@@ -134,11 +123,9 @@ export function useInviteManager(workspaceId: string | null) {
     invites,
     setInvites,
     busy,
-    copiedToken,
     sendInvite,
     resendInvite,
     revokeInvite,
-    copyInviteLink,
     getExpiryMeta,
   };
 }

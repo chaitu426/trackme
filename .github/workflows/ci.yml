@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The default token can read the repository and nothing else; a job that needs more asks for it explicitly.
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Lint, Typecheck & Test
@@ -84,3 +88,47 @@ jobs:
       - name: Test ingest-proxy
         working-directory: services/ingest-proxy
         run: go test ./...
+
+      - name: Known vulnerabilities in Go dependencies (edge)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+      - name: Known vulnerabilities in Go dependencies (ingest-proxy)
+        working-directory: services/ingest-proxy
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  security:
+    name: Security gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository (full history, for secret scanning)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.5.2
+          run_install: false
+
+      # Each rule in scripts/security-guard.mjs corresponds to a vulnerability that was found and fixed
+      # (docs/SECURITY_AUDIT.md). A change that brings the pattern back fails here.
+      - name: Security guard rules
+        run: node scripts/security-guard.mjs
+
+      - name: Security guard rule tests
+        run: node --test scripts/security-guard.test.mjs
+
+      # High and critical advisories in production dependencies fail the build. The one advisory that is
+      # ignored on purpose (zod, GHSA-mrhx-c7xc-m3w5) is listed in package.json with its reason in docs/SECURITY_AUDIT.md.
+      - name: Dependency advisories (production dependencies)
+        run: pnpm audit --prod --audit-level=high
+
+      - name: Secret scan (working tree and history)
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --no-banner --redact --verbose

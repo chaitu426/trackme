@@ -18,7 +18,6 @@ export const apiKeys = pgTable(
   },
   (table) => [
     index("idx_api_keys_workspace_id").on(table.workspaceId),
-    index("idx_api_keys_hash").on(table.keyHash),
   ]
 );
 

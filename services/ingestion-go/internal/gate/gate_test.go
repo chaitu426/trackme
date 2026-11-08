@@ -154,6 +154,32 @@ func TestUnlimitedQuota(t *testing.T) {
 	}
 }
 
+func TestIPLimitIsFusedIntoTheSameCall(t *testing.T) {
+	g, mr := newGate(t, 100)
+	ctx := context.Background()
+
+	for i := 0; i < 2; i++ {
+		r := req("ip-" + strconv.Itoa(i))
+		r.ClientIP = "198.51.100.7"
+		r.IPLimit = 2
+		res, err := g.Admit(ctx, r)
+		if err != nil || res.Status != Admitted {
+			t.Fatalf("request %d: res=%+v err=%v", i, res, err)
+		}
+	}
+
+	r := req("ip-over")
+	r.ClientIP = "198.51.100.7"
+	r.IPLimit = 2
+	res, err := g.Admit(ctx, r)
+	if err != nil || res.Status != IPLimited {
+		t.Fatalf("res=%+v err=%v, want IPLimited", res, err)
+	}
+	if mr.Exists(dedupe.EventKey("ip-over")) {
+		t.Fatal("an IP-limited request must not claim ids")
+	}
+}
+
 func TestRedisDownIsAnError(t *testing.T) {
 	g, mr := newGate(t, 10)
 	mr.Close()

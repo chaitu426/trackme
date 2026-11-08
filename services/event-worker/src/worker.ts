@@ -7,6 +7,7 @@ import { getClickHouseClient } from "@trackme/analytics";
 import { createClickHouseWriter } from "./writers/clickhouse.js";
 import { updateRealtimeState } from "./state/redis-realtime.js";
 import { sendToDLQ } from "./dlq.js";
+import { clearIntent, pin, readIntent, writeIntent } from "./intent.js";
 import { checkEvent } from "./contract.js";
 import { isDataError } from "./errors.js";
 import { kafkaConnection } from "./kafka-config.js";
@@ -15,10 +16,14 @@ import { writeIsolating } from "./isolate.js";
 import {
   batchRows,
   consumerLag,
+  consumerLagTotal,
   deadLettered,
+  e2eLatency,
   eventsStored,
   insertDuration,
+  intentErrors,
   lagAfter,
+  stopwatch,
   realtimeErrors,
   v2WriteErrors,
   startMetricsServer,
@@ -68,7 +73,22 @@ const consumer = kafka.consumer({
   maxBytesPerPartition: env.WORKER_FETCH_MAX_BYTES_PER_PARTITION,
 });
 
+// Freshness for the live view comes from this consumer; the writer above can afford big blocks.
+const realtimeConsumer = kafka.consumer({
+  groupId: `${GROUP_ID}_realtime`,
+  sessionTimeout: 30_000,
+  heartbeatInterval: 3_000,
+  minBytes: 1,
+  maxWaitTimeInMs: 100,
+});
+
+/** WORKER_ROLES=writer,realtime runs both in one process; split them across deployments to scale separately. */
+const roles = new Set(env.WORKER_ROLES.split(",").map((r) => r.trim()));
+
+const admin = kafka.admin();
+
 let isRunning = true;
+let lagTimer: NodeJS.Timeout | null = null;
 
 type ParsedMessage = {
   offset: string;
@@ -83,6 +103,38 @@ function parseMessage(value: Buffer | null, offset: string, partition: number): 
     return { offset, partition, decoded: raw ? JSON.parse(raw) : null, raw };
   } catch {
     return { offset, partition, decoded: null, raw };
+  }
+}
+
+/**
+ * Sample lag from the admin API on a timer. The per-batch gauge only updates
+ * after a batch completes, so it keeps its old value (often 0) while the
+ * consumer is stalled; this sampler stays truthful either way.
+ */
+async function sampleConsumerLag(): Promise<void> {
+  try {
+    const [topicOffsets, groupOffsets] = await Promise.all([
+      admin.fetchTopicOffsets(TOPIC),
+      admin.fetchOffsets({ groupId: GROUP_ID, topics: [TOPIC] }),
+    ]);
+    const committed = new Map<number, bigint>();
+    for (const topic of groupOffsets) {
+      if (topic.topic !== TOPIC) continue;
+      for (const partition of topic.partitions) {
+        if (partition.offset !== "-1") committed.set(partition.partition, BigInt(partition.offset));
+      }
+    }
+    let total = 0n;
+    for (const partition of topicOffsets) {
+      const high = BigInt(partition.high);
+      const current = committed.get(partition.partition) ?? BigInt(partition.low);
+      const lag = high > current ? high - current : 0n;
+      consumerLag.set({ partition: String(partition.partition) }, Number(lag));
+      total += lag;
+    }
+    consumerLagTotal.set(Number(total));
+  } catch (error) {
+    console.error("⚠️ Failed to sample consumer lag:", error);
   }
 }
 
@@ -107,10 +159,20 @@ async function processBatch({
   isRunning: batchRunning,
 }: EachBatchPayload): Promise<void> {
   if (!batchRunning() || !isRunning) return;
+  const lap = stopwatch();
+  const { partition } = batch;
 
-  const parsed = batch.messages.map((msg) =>
-    parseMessage(msg.value, msg.offset, batch.partition)
-  );
+  // Exact replay (see intent.ts): after a crash, re-cut this batch to the range that was
+  // being inserted so the dedupe token matches. Redis trouble degrades exactness, not liveness.
+  const intent = await readIntent(redis, GROUP_ID, partition).catch(() => (intentErrors.inc(), null));
+  const messages = pin(batch.messages, intent);
+  if (messages.length === 0) return;
+  const range = { first: messages[0]!.offset, last: messages[messages.length - 1]!.offset };
+  if (intent?.first !== range.first || intent.last !== range.last) {
+    await writeIntent(redis, GROUP_ID, partition, range).catch(() => intentErrors.inc());
+  }
+
+  const parsed = messages.map((msg) => parseMessage(msg.value, msg.offset, partition));
 
   const good: EnrichedEvent[] = [];
   const deadLetters: { raw: string; reason: string; kind: DeadLetterReason }[] = [];
@@ -128,17 +190,7 @@ async function processBatch({
     }
   }
   await heartbeat();
-
-  // Realtime is non-fatal and independent of the insert, so run it concurrently
-  // instead of paying its latency after the insert. A row ClickHouse later
-  // refuses may briefly show as active; that is harmless and self-expires.
-  const realtimeUpdate: Promise<void> =
-    good.length > 0
-      ? updateRealtimeState(redis, good).catch((error) => {
-          realtimeErrors.inc();
-          console.error("⚠️ Failed to update realtime state:", error);
-        })
-      : Promise.resolve();
+  lap("decode");
 
   let refused: Awaited<ReturnType<typeof writeIsolating<EnrichedEvent>>>;
   const stopInsertTimer = insertDuration.startTimer();
@@ -146,7 +198,7 @@ async function processBatch({
     refused = await writeIsolating(good, writeEventsToClickHouse, isDataError);
   } finally {
     stopInsertTimer();
-    await realtimeUpdate;
+    lap("insert");
   }
   const refusedIds = new Set<string>();
   for (const { item, error } of refused) {
@@ -159,26 +211,55 @@ async function processBatch({
   }
   const written = refusedIds.size === 0 ? good : good.filter((e) => !refusedIds.has(e.eventId));
 
-  for (const letter of deadLetters) {
-    await sendToDLQ(letter.raw, letter.reason);
-    deadLettered.inc({ reason: letter.kind });
+  // Edge receipt -> insert completion. receivedAt is stamped before admission,
+  // so this measures the full ingestion pipeline, not just the ClickHouse call.
+  const insertedAt = Date.now();
+  for (const event of written) {
+    const receivedAt = Date.parse(event.receivedAt);
+    if (!Number.isNaN(receivedAt)) {
+      e2eLatency.observe(Math.max(0, insertedAt - receivedAt) / 1000);
+    }
   }
+
+  await sendToDLQ(deadLetters);
+  for (const letter of deadLetters) deadLettered.inc({ reason: letter.kind });
   await heartbeat();
+  lap("dlq");
 
-  for (const message of batch.messages) {
-    resolveOffset(message.offset);
-  }
+  for (const message of messages) resolveOffset(message.offset);
+  // Commit after every batch (not on a timer) so the only range that can ever be replayed is
+  // the one in the intent record. The record is cleared after the commit; a crash between the
+  // two leaves a stale record that pin() ignores because the next batch starts past it.
+  await consumer.commitOffsets([{ topic: TOPIC, partition, offset: (BigInt(range.last) + 1n).toString() }]);
+  await clearIntent(redis, GROUP_ID, partition).catch(() => intentErrors.inc());
 
-  batchRows.observe(batch.messages.length);
+  batchRows.observe(messages.length);
   eventsStored.inc(written.length);
-  const lastMessage = batch.messages[batch.messages.length - 1];
-  if (lastMessage) {
-    consumerLag.set({ partition: String(batch.partition) }, lagAfter(batch.highWatermark, lastMessage.offset));
-  }
+  consumerLag.set({ partition: String(partition) }, lagAfter(batch.highWatermark, range.last));
 
-  console.log(
-    `✅ Kafka partition=${batch.partition} stored=${written.length} dead_lettered=${deadLetters.length}`
-  );
+  console.log(`✅ Kafka partition=${partition} stored=${written.length} dead_lettered=${deadLetters.length}`);
+}
+
+/**
+ * Realtime has its own consumer group, so a slow or failing Redis can never delay an insert,
+ * and inserts never delay the live view. It reads only new messages (a fresh group starts at
+ * the end: five minutes of history is all realtime shows) and is idempotent, so the default
+ * auto-commit and at-least-once delivery are fine. Malformed messages are the writer's to dead-letter.
+ */
+async function processRealtime({ batch }: EachBatchPayload): Promise<void> {
+  const events: EnrichedEvent[] = [];
+  for (const m of batch.messages) {
+    try {
+      if (m.value) events.push(JSON.parse(m.value.toString("utf8")) as EnrichedEvent);
+    } catch {
+      /* dead-lettered by the writer group */
+    }
+  }
+  if (events.length === 0) return;
+  await updateRealtimeState(redis, events).catch((error) => {
+    realtimeErrors.inc();
+    console.error("⚠️ Failed to update realtime state:", error);
+  });
 }
 
 async function main(): Promise<void> {
@@ -187,26 +268,46 @@ async function main(): Promise<void> {
   );
 
   startMetricsServer(env.WORKER_METRICS_PORT);
-  await consumer.connect();
-  // fromBeginning only applies when the group has no committed offset yet. With
-  // false, a new or renamed group would silently skip everything already in the
-  // topic. Replaying is safe: event_id dedupes in ClickHouse.
-  await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
-
-  await consumer.run({
-    autoCommit: true,
-    autoCommitInterval: 5000,
-    partitionsConsumedConcurrently: env.WORKER_PARTITION_CONCURRENCY,
-    eachBatchAutoResolve: false,
-    eachBatch: processBatch,
-  });
+  if (roles.has("writer")) {
+    await consumer.connect();
+    await admin.connect();
+    // fromBeginning only applies when the group has no committed offset yet. With
+    // false, a new or renamed group would silently skip everything already in the
+    // topic. Replaying is safe: event_id dedupes in ClickHouse.
+    await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
+    await consumer.run({
+      autoCommit: false, // committed explicitly after each batch, see processBatch
+      partitionsConsumedConcurrently: env.WORKER_PARTITION_CONCURRENCY,
+      eachBatchAutoResolve: false,
+      eachBatch: processBatch,
+    });
+    void sampleConsumerLag();
+    lagTimer = setInterval(() => void sampleConsumerLag(), env.WORKER_LAG_SAMPLE_MS);
+    lagTimer.unref();
+  }
+  if (roles.has("realtime")) {
+    await realtimeConsumer.connect();
+    await realtimeConsumer.subscribe({ topic: TOPIC, fromBeginning: false });
+    await realtimeConsumer.run({ eachBatch: processRealtime });
+  }
 }
 
 async function shutdown(): Promise<void> {
   console.log("Shutting down worker...");
   isRunning = false;
+  if (lagTimer) {
+    clearInterval(lagTimer);
+    lagTimer = null;
+  }
+  for (const c of [consumer, realtimeConsumer]) {
+    try {
+      await c.disconnect();
+    } catch {
+      // ignore
+    }
+  }
   try {
-    await consumer.disconnect();
+    await admin.disconnect();
   } catch {
     // ignore
   }

@@ -55,13 +55,42 @@ const nextConfig: NextConfig = {
     // public files with max-age=0, which forces a revalidation round trip each time.
     // Cache for 5 minutes and serve stale for a day while refreshing in the background,
     // so a release reaches visitors within minutes and nobody waits for it.
+    // Subresource Integrity on a script from another origin only works if that response allows CORS, otherwise
+    // the browser refuses to run it. The files are public, so "*" exposes nothing.
+    const trackerPublic = [
+      { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+      { key: "Access-Control-Allow-Origin", value: "*" },
+    ];
     const trackerCache = [
       { key: "Cache-Control", value: "public, max-age=300, stale-while-revalidate=86400" },
-      { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+      ...trackerPublic,
+    ];
+    // The versioned file never changes, so it can be cached for a year.
+    const trackerImmutable = [
+      { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+      ...trackerPublic,
+    ];
+    // Security headers for every page and API response. Everything here is safe to enforce unconditionally; the
+    // script policy (which can block a page if it is wrong) is added per request by the middleware, in
+    // report-only mode until CSP_MODE=enforce (see src/lib/csp.ts).
+    const security = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" },
+      { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+      { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" },
+      ...(process.env.NODE_ENV === "production"
+        ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
+        : []),
     ];
     return [
       { source: "/tracker.js", headers: trackerCache },
       { source: "/t/v1/tracker.js", headers: trackerCache },
+      { source: "/t/:version/tracker.:rest.js", headers: trackerImmutable },
+      { source: "/t/manifest.json", headers: trackerCache },
+      // The tracker is loaded by other sites; every other response gets the security headers.
+      { source: "/((?!tracker\\.js|t/).*)", headers: security },
     ];
   },
   webpack(config) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -63,11 +64,18 @@ const (
 	// An entry past cacheTTL is still served for up to staleMax while one background
 	// query refreshes it, so the request that happens to land on expiry no longer pays
 	// the database round trip. Past staleMax (a long database outage) it is not served.
-	staleMax    = 5 * time.Minute
-	cacheMax    = 5000
-	negativeTTL = 10 * time.Second // short, so a site created a moment ago starts working quickly
-	negativeMax = 10000
-	loadTimeout = 5 * time.Second
+	staleMax = 5 * time.Minute
+	// A site we already know keeps being served from its last good entry for up to this long when
+	// the database cannot be reached, so a Postgres outage does not stop ingestion. Only errors
+	// qualify: a successful lookup, including "not found", always wins, so a revoked key or a
+	// changed signing secret still takes effect the moment the database answers.
+	staleIfErrorMax = 6 * time.Hour
+	// After a failed lookup, serve the old entry for this long without asking the database again.
+	errorBackoff = 5 * time.Second
+	cacheMax     = 5000
+	negativeTTL  = 10 * time.Second // short, so a site created a moment ago starts working quickly
+	negativeMax  = 10000
+	loadTimeout  = 5 * time.Second
 )
 
 const InvalidateChannel = "site:invalidate"
@@ -97,6 +105,7 @@ type Resolver struct {
 	cache    map[string]cacheEntry // keyed by public_key_hash
 	missing  map[string]time.Time  // hashes known not to exist, with when that was learned
 	inflight map[string]*inflight
+	failed   map[string]time.Time // hashes whose last lookup errored (not "not found")
 }
 
 func NewResolver(pool *pgxpool.Pool) *Resolver {
@@ -110,6 +119,7 @@ func newResolver(load loadFunc, now func() time.Time) *Resolver {
 		cache:    make(map[string]cacheEntry),
 		missing:  make(map[string]time.Time),
 		inflight: make(map[string]*inflight),
+		failed:   make(map[string]time.Time),
 	}
 }
 
@@ -118,49 +128,104 @@ func HashPublicKey(plaintext string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-const encryptedSecretPrefix = "enc:v1:"
+const (
+	encryptedSecretPrefixV1 = "enc:v1:"
+	encryptedSecretPrefixV2 = "enc:v2:"
+	devSecretKey            = "dev-site-signing-secret-key-min-32-chars"
+)
 
-func siteSigningSecretKey() string {
-	key := strings.TrimSpace(os.Getenv("SITE_SIGNING_SECRET_KEY"))
-	if key == "" {
-		key = "dev-site-signing-secret-key-min-32-chars"
+// secretKeyRing is the set of keys that may have encrypted a stored secret: the current key first, then the
+// previous ones kept for rotation (SITE_SIGNING_SECRET_KEY_PREVIOUS, comma separated). It mirrors
+// apps/web/src/lib/secret-box.ts. There is no fallback to the public development key in production, and a key
+// under 32 characters is ignored rather than replaced by a default: with no usable key a secret simply fails
+// to decrypt, the signature check fails, and the request is refused (fail closed).
+func secretKeyRing() []string {
+	var keys []string
+	add := func(k string) {
+		if k = strings.TrimSpace(k); len(k) >= 32 {
+			keys = append(keys, k)
+		}
 	}
-	if len(key) < 32 {
-		return "dev-site-signing-secret-key-min-32-chars"
+	add(os.Getenv("SITE_SIGNING_SECRET_KEY"))
+	for _, k := range strings.Split(os.Getenv("SITE_SIGNING_SECRET_KEY_PREVIOUS"), ",") {
+		add(k)
 	}
-	return key
+	if len(keys) == 0 && os.Getenv("NODE_ENV") != "production" {
+		return []string{devSecretKey}
+	}
+	return keys
 }
 
-func decryptStoredSecret(value string) (string, error) {
-	if value == "" || !strings.HasPrefix(value, encryptedSecretPrefix) {
-		return value, nil
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(value, encryptedSecretPrefix))
-	if err != nil {
-		return "", err
-	}
+func keyID(secret string) string {
+	sum := sha256.Sum256([]byte(secret))
+	return hex.EncodeToString(sum[:])[:8]
+}
+
+// hkdfSHA256 is HKDF (RFC 5869) for an output of at most 32 bytes: extract, then a single expand block.
+func hkdfSHA256(secret, salt, info string) []byte {
+	extract := hmac.New(sha256.New, []byte(salt))
+	extract.Write([]byte(secret))
+	expand := hmac.New(sha256.New, extract.Sum(nil))
+	expand.Write([]byte(info))
+	expand.Write([]byte{1})
+	return expand.Sum(nil)
+}
+
+func openGCM(key, payload []byte) (string, error) {
 	if len(payload) <= 28 {
 		return "", fmt.Errorf("secret payload too short")
 	}
-	key := sha256.Sum256([]byte(siteSigningSecretKey()))
-	block, err := aes.NewCipher(key[:])
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
-	iv := payload[:12]
-	tag := payload[len(payload)-16:]
-	ciphertext := payload[12 : len(payload)-16]
-	stream, err := cipher.NewGCM(block)
+	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return "", err
 	}
-	combined := append([]byte{}, ciphertext...)
-	combined = append(combined, tag...)
-	plaintext, err := stream.Open(nil, iv, combined, nil)
+	// gcm.Open wants ciphertext followed by the tag, which is how the payload is laid out after the 12-byte iv.
+	plaintext, err := gcm.Open(nil, payload[:12], payload[12:], nil)
 	if err != nil {
 		return "", err
 	}
 	return string(plaintext), nil
+}
+
+// decryptStoredSecret reads both stored formats (v1: key = SHA-256 of the variable; v2: key id plus HKDF) and
+// passes through values that were never encrypted.
+func decryptStoredSecret(value string) (string, error) {
+	switch {
+	case strings.HasPrefix(value, encryptedSecretPrefixV2):
+		rest := strings.TrimPrefix(value, encryptedSecretPrefixV2)
+		kid, encoded, ok := strings.Cut(rest, ":")
+		if !ok {
+			return "", fmt.Errorf("malformed secret")
+		}
+		payload, err := base64.RawURLEncoding.DecodeString(encoded)
+		if err != nil {
+			return "", err
+		}
+		for _, k := range secretKeyRing() {
+			if keyID(k) == kid {
+				return openGCM(hkdfSHA256(k, kid, "trackme/secret-box/v2"), payload)
+			}
+		}
+		return "", fmt.Errorf("secret was encrypted with a key that is not configured")
+	case strings.HasPrefix(value, encryptedSecretPrefixV1):
+		payload, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(value, encryptedSecretPrefixV1))
+		if err != nil {
+			return "", err
+		}
+		for _, k := range secretKeyRing() {
+			sum := sha256.Sum256([]byte(k))
+			if plaintext, err := openGCM(sum[:], payload); err == nil {
+				return plaintext, nil
+			}
+		}
+		return "", fmt.Errorf("secret could not be decrypted with any configured key")
+	default:
+		return value, nil
+	}
 }
 
 func normalizeSettings(settings *Settings) {
@@ -236,6 +301,14 @@ func (r *Resolver) Resolve(ctx context.Context, publicKey string) (*ResolvedSite
 		return &site, nil
 	}
 
+	if at, bad := r.failed[hash]; bad && r.now().Sub(at) < errorBackoff {
+		if site, ok := r.staleIfErrorLocked(hash); ok {
+			metrics.Default.SiteCache.WithLabelValues("stale_error").Inc()
+			r.mu.Unlock()
+			return &site, nil
+		}
+	}
+
 	call, running := r.inflight[hash]
 	if !running {
 		call = &inflight{done: make(chan struct{})}
@@ -256,10 +329,27 @@ func (r *Resolver) Resolve(ctx context.Context, publicKey string) (*ResolvedSite
 		return nil, ctx.Err()
 	}
 	if call.err != nil {
+		if !errors.Is(call.err, ErrNotFound) {
+			r.mu.Lock()
+			site, ok := r.staleIfErrorLocked(hash)
+			r.mu.Unlock()
+			if ok {
+				metrics.Default.SiteCache.WithLabelValues("stale_error").Inc()
+				return &site, nil
+			}
+		}
 		return nil, call.err
 	}
 	site := call.site
 	return &site, nil
+}
+
+func (r *Resolver) staleIfErrorLocked(hash string) (ResolvedSite, bool) {
+	entry, ok := r.cache[hash]
+	if !ok || r.now().Sub(entry.cachedAt) >= staleIfErrorMax {
+		return ResolvedSite{}, false
+	}
+	return entry.site, true
 }
 
 // run performs the one shared lookup for hash. It is detached from every
@@ -273,10 +363,17 @@ func (r *Resolver) run(hash string, call *inflight) {
 	switch {
 	case err == nil:
 		r.storeLocked(hash, site)
+		delete(r.failed, hash)
 	case errors.Is(err, ErrNotFound):
 		// The site is gone: stop serving its stale entry too.
 		delete(r.cache, hash)
+		delete(r.failed, hash)
 		r.storeMissingLocked(hash)
+	default:
+		if len(r.failed) >= negativeMax {
+			r.failed = make(map[string]time.Time)
+		}
+		r.failed[hash] = r.now()
 	}
 	delete(r.inflight, hash)
 	r.mu.Unlock()

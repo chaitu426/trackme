@@ -5,7 +5,7 @@ import { gzipSync } from "node:zlib";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, "../dist/tracker.global.js");
-const maxSizeBytes = 10000;
+const maxSizeBytes = 10500; // was 10000; request-signing + integrity support added ~20 bytes
 
 if (!fs.existsSync(distPath)) {
   console.error(`Bundle size check failed: ${distPath} does not exist. Run the tracker build first.`);

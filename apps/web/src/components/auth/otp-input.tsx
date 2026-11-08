@@ -5,11 +5,13 @@ import { Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
 
 interface OtpInputProps {
   email: string;
-  purpose: "login_otp" | "signup_verify" | "password_reset";
+  purpose: "login_otp" | "signup_verify";
   onSuccess: (data: { redirectTo?: string; user?: unknown }) => void;
   onCancel?: () => void;
   devCode?: string | undefined;
   rememberMe?: boolean | undefined;
+  /** From /auth/login when the account needs its password first; sent back so the code can complete that sign-in. */
+  challenge?: string | undefined;
 }
 
 export function OtpVerificationModal({
@@ -19,6 +21,7 @@ export function OtpVerificationModal({
   onCancel,
   devCode: initialDevCode,
   rememberMe = false,
+  challenge,
 }: OtpInputProps) {
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -105,6 +108,7 @@ export function OtpVerificationModal({
           code,
           purpose,
           rememberMe,
+          ...(challenge ? { challenge } : {}),
         }),
       });
 
@@ -127,6 +131,11 @@ export function OtpVerificationModal({
 
   async function handleResend() {
     if (resendCooldown > 0 || isResending) return;
+    if (challenge) {
+      // The code is tied to the password step; a new one needs a new password sign-in.
+      setError("Go back and sign in again to get a new code.");
+      return;
+    }
     setIsResending(true);
     setError(null);
 
