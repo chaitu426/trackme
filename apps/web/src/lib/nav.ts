@@ -1,4 +1,6 @@
 import {
+  Activity,
+  Plug,
   BarChart2,
   CreditCard,
   FileText,
@@ -71,7 +73,12 @@ export const NAV_SUITES: NavSuite[] = [
   {
     id: "payments",
     title: "Payments & Revenue",
-    items: [{ path: "payments/connect", label: "Integrations", icon: CreditCard }],
+    items: [
+      { path: "payments", label: "Payments Overview", icon: CreditCard },
+      { path: "payments/checkout", label: "Checkout Funnel", icon: Filter },
+      { path: "payments/health", label: "Gateway Health", icon: Activity },
+      { path: "payments/connect", label: "Integrations", icon: Plug },
+    ],
   },
 ];
 
