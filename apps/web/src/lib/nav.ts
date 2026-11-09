@@ -7,6 +7,7 @@ import {
   Radio,
   Bug,
   Repeat2,
+  Rocket,
   Settings2,
   Target,
   TrendingUp,
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 
 /** Suite features that ship behind a flag. An item naming one is hidden until FEATURE_FLAGS lists it. */
-export type FeatureFlag = "errors" | "retention" | "segments";
+export type FeatureFlag = "errors" | "retention" | "segments" | "releases";
 
 export interface NavItem {
   /** Path under the active site (`/<workspace>/sites/<domain>/<path>`), or under the workspace when `workspace` is set. */
@@ -66,7 +67,10 @@ export const NAV_SUITES: NavSuite[] = [
   {
     id: "reliability",
     title: "Errors & Reliability",
-    items: [{ path: "errors", label: "Error Tracking", icon: Bug, flag: "errors" }],
+    items: [
+      { path: "errors", label: "Error Tracking", icon: Bug, flag: "errors" },
+      { path: "releases", label: "Release Impact", icon: Rocket, flag: "releases" },
+    ],
   },
 ];
 

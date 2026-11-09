@@ -24,3 +24,5 @@ export * from "./queries/errors.js";
 export * from "./queries/retention.js";
 export * from "./stats.js";
 export * from "./queries/user360.js";
+export * from "./queries/release-impact.js";
+export * from "./release-report.js";

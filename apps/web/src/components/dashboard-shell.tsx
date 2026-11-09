@@ -76,6 +76,7 @@ export function DashboardShell({
     pages: "Page Performance",
     errors: "Error Tracking",
     retention: "Retention & Cohorts",
+    releases: "Release Impact",
   };
   const segments = pathname.split("/").filter(Boolean);
   const pageLabel = (() => {
