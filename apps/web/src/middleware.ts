@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 import { cspHeader, cspMode, newNonce } from "@/lib/csp";
 
-const PUBLIC_EXACT = new Set(["/", "/login", "/signup", "/tracker.js", "/demo.html"]);
+const PUBLIC_EXACT = new Set(["/", "/login", "/signup", "/tracker.js", "/demo.html"])
 const PUBLIC_API_PREFIXES = [
   "/api/auth/login",
   "/api/auth/signup",

@@ -22,7 +22,8 @@ import { formatNumber, formatPercent } from "@/lib/format";
 const TTL_SECONDS = 300;
 /** Below this success rate a method or gateway is shown as a problem. */
 const WEAK_SUCCESS = 85;
-const change = (v: number | null) => (v === null ? undefined : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`);
+/** A change against a tiny previous period can be thousands of percent; past 999 it is shown as a bound, not a precise figure. */
+const change = (v: number | null) => (v === null ? undefined : Math.abs(v) > 999 ? `${v > 0 ? ">" : "<-"}999%` : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`);
 
 export default async function PaymentsOverviewPage({
   params,
@@ -102,22 +103,21 @@ async function Body({ siteId, range, requested, base }: { siteId: string; range:
 
   return (
     <>
-      <div className="enter grid gap-4 sm:grid-cols-2 xl:grid-cols-6" style={{ ["--i" as string]: 0 }}>
+      <div className="enter grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" style={{ ["--i" as string]: 0 }}>
         <StatsCard
-          className="xl:col-span-2"
+          className="sm:col-span-2"
           title="Revenue"
           value={formatMoney(cur.revenueMinor, currency)}
           change={change(pctChange(cur.revenueMinor, prev?.revenueMinor ?? 0))}
           isPositive={cur.revenueMinor >= (prev?.revenueMinor ?? 0)}
-          {...(cur.refundedMinor > 0 ? { subtitle: `${formatMoney(cur.refundedMinor, currency)} refunded` } : {})}
         />
-        <StatsCard title="Successful payments" value={formatNumber(cur.paid)} change={change(pctChange(cur.paid, prev?.paid ?? 0))} isPositive={cur.paid >= (prev?.paid ?? 0)} />
         <StatsCard
           title="Success rate"
           value={successRate === null ? "–" : formatPercent(successRate)}
           change={successRate !== null && prevRate !== null ? `${successRate - prevRate > 0 ? "+" : ""}${(successRate - prevRate).toFixed(1)} pts` : undefined}
           isPositive={successRate !== null && prevRate !== null && successRate >= prevRate}
         />
+        <StatsCard title="Successful payments" value={formatNumber(cur.paid)} change={change(pctChange(cur.paid, prev?.paid ?? 0))} isPositive={cur.paid >= (prev?.paid ?? 0)} />
         <StatsCard title="Average order" value={cur.paid > 0 ? formatMoney(aov, currency) : "–"} change={change(pctChange(aov, prevAov))} isPositive={aov >= prevAov} />
         <StatsCard
           title="Per paying customer"
@@ -131,7 +131,9 @@ async function Body({ siteId, range, requested, base }: { siteId: string; range:
         <CardHeader className="flex-row items-start justify-between gap-4 px-5 pb-2">
           <div>
             <CardTitle>Revenue per day</CardTitle>
-            <CardDescription>Captured payments in {currency}, by the day the payment started (UTC)</CardDescription>
+            <CardDescription>
+              Captured payments in {currency}, by the day the payment started (UTC){cur.refundedMinor > 0 ? `. ${formatMoney(cur.refundedMinor, currency)} was refunded in this period.` : ""}
+            </CardDescription>
           </div>
           {current.currencies.length > 1 && (
             <Segmented

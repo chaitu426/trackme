@@ -76,7 +76,7 @@ export function SitePrivacyForm({ siteId, initialSettings }: { siteId: string; i
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card id="privacy" className="scroll-mt-6">
         <CardHeader>
           <CardTitle>Privacy and collection</CardTitle>
           <CardDescription>How visitor events are handled at the edge. Each change applies as soon as it saves.</CardDescription>
@@ -123,7 +123,7 @@ export function SitePrivacyForm({ siteId, initialSettings }: { siteId: string; i
       </Card>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <Card>
+        <Card id="retention" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>Data retention</CardTitle>
             <CardDescription>Raw events older than this are deleted automatically.</CardDescription>
@@ -136,7 +136,7 @@ export function SitePrivacyForm({ siteId, initialSettings }: { siteId: string; i
           </div>
         </Card>
 
-        <Card>
+        <Card id="public-link" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>Public dashboard</CardTitle>
             <CardDescription>Share aggregate, privacy-safe analytics without a sign-in.</CardDescription>

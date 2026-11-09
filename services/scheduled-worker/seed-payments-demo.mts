@@ -71,9 +71,11 @@ function failure(method: string, ctx: { safari: boolean; outage: boolean; mobile
 }
 
 async function remove(siteId: string): Promise<void> {
+  // ALTER ... DELETE rewrites the parts, so the rows are physically gone. A lightweight DELETE only masks them, and a same-key
+  // row inserted right after could then lose to the masked one when parts merge.
   const opts = { clickhouse_settings: { mutations_sync: 2, allow_nondeterministic_mutations: 1 } };
-  await ch.command({ query: `DELETE FROM ${DB}.payment_events WHERE site_id = '${siteId}' AND startsWith(gateway_event_id, 'demo_')`, ...opts });
-  await ch.command({ query: `DELETE FROM ${DB}.order_session WHERE site_id = '${siteId}' AND startsWith(order_id, 'order_demo_')`, ...opts });
+  await ch.command({ query: `ALTER TABLE ${DB}.payment_events DELETE WHERE site_id = '${siteId}' AND startsWith(gateway_event_id, 'demo_')`, ...opts });
+  await ch.command({ query: `ALTER TABLE ${DB}.order_session DELETE WHERE site_id = '${siteId}' AND startsWith(order_id, 'order_demo_')`, ...opts });
   console.log("Demo payments removed.");
 }
 

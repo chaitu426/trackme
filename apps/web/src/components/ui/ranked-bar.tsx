@@ -7,7 +7,7 @@ export interface RankedRow {
   /** 0 to 1: the bar's length. */
   share: number;
   value: ReactNode;
-  /** A quiet second figure under or beside the value. */
+  /** A quiet caption under the name (a success rate, a count). */
   meta?: ReactNode;
   /** Draws the bar in the accent instead of the neutral step: the one row that matters. */
   emphasis?: boolean;
@@ -15,18 +15,22 @@ export interface RankedRow {
   bad?: boolean;
 }
 
-/** A ranked list with thin bars: the quiet way to show a share or a comparison next to a main chart. */
+/**
+ * A ranked list with thin bars. Each row is a name with its caption underneath on the left and the main figure on the right,
+ * so the figures stack in one right-aligned column of tabular digits at any card width, and a narrow card never squeezes a
+ * name to nothing. The bar runs the full width under the row.
+ */
 export function RankedBars({ rows }: { rows: RankedRow[] }) {
   return (
     <ul>
       {rows.map((r, i) => (
         <li key={r.key} className="border-t border-white/[0.04] px-5 py-3 first:border-t-0">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 truncate text-sm text-zinc-200">{r.label}</span>
-            <span className={cn("shrink-0 font-mono text-sm tabular-nums", r.bad ? "text-[#e5484d]" : "text-zinc-50")}>
-              {r.value}
-              {r.meta && <span className="ml-2 text-xs text-zinc-500">{r.meta}</span>}
-            </span>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate text-sm leading-5 text-zinc-200">{r.label}</p>
+              {r.meta && <p className="truncate text-xs leading-4 text-zinc-500">{r.meta}</p>}
+            </div>
+            <p className={cn("shrink-0 text-right font-mono text-sm leading-5 tabular-nums", r.bad ? "text-[#e5484d]" : "text-zinc-50")}>{r.value}</p>
           </div>
           <div className="mt-2 h-1 rounded-full bg-white/[0.06]" aria-hidden="true">
             <div

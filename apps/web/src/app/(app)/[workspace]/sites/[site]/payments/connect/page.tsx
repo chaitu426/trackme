@@ -45,15 +45,17 @@ export default async function PaymentConnectPage({ params }: { params: Promise<{
   });
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="w-full space-y-5 text-left">
       <PageHeader title="Payment Integrations" art="gauge">
         Connect your payment gateway for <span className="font-mono text-zinc-300">{site.domain}</span>. TrackMe receives signed webhooks and stores
         amounts and failure codes only, never card numbers, UPI ids, emails or phone numbers.
       </PageHeader>
-      {cards.map((g) => (
-        <PaymentGatewayCard key={g.gateway} siteId={site.id} g={g} />
-      ))}
-      <section className="linear-card p-6 space-y-3">
+      <div className="grid items-start gap-5 xl:grid-cols-2">
+        {cards.map((g) => (
+          <PaymentGatewayCard key={g.gateway} siteId={site.id} g={g} />
+        ))}
+      </div>
+      <section className="linear-card space-y-3 p-6">
         <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
           <h3 className="text-sm font-medium text-zinc-50">Link payments to sessions</h3>
           <CopyButton text={LINK_SNIPPET} label="Copy" />
