@@ -2,6 +2,9 @@
 
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
+import { inputCompactClass } from "@/components/ui/field";
+import { AnimatePresence } from "motion/react";
+import { ModalFrame } from "@/components/ui/dialog";
 import {
   Plus,
   Trash2,
@@ -255,15 +258,17 @@ export function FunnelsClient({
         </Card>
       )}
 
-      {modalOpen && (
-        <CreateFunnelDialog
-          siteId={site.id}
-          suggestions={suggestions}
-          prefillPaths={prefillPaths}
-          onClose={() => setModalOpen(false)}
-          onCreated={handleCreated}
-        />
-      )}
+      <AnimatePresence>
+        {modalOpen && (
+          <CreateFunnelDialog
+            siteId={site.id}
+            suggestions={suggestions}
+            prefillPaths={prefillPaths}
+            onClose={() => setModalOpen(false)}
+            onCreated={handleCreated}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -659,22 +664,10 @@ function CreateFunnelDialog({
     }
   }
 
-  const input =
-    "w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-white/[0.25] focus:bg-white/[0.04]";
+  const input = inputCompactClass;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in"
-      onMouseDown={onClose}
-    >
-      <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="funnel-dialog-title"
-        onSubmit={submit}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-white/[0.1] bg-card shadow-2xl animate-slide-down"
-      >
+    <ModalFrame onClose={onClose} labelledBy="funnel-dialog-title" onSubmit={submit} dismissible={!saving}>
         {suggestions && (
           <React.Suspense fallback={null}>
             <SuggestionLists promise={suggestions} />
@@ -914,7 +907,6 @@ function CreateFunnelDialog({
             {saving ? "Creating…" : "Create funnel"}
           </button>
         </div>
-      </form>
-    </div>
+    </ModalFrame>
   );
 }

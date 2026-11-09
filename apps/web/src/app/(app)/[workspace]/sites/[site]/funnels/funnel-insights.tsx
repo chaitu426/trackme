@@ -1,5 +1,6 @@
 "use client";
 
+import { NativeSelect } from "@/components/ui/field";
 import * as React from "react";
 import { Clock, Layers, SlidersHorizontal } from "lucide-react";
 import type { FunnelAnalysisResult, FunnelInsights, FunnelSegment } from "@trackme/analytics";
@@ -366,18 +367,18 @@ function WhatIf({ analysis }: { analysis: FunnelAnalysisResult }) {
           <label htmlFor="whatif-step" className="text-xs font-medium text-zinc-400">
             Transition
           </label>
-          <select
+          <NativeSelect
             id="whatif-step"
             value={selected}
             onChange={(e) => setSelected(Number(e.target.value))}
-            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs text-zinc-100 outline-none focus:border-white/[0.25]"
+            className="w-full"
           >
             {transitions.map((tr, i) => (
               <option key={tr.index} value={i} className="bg-zinc-900">
                 {tr.from.name} → {tr.to.name} ({Math.round(tr.rate * 1000) / 10}% continue)
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
 
         <div className="space-y-2">

@@ -2,6 +2,8 @@
 
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
+import { AnimatePresence } from "motion/react";
+import { SidePanelFrame } from "@/components/ui/dialog";
 import {
   Search,
   Code,
@@ -565,19 +567,22 @@ export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSear
         )}
       </Card>
 
-      {builderOpen && (
-        <SegmentBuilder
-          siteId={site.id}
-          traitKeys={traitKeys}
-          onClose={() => setBuilderOpen(false)}
-          onSaved={(segment) => {
-            setSegments((prev) => [segment, ...prev]);
-            setBuilderOpen(false);
-            void selectSegment(segment);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {builderOpen && (
+          <SegmentBuilder
+            siteId={site.id}
+            traitKeys={traitKeys}
+            onClose={() => setBuilderOpen(false)}
+            onSaved={(segment) => {
+              setSegments((prev) => [segment, ...prev]);
+              setBuilderOpen(false);
+              void selectSegment(segment);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
+      <AnimatePresence>
       {selectedUser && (
         <ProfileDrawer
           user={selectedUser}
@@ -592,6 +597,7 @@ export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSear
           onClose={() => setSelectedUser(null)}
         />
       )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -702,33 +708,8 @@ function ProfileDrawer({
   const sessions = React.useMemo(() => groupBySession(timeline), [timeline]);
   const pageviews = timeline.filter((e) => e.type === "pageview").length;
 
-  // The parent passes a fresh onClose every render; hold it in a ref so the effect (which
-  // grabs focus and locks scroll) runs once per open, not on every timeline update.
-  const onCloseRef = React.useRef(onClose);
-  onCloseRef.current = onClose;
-  React.useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCloseRef.current();
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
-
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={onClose}>
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Profile for ${label}`}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-xl flex-col border-l border-white/[0.08] bg-card shadow-2xl"
-      >
+    <SidePanelFrame onClose={onClose} label={`Profile for ${label}`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] p-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -860,8 +841,7 @@ function ProfileDrawer({
           </section>
           )}
         </div>
-      </aside>
-    </div>
+    </SidePanelFrame>
   );
 }
 

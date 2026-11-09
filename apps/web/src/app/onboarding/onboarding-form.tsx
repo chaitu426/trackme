@@ -22,6 +22,7 @@ import { GlyphField } from "@trackme/landing";
 import { FirstEventVerifier } from "@/components/first-event-verifier";
 import { useInviteManager } from "@/hooks/use-invite-manager";
 import { DrawCheck, Notice, PillTabs, StepPanel } from "@/components/motion/primitives";
+import { inputClass } from "@/components/ui/field";
 
 type CreatedWorkspace = {
   workspace: { id: string; name: string; slug: string };
@@ -283,8 +284,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
   }
 
 
-  const input =
-    "h-10 w-full rounded-lg border border-white/[0.1] bg-card px-3 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors duration-150 hover:border-white/[0.18] focus:border-white/[0.35]";
+  const input = inputClass;
   const primary =
     "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#ededed] px-5 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] press hover:bg-white disabled:pointer-events-none disabled:opacity-60";
   const ghost =

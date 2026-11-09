@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { inputCompactClass, NativeSelect } from "@/components/ui/field";
+import { ModalFrame } from "@/components/ui/dialog";
 import { AlertCircle, Check, Loader2, Plus, Trash2, X } from "lucide-react";
 import {
   EMPTY_SEGMENT,
@@ -48,9 +50,8 @@ function blankCondition(field: ProfileCondition["field"]): ProfileCondition {
   }
 }
 
-const input =
-  "rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-white/[0.25] focus:bg-white/[0.04]";
-const select = `${input} cursor-pointer`;
+const input = inputCompactClass;
+const select = "";
 
 export function SegmentBuilder({
   siteId,
@@ -170,15 +171,7 @@ export function SegmentBuilder({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in" onMouseDown={onClose}>
-      <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="segment-dialog-title"
-        onSubmit={submit}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-white/[0.1] bg-card shadow-2xl animate-slide-down"
-      >
+    <ModalFrame onClose={onClose} labelledBy="segment-dialog-title" onSubmit={submit} dismissible={!saving}>
         <datalist id="segment-trait-keys">
           {traitKeys.map((k) => (
             <option key={k} value={k} />
@@ -267,14 +260,14 @@ export function SegmentBuilder({
             </h3>
             {definition.behavior.map((b, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.015] p-3">
-                <select aria-label="Did or did not" value={b.op} onChange={(e) => setBehavior(i, { op: e.target.value as BehaviorCondition["op"] })} className={select}>
+                <NativeSelect aria-label="Did or did not" value={b.op} onChange={(e) => setBehavior(i, { op: e.target.value as BehaviorCondition["op"] })} className={select}>
                   <option value="did" className="bg-zinc-900">Did</option>
                   <option value="did_not" className="bg-zinc-900">Never did</option>
-                </select>
-                <select aria-label="Page or event" value={b.kind} onChange={(e) => setBehavior(i, { kind: e.target.value as BehaviorCondition["kind"] })} className={select}>
+                </NativeSelect>
+                <NativeSelect aria-label="Page or event" value={b.kind} onChange={(e) => setBehavior(i, { kind: e.target.value as BehaviorCondition["kind"] })} className={select}>
                   <option value="pageview" className="bg-zinc-900">visit page</option>
                   <option value="custom_event" className="bg-zinc-900">trigger event</option>
-                </select>
+                </NativeSelect>
                 <input
                   aria-label="Page path or event name"
                   value={b.target}
@@ -283,13 +276,13 @@ export function SegmentBuilder({
                   className={`${input} min-w-[140px] flex-1 font-mono`}
                 />
                 <span className="text-xs text-zinc-500">in the last</span>
-                <select aria-label="Time window" value={b.days} onChange={(e) => setBehavior(i, { days: Number(e.target.value) })} className={select}>
+                <NativeSelect aria-label="Time window" value={b.days} onChange={(e) => setBehavior(i, { days: Number(e.target.value) })} className={select}>
                   {[7, 30, 90, 365].map((d) => (
                     <option key={d} value={d} className="bg-zinc-900">
                       {d} days
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
                 <button
                   type="button"
                   aria-label="Remove behaviour rule"
@@ -369,8 +362,7 @@ export function SegmentBuilder({
             {saving ? "Saving…" : "Save segment"}
           </button>
         </div>
-      </form>
-    </div>
+    </ModalFrame>
   );
 }
 
@@ -387,7 +379,7 @@ function ConditionRow({
 }) {
   return (
     <div className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${invalid ? "border-[#e5484d]/30 bg-[#e5484d]/[0.04]" : "border-white/[0.07] bg-white/[0.015]"}`}>
-      <select
+      <NativeSelect
         aria-label="Rule type"
         value={condition.field}
         onChange={(e) => onChange(blankCondition(e.target.value as ProfileCondition["field"]))}
@@ -398,7 +390,7 @@ function ConditionRow({
             {f.label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
 
       {condition.field === "trait" && (
         <>
@@ -410,7 +402,7 @@ function ConditionRow({
             placeholder="plan"
             className={`${input} w-28 font-mono`}
           />
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as typeof condition.op })} className={select}>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as typeof condition.op })} className={select}>
             <option value="eq" className="bg-zinc-900">is</option>
             <option value="neq" className="bg-zinc-900">is not</option>
             <option value="contains" className="bg-zinc-900">contains</option>
@@ -418,7 +410,7 @@ function ConditionRow({
             <option value="lt" className="bg-zinc-900">is less than</option>
             <option value="exists" className="bg-zinc-900">is set</option>
             <option value="missing" className="bg-zinc-900">is not set</option>
-          </select>
+          </NativeSelect>
           {condition.op !== "exists" && condition.op !== "missing" && (
             <input
               aria-label="Value"
@@ -433,10 +425,10 @@ function ConditionRow({
 
       {(condition.field === "lastSeen" || condition.field === "firstSeen") && (
         <>
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "within" | "before" })} className={select}>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "within" | "before" })} className={select}>
             <option value="within" className="bg-zinc-900">in the last</option>
             <option value="before" className="bg-zinc-900">more than</option>
-          </select>
+          </NativeSelect>
           <input
             aria-label="Days"
             type="number"
@@ -452,10 +444,10 @@ function ConditionRow({
 
       {(condition.field === "sessions" || condition.field === "events") && (
         <>
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "gte" | "lte" })} className={select}>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "gte" | "lte" })} className={select}>
             <option value="gte" className="bg-zinc-900">at least</option>
             <option value="lte" className="bg-zinc-900">at most</option>
-          </select>
+          </NativeSelect>
           <input
             aria-label="Count"
             type="number"
@@ -469,11 +461,11 @@ function ConditionRow({
 
       {condition.field === "email" && (
         <>
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "exists" | "missing" | "contains" })} className={select}>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "exists" | "missing" | "contains" })} className={select}>
             <option value="exists" className="bg-zinc-900">is set</option>
             <option value="missing" className="bg-zinc-900">is not set</option>
             <option value="contains" className="bg-zinc-900">contains</option>
-          </select>
+          </NativeSelect>
           {condition.op === "contains" && (
             <input
               aria-label="Value"

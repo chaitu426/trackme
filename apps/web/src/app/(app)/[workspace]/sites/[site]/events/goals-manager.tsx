@@ -1,5 +1,6 @@
 "use client";
 
+import { NativeSelect } from "@/components/ui/field";
 import { useState } from "react";
 import {
   Trash2,
@@ -11,6 +12,8 @@ import {
   Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { toast } from "@/lib/toast";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { GoalMetric } from "@trackme/analytics";
@@ -30,6 +33,7 @@ export function GoalsManager({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirmGoalId, setConfirmGoalId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Form states
@@ -176,10 +180,6 @@ export function GoalsManager({
   }
 
   async function handleDelete(goalId: string) {
-    if (!window.confirm("Are you sure you want to delete this conversion goal?")) {
-      return;
-    }
-
     setPending(true);
     setError(null);
     try {
@@ -193,6 +193,8 @@ export function GoalsManager({
       }
 
       setGoals((prev) => prev.filter((g) => g.id !== goalId));
+      setConfirmGoalId(null);
+      toast.success("Goal deleted");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete conversion goal");
     } finally {
@@ -204,7 +206,7 @@ export function GoalsManager({
     <div className="space-y-6">
       {/* Metric Highlights */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
             <span className="text-xs font-medium">Total Conversions</span>
             <Award className="w-4 h-4 text-zinc-300" />
@@ -215,7 +217,7 @@ export function GoalsManager({
           <p className="text-xs text-zinc-500 mt-1">Sum across active goals; a visit that hits two goals counts twice</p>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
             <span className="text-xs font-medium">Avg. Conversion Rate</span>
             <TrendingUp className="w-4 h-4 text-[#4cc38a]" />
@@ -226,7 +228,7 @@ export function GoalsManager({
           <p className="text-xs text-zinc-500 mt-1">Simple average of active goals</p>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
             <span className="text-xs font-medium">Active Goals</span>
             <Zap className="w-4 h-4 text-zinc-300" />
@@ -275,20 +277,20 @@ export function GoalsManager({
                     placeholder="e.g. Completed Checkout or Demo Request"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
+                    className="w-full"
                   />
                 </div>
 
                 <div>
                   <label className="mb-1 block text-zinc-400 font-medium">Trigger Type</label>
-                  <select
+                  <NativeSelect
                     value={type}
                     onChange={(e) => setType(e.target.value as "pageview_rule" | "custom_event")}
-                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
+                    className="w-full"
                   >
                     <option value="pageview_rule">Pageview Rule (URL Path)</option>
                     <option value="custom_event">Custom Event (JavaScript Trigger)</option>
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
 
@@ -328,7 +330,7 @@ export function GoalsManager({
                     placeholder="e.g. 99.00"
                     value={targetValue}
                     onChange={(e) => setTargetValue(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
+                    className="w-full"
                   />
                 </div>
               </div>
@@ -367,7 +369,7 @@ export function GoalsManager({
                     key={goal.id}
                     className={`flex flex-col justify-between gap-4 rounded-xl border p-4 text-xs transition-colors md:flex-row md:items-center ${
                       isEnabled
-                        ? "border-white/[0.08] bg-zinc-950/70"
+                        ? "border-border bg-card"
                         : "border-white/[0.04] bg-white/[0.01] opacity-60"
                     }`}
                   >
@@ -486,7 +488,7 @@ export function GoalsManager({
                         size="sm"
                         className="h-8 px-2 text-[#e5484d] hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
                         disabled={pending}
-                        onClick={() => void handleDelete(goal.id)}
+                        onClick={() => setConfirmGoalId(goal.id)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -498,6 +500,16 @@ export function GoalsManager({
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirmGoalId !== null}
+        onClose={() => setConfirmGoalId(null)}
+        onConfirm={() => confirmGoalId && void handleDelete(confirmGoalId)}
+        loading={pending}
+        title="Delete this goal?"
+        description="Past conversions it counted stay in your data, but the goal stops appearing in reports."
+        confirmLabel="Delete goal"
+      />
     </div>
   );
 }
