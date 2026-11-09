@@ -64,6 +64,13 @@
       "when": 1794211097902,
       "tag": "0008_site_error_status",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794221657779,
+      "tag": "0009_site_payment_gateways",
+      "breakpoints": true
     }
   ]
 }
