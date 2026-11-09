@@ -6,6 +6,7 @@ export type WorkspaceRole = z.infer<typeof WorkspaceRoleSchema>;
 export const ApiKeyScopeSchema = z.enum([
   "read:analytics",
   "write:events",
+  "write:deploys",
   "admin:workspace",
 ]);
 export type ApiKeyScope = z.infer<typeof ApiKeyScopeSchema>;

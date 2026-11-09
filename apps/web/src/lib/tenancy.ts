@@ -137,10 +137,7 @@ async function touchApiKey(id: string): Promise<void> {
   }
 }
 
-async function authenticateApiKey(
-  request: NextRequest,
-  workspaceId: string
-): Promise<TenantContext | null> {
+async function resolveApiKey(request: NextRequest): Promise<{ id: string; workspaceId: string; scopes: ApiKeyScope[] } | null> {
   const header = request.headers.get("authorization");
   if (!header) {
     return null;
@@ -172,15 +169,42 @@ async function authenticateApiKey(
   }
 
   void touchApiKey(apiKey.id);
-  const scopes = parseScopes(apiKey.scopes);
+  return { id: apiKey.id, workspaceId: apiKey.workspaceId, scopes: parseScopes(apiKey.scopes) };
+}
+
+async function authenticateApiKey(
+  request: NextRequest,
+  workspaceId: string
+): Promise<TenantContext | null> {
+  const apiKey = await resolveApiKey(request);
+  if (!apiKey) {
+    return null;
+  }
+
   const ctx: TenantContext = {
     userId: `api-key:${apiKey.id}`,
     workspaceId: apiKey.workspaceId,
-    role: roleFromApiKeyScopes(scopes),
+    role: roleFromApiKeyScopes(apiKey.scopes),
   };
 
   assertWorkspaceMatch(ctx, workspaceId);
   return ctx;
+}
+
+/**
+ * A CI job reporting a deploy. The key must carry `write:deploys` (or admin) and nothing else is granted:
+ * no session, no analytics access. The workspace comes from the key, never from the request.
+ */
+export async function authenticateDeployKey(request: NextRequest): Promise<{ workspaceId: string; keyId: string }> {
+  const apiKey = await resolveApiKey(request);
+  if (!apiKey) {
+    throw new AppError(401, "UNAUTHENTICATED", "A Bearer API key with the write:deploys scope is required");
+  }
+  if (!hasScope(apiKey.scopes, "write:deploys")) {
+    throw new AppError(403, "FORBIDDEN", "API key is missing the write:deploys scope");
+  }
+  await enforceCallerLimit({ userId: `api-key:${apiKey.id}`, workspaceId: apiKey.workspaceId, role: "viewer" });
+  return { workspaceId: apiKey.workspaceId, keyId: apiKey.id };
 }
 
 export async function authenticateRequest(

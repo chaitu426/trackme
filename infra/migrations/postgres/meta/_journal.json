@@ -50,6 +50,13 @@
       "when": 1794124714127,
       "tag": "0006_mature_omega_flight",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794208095984,
+      "tag": "0007_site_releases",
+      "breakpoints": true
     }
   ]
 }

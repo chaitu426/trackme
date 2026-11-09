@@ -10,6 +10,8 @@ const PUBLIC_API_PREFIXES = [
   // Called before a session exists: the code itself is the credential, and verify issues the session.
   "/api/auth/otp",
   "/api/v1/invites/accept",
+  // A CI job reports a deploy with an API key (Authorization: Bearer); the route checks the key itself.
+  "/api/v1/deploys",
   // Browsers post CSP violation reports without credentials.
   "/api/security/csp-report",
   // Authenticates itself with METRICS_TOKEN (404 when unset); Prometheus has no session.

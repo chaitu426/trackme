@@ -30,7 +30,7 @@ export function ApiKeysManager({
   const [justCreated, setJustCreated] = useState<string | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  async function generateKey() {
+  async function generateKey(kind: "reporting" | "deploy" = "reporting") {
     setPending(true);
     setError(null);
     try {
@@ -38,8 +38,8 @@ export function ApiKeysManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: `Reporting Key ${keys.length + 1}`,
-          scopes: ["read:analytics"],
+          name: kind === "deploy" ? `Deploy Key ${keys.length + 1}` : `Reporting Key ${keys.length + 1}`,
+          scopes: kind === "deploy" ? ["write:deploys"] : ["read:analytics"],
         }),
       });
       const payload = (await response.json()) as {
@@ -200,6 +200,16 @@ export function ApiKeysManager({
         >
           <Plus className="w-3.5 h-3.5" />
           <span>{pending ? "Generating Key..." : "Generate New API Key"}</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full flex items-center justify-center space-x-2"
+          disabled={pending}
+          onClick={() => void generateKey("deploy")}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Generate Deploy Key (CI, can only report deploys)</span>
         </Button>
       </div>
     </Card>

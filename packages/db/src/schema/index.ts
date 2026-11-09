@@ -15,3 +15,5 @@ export * from "./alert-channels.js";
 export * from "./alert-rules.js";
 
 export * from "./segments.js";
+
+export * from "./releases.js";
