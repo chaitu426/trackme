@@ -48,6 +48,7 @@ const SPECS: [string, string][] = [
 ];
 
 const SECTIONS = [
+  { id: "ask", label: "Ask" },
   { id: "system", label: "System" },
   { id: "privacy", label: "Privacy" },
   { id: "install", label: "Setup" },
@@ -133,7 +134,7 @@ export function Navbar({ product, links, viewer }: { product: string; links: Nav
               Product
               <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${menu ? "rotate-180" : ""}`} strokeWidth={1.5} />
             </button>
-            {SECTIONS.slice(0, 3).map((s) => (
+            {SECTIONS.slice(0, 4).map((s) => (
               <a key={s.id} href={`#${s.id}`} className={linkClass(active === s.id)}>
                 {s.label}
               </a>
