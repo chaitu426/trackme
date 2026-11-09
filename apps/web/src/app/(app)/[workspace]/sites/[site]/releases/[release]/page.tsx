@@ -126,6 +126,12 @@ export default async function ReleaseReportPage({
             ))}
           </ul>
         )}
+        {report.rollbackSuggested && report.previousRelease && (
+          <p className="mt-3 border-t border-white/10 pt-3 text-xs text-zinc-200">
+            If this is hurting users right now, rolling back to <span className="font-mono">{report.previousRelease}</span> is worth considering while you
+            investigate. This comes from the numbers on this page, not from a diagnosis of the cause.
+          </p>
+        )}
       </div>
 
       {report.metrics.length > 0 && (
@@ -166,6 +172,13 @@ export default async function ReleaseReportPage({
               </tbody>
             </table>
           </div>
+          {report.baseline && (
+            <p className="border-t border-white/[0.06] px-5 py-3 text-xs text-zinc-400">
+              For comparison, in the same hours a week earlier (all releases, {formatNumber(report.baseline.sessions)} sessions),{" "}
+              <span className="font-mono text-zinc-200">{(report.baseline.errorRate * 100).toFixed(report.baseline.errorRate >= 0.1 ? 1 : 2)}%</span> of sessions had an
+              error. If this release&apos;s rate is close to that, the difference may be about the time of week, not the deploy.
+            </p>
+          )}
         </Card>
       )}
 

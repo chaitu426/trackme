@@ -25,10 +25,12 @@ const KIND_ICON: Record<string, React.ReactNode> = {
 };
 const KIND_LABEL: Record<string, string> = { page: "Page", event: "Event", error: "Error" };
 
+type Summary = Omit<UserSummary, "milestones"> & { milestones: Array<{ event: string; firstDay: string; label: string }> };
+
 interface Response {
   items: TimelineItem[];
   nextCursor: string | null;
-  summary: UserSummary | null;
+  summary: Summary | null;
 }
 
 /** A person's pages, events and errors on one clock, newest first, with filters and paging. */
@@ -45,7 +47,7 @@ export function UserTimeline({
 }) {
   const [filter, setFilter] = React.useState<Filter>("all");
   const [items, setItems] = React.useState<TimelineItem[]>([]);
-  const [summary, setSummary] = React.useState<UserSummary | null>(null);
+  const [summary, setSummary] = React.useState<Summary | null>(null);
   const [next, setNext] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [loadingMore, setLoadingMore] = React.useState(false);
@@ -151,6 +153,11 @@ export function UserTimeline({
             </p>
             <ul className="space-y-1 text-zinc-300">
               <li>First seen {summary.firstSeen ?? "–"}</li>
+              {summary.milestones.map((m) => (
+                <li key={m.event}>
+                  First {m.label.toLowerCase()} {m.firstDay}
+                </li>
+              ))}
               <li>Last seen {summary.lastSeen ? formatRelativeTime(summary.lastSeen) : "–"}</li>
               {summary.lastError && (
                 <li>

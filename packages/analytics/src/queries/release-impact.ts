@@ -60,6 +60,26 @@ export interface WindowRow {
   errors: number;
 }
 
+/** The same totals for every release together: what a window looked like regardless of which build was live. */
+export async function getSiteWindowStats(
+  siteId: string,
+  window: Window,
+  client: Client = getDashboardClickHouseClient()
+): Promise<WindowRow | null> {
+  checkWindow(window);
+  const rows = await run<{ sessions: string; err_sessions: string; errors: string }>(
+    client,
+    `SELECT uniqExactIf(session_hash, type = 'pageview') AS sessions,
+            uniqExactIf(session_hash, type = 'error') AS err_sessions,
+            countIf(type = 'error') AS errors
+     FROM events_v2
+     WHERE site_id = {siteId:UUID} AND bot_status = 'human' AND ${TIME} AND type IN ('pageview', 'error')`,
+    { siteId, from: toCH(window.from), to: toCH(window.to) }
+  );
+  const r = rows[0];
+  return r ? { value: "", sessions: Number(r.sessions), errorSessions: Number(r.err_sessions), errors: Number(r.errors) } : null;
+}
+
 /** Sessions, sessions with an error and error count for one release in a window, overall or by one dimension. */
 export async function getReleaseWindowStats(
   siteId: string,
@@ -236,6 +256,8 @@ export async function gatherReportInput(
   before: SideInput;
   after: SideInput;
   newIssues: NewIssue[];
+  /** The after window's hours one week earlier, all releases together; null when there was too little traffic then. */
+  baselineWeekAgo: WindowRow | null;
   windows: { before: Window; after: Window };
 }> {
   const deployMs = Date.parse(o.deployedAt);
@@ -263,10 +285,16 @@ export async function gatherReportInput(
     return { total: total[0] ?? null, byDimension: { browser, country, device }, lcp, inp, conversion };
   };
 
-  const [before, after, newIssues] = await Promise.all([
+  const weekAgo: Window = {
+    from: new Date(Date.parse(afterWindow.from) - 7 * 86_400_000).toISOString(),
+    to: new Date(Date.parse(afterWindow.to) - 7 * 86_400_000).toISOString(),
+  };
+  const [before, after, newIssues, baselineRaw] = await Promise.all([
     sideFor(previousRelease, beforeWindow),
     sideFor(o.release, afterWindow),
     getNewIssues(o.siteId, o.release, afterWindow.from, client),
+    getSiteWindowStats(o.siteId, weekAgo, client),
   ]);
-  return { previousRelease, before, after, newIssues, windows: { before: beforeWindow, after: afterWindow } };
+  const baselineWeekAgo = baselineRaw && baselineRaw.sessions >= 100 ? baselineRaw : null;
+  return { previousRelease, before, after, newIssues, baselineWeekAgo, windows: { before: beforeWindow, after: afterWindow } };
 }

@@ -67,3 +67,16 @@ test("the summary of a person with no activity is empty, not an error", async ()
   const s = await getUserSummary(SITE, "nobody", client);
   assert.deepEqual([s.firstSeen, s.lastSeen, s.sessions, s.lastError], [null, null, 0, null]);
 });
+
+test("milestones are looked up for the named events only, and not at all when none are named", async () => {
+  const none = fake([]);
+  const summary = await getUserSummary(SITE, "u", none.client);
+  assert.deepEqual(summary.milestones, []);
+  assert.ok(!none.calls.some((c) => c.query.includes("user_event_day")));
+
+  const named = fake([]);
+  await getUserSummary(SITE, "u", named.client, ["signup", "", "x".repeat(200), "purchase"]);
+  const call = named.calls.find((c) => c.query.includes("user_event_day"))!;
+  assert.deepEqual(call.params.names, ["signup", "purchase"]);
+  assert.match(call.query, /site_id = \{siteId:UUID\}/);
+});

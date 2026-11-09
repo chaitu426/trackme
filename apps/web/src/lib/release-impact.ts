@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, db, eq, goals, siteErrorStatus, siteReleases } from "@trackme/db";
+import { and, asc, db, eq, goals, siteErrorStatus, siteReleases, sites } from "@trackme/db";
 import {
   buildReport,
   gatherReportInput,
@@ -68,13 +68,16 @@ export async function loadReleaseReport(siteId: string, release: string, windowH
   const item = list.find((r) => r.release === release);
   if (!item) return null;
 
-  return cached(key("report", siteId, [release, hours, item.at]), TTL_SECONDS, async () => {
-    const [goal] = await db
-      .select({ name: goals.name, type: goals.type, eventName: goals.eventName, pathPattern: goals.pathPattern })
+  return cached(key("report", siteId, [release, hours, item.at, "v2"]), TTL_SECONDS, async () => {
+    // The site's chosen conversion goal if it is still enabled, otherwise its first enabled goal.
+    const enabled = await db
+      .select({ id: goals.id, name: goals.name, type: goals.type, eventName: goals.eventName, pathPattern: goals.pathPattern })
       .from(goals)
       .where(and(eq(goals.siteId, siteId), eq(goals.enabled, true)))
-      .orderBy(asc(goals.createdAt))
-      .limit(1);
+      .orderBy(asc(goals.createdAt));
+    const [site] = await db.select({ settings: sites.settings }).from(sites).where(eq(sites.id, siteId)).limit(1);
+    const chosen = (site?.settings as { primaryGoalId?: string | null } | undefined)?.primaryGoalId;
+    const goal = enabled.find((g) => g.id === chosen) ?? enabled[0];
 
     const [gathered, regressed] = await Promise.all([
       gatherReportInput({ siteId, release, deployedAt: item.at, windowHours: hours, goal: goal ?? null }),
@@ -90,6 +93,7 @@ export async function loadReleaseReport(siteId: string, release: string, windowH
       after: gathered.after,
       newIssues: gathered.newIssues,
       regressions: regressed.length,
+      baselineWeekAgo: gathered.baselineWeekAgo,
       goalName: goal?.name,
     });
   });

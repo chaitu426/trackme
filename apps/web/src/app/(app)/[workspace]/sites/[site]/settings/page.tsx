@@ -9,6 +9,8 @@ import { requireDashboardSite } from "@/lib/tenancy";
 import { resolveTrackerScriptUrl, trackerIntegrityAttrs } from "@/lib/tracker-url";
 import { SitePrivacyForm } from "@/components/site-privacy-form";
 import { CopyButton } from "@/components/ui/copy-button";
+import { PrimaryGoalSelect } from "@/components/primary-goal-select";
+import { and, asc, db, eq, goals } from "@trackme/db";
 
 export default async function SiteSettingsPage({
   params,
@@ -25,6 +27,13 @@ export default async function SiteSettingsPage({
     notFound();
   }
   const { workspace, site } = context;
+
+  const siteGoals = await db
+    .select({ id: goals.id, name: goals.name })
+    .from(goals)
+    .where(and(eq(goals.siteId, site.id), eq(goals.enabled, true)))
+    .orderBy(asc(goals.createdAt));
+  const primaryGoalId = (site.settings as { primaryGoalId?: string | null }).primaryGoalId ?? null;
 
   const snippet = `<script defer src="${resolveTrackerScriptUrl()}"${trackerIntegrityAttrs()} data-site="${site.publicKey}" data-endpoint="${env.INGESTION_URL}/v1/batch"></script>`;
 
@@ -64,6 +73,10 @@ export default async function SiteSettingsPage({
           </div>
           <Badge variant="outline">Write-Only</Badge>
         </div>
+      </section>
+
+      <section id="release-goal">
+        <PrimaryGoalSelect siteId={site.id} goals={siteGoals} current={primaryGoalId} />
       </section>
 
       {/* ── Privacy & Telemetry Form ── */}

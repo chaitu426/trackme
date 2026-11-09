@@ -27,6 +27,8 @@ export interface ReportInput {
   newIssues: NewIssue[];
   /** Resolved issues that came back in this release. */
   regressions: number;
+  /** All releases together in the same hours a week earlier, for a seasonality sanity check. */
+  baselineWeekAgo?: WindowRow | null;
   goalName?: string | undefined;
   rules?: VerdictRules;
 }
@@ -74,6 +76,13 @@ export interface ReleaseReport {
   breakdown: BreakdownRow[];
   newIssues: NewIssue[];
   regressions: number;
+  /** Share of sessions with an error in the same hours a week earlier (all releases), and how many sessions that is. */
+  baseline: { errorRate: number; sessions: number } | null;
+  /**
+   * True only for a clear, large regression on real traffic: the verdict is Regressed, the evidence is p < 0.001, and the
+   * metric is at least 50% worse. It is a prompt to consider rolling back, never an instruction.
+   */
+  rollbackSuggested: boolean;
 }
 
 /** Smallest group of sessions (each side) worth testing in a breakdown. */
@@ -169,6 +178,11 @@ export function buildReport(input: ReportInput): ReleaseReport {
     return `${f.metric} ${how} (${pLabel(f.p)}, n=${f.n.toLocaleString("en")})${where}`;
   });
 
+  const b = input.baselineWeekAgo;
+  const baseline = b && b.sessions > 0 ? { errorRate: b.errorSessions / b.sessions, sessions: b.sessions } : null;
+  const rollbackSuggested =
+    decision.verdict === "regressed" && decision.reasons.some((f) => f.p < 0.001 && f.relativeChange !== null && f.relativeChange >= 0.5);
+
   return {
     release: input.release,
     previousRelease: input.previousRelease,
@@ -183,5 +197,7 @@ export function buildReport(input: ReportInput): ReleaseReport {
     breakdown: breakdown.slice(0, 6),
     newIssues: input.newIssues,
     regressions: input.regressions,
+    baseline,
+    rollbackSuggested,
   };
 }

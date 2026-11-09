@@ -134,15 +134,19 @@ export interface UserSummary {
   country: string;
   device: string;
   lastError: { eventId: string; at: string; summary: string; ref: string } | null;
+  /** The first day the person did each of the named events (the site's conversion goals): a signup, a purchase. */
+  milestones: Array<{ event: string; firstDay: string }>;
 }
 
 /** The header of a person's page: counts over the retained window, where they last were, and their latest error. */
 export async function getUserSummary(
   siteId: string,
   userId: string,
-  client: Client = getDashboardClickHouseClient()
+  client: Client = getDashboardClickHouseClient(),
+  milestoneEvents: string[] = []
 ): Promise<UserSummary> {
-  const [totals, first, error] = await Promise.all([
+  const names = milestoneEvents.filter((name) => name.length > 0 && name.length <= 128).slice(0, 10);
+  const [totals, first, error, marks] = await Promise.all([
     run<{
       sessions: string; pages: string; events: string; errors: string; last_ms: string;
       rel: string; ctry: string; dev: string; n: string;
@@ -170,6 +174,15 @@ export async function getUserSummary(
        ORDER BY ts DESC, event_id DESC LIMIT 1`,
       { siteId, userId }
     ),
+    names.length === 0
+      ? Promise.resolve([] as Array<{ name: string; day: string }>)
+      : run<{ name: string; day: string }>(
+          client,
+          `SELECT event_name AS name, toString(min(date)) AS day FROM user_event_day
+           WHERE site_id = {siteId:UUID} AND user_id = {userId:String} AND event_name IN {names:Array(String)}
+           GROUP BY event_name`,
+          { siteId, userId, names }
+        ),
   ]);
 
   const t = totals[0];
@@ -188,5 +201,6 @@ export async function getUserSummary(
     lastError: lastError
       ? { eventId: lastError.eid, at: new Date(Number(lastError.ms)).toISOString(), summary: lastError.summary, ref: lastError.ref }
       : null,
+    milestones: marks.map((m) => ({ event: m.name, firstDay: m.day })).sort((a, b) => a.firstDay.localeCompare(b.firstDay)),
   };
 }

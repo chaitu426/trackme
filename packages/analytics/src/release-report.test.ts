@@ -92,3 +92,21 @@ test("a metric with no data on either side is left out rather than shown as zero
   const r = buildReport(input(side({ lcp: [] }), side({ lcp: [] })));
   assert.ok(!r.metrics.some((m) => m.key === "lcp" || m.key === "conversion"));
 });
+
+test("a clear, large, well-evidenced regression suggests considering a rollback; a modest one does not", () => {
+  const big = buildReport(input(side({ total: row("", 2000, 60) }), side({ total: row("", 2000, 180) })));
+  assert.equal(big.verdict, "regressed");
+  assert.equal(big.rollbackSuggested, true);
+  // 40% worse and clearly significant is Regressed, but below the 50% bar for suggesting a rollback.
+  const modest = buildReport(input(side({ total: row("", 20000, 600) }), side({ total: row("", 20000, 840) })));
+  assert.equal(modest.verdict, "regressed");
+  assert.equal(modest.rollbackSuggested, false);
+  assert.equal(buildReport(input(side(), side())).rollbackSuggested, false);
+});
+
+test("the same hours a week earlier are reported as a baseline when there was traffic", () => {
+  const r = buildReport(input(side(), side(), { baselineWeekAgo: row("", 800, 24) }));
+  assert.deepEqual(r.baseline, { errorRate: 0.03, sessions: 800 });
+  assert.equal(buildReport(input(side(), side(), { baselineWeekAgo: null })).baseline, null);
+  assert.equal(buildReport(input(side(), side())).baseline, null);
+});
