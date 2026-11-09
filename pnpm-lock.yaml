@@ -392,6 +392,9 @@ importers:
       '@trackme/object-store':
         specifier: workspace:*
         version: link:../../packages/object-store
+      '@trackme/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       ioredis:
         specifier: ^5.6.0
         version: 5.11.1

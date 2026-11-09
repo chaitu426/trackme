@@ -13,3 +13,4 @@ const GATEWAYS: Record<GatewayId, PaymentGateway> = { razorpay, stripe };
 export function getGateway(id: string): PaymentGateway | null {
   return (GATEWAY_IDS as readonly string[]).includes(id) ? GATEWAYS[id as GatewayId] : null;
 }
+export * from "./failure-doctor.js";

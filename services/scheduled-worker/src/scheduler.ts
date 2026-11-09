@@ -10,6 +10,8 @@ import { runReconciliation } from "./jobs/reconciliation.js";
 import { runErrorRegressions } from "./jobs/error-regressions.js";
 import { runSourceMapRetention } from "./jobs/sourcemap-retention.js";
 import { runPaymentPayloadRetention } from "./jobs/payment-payload-retention.js";
+import { classifyPending } from "./jobs/payment-failure-classifier.js";
+import { createClickHouseClassifierDeps } from "./jobs/payment-failure-classifier.db.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
 import { withDistributedLock } from "./lock.js";
 
@@ -126,6 +128,22 @@ cron.schedule("50 3 * * *", async () => {
     );
   } catch (err) {
     console.error("Failed running source map retention:", err);
+  }
+});
+
+// Payment Failure Doctor: every minute, classify failed payments that have no classification yet (a failure is picked up
+// one minute after it happens, so the errors and outcomes around it have arrived). A batch is at most 500 payments.
+cron.schedule("* * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:payment_failure_classifier",
+      55,
+      "Payment Failure Classifier",
+      instrumentJob("payment_failure_classifier", () => classifyPending(createClickHouseClassifierDeps()).then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed classifying payment failures:", err);
   }
 });
 
