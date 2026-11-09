@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
   Activity,
   ChevronDown,
@@ -17,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { NAV_SUITES, SITE_SETTINGS_ITEM } from "@/lib/nav";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const SUITES_STORAGE_KEY = "trackme_sidebar_closed_suites";
 interface SidebarProps {
@@ -142,7 +144,7 @@ export function Sidebar({
 
   const userInitials = user.email ? user.email.slice(0, 2).toUpperCase() : "TM";
 
-  const renderContent = (collapsed: boolean) => (
+  const renderContent = (collapsed: boolean, scope: "desktop" | "drawer" = "desktop") => (
     <div className="flex h-full flex-col justify-between overflow-hidden border-r border-border bg-sidebar">
       <div>
         <div className={`flex h-14 items-center justify-between border-b border-border px-3 ${collapsed ? "h-auto flex-col gap-2 py-3" : ""}`}>
@@ -170,6 +172,7 @@ export function Sidebar({
           </button>
         </div>
 
+        <LayoutGroup id={`sidebar-${scope}-${collapsed ? "rail" : "full"}`}>
         <div className="max-h-[calc(100vh-180px)] space-y-6 overflow-y-auto px-2 py-4">
           {navGroups.map((group) => {
             const open = collapsed || !closedSuites.includes(group.id);
@@ -192,35 +195,39 @@ export function Sidebar({
                   const isActive = item.href === activeHref && !(item.scoped && !siteBase);
                   const Icon = item.icon;
 
-                  return (
+                  const link = (
                     <Link
                       key={item.label}
                       href={item.href}
-                      title={collapsed ? item.label : undefined}
+                      aria-current={isActive ? "page" : undefined}
                       className={`
-                        group relative flex items-center rounded-lg text-sm transition-colors duration-150
+                        group press relative flex items-center rounded-lg text-sm
                         ${collapsed ? "mx-auto h-8 w-8 justify-center" : "h-8 gap-3 px-3"}
-                        ${
-                          isActive
-                            ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                            : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
-                        }
+                        ${isActive ? "font-medium text-zinc-50" : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"}
                       `}
                     >
-                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"}`} />
+                      {isActive && (
+                        <motion.span
+                          layoutId="sidebar-active"
+                          className="absolute inset-0 rounded-lg bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                          transition={{ type: "spring", bounce: 0, visualDuration: 0.28 }}
+                        />
+                      )}
+                      <Icon className={`relative h-4 w-4 shrink-0 transition-colors duration-150 ${isActive ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"}`} />
 
-                      {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                      {!collapsed && <span className="relative flex-1 truncate">{item.label}</span>}
 
                       {!collapsed && item.badge === "live" && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" aria-label="Live" />
-                      )}
-
-                      {collapsed && (
-                        <div className="absolute left-full z-50 ml-2 hidden whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-xs text-zinc-100 shadow-float group-hover:block">
-                          {item.label}
-                        </div>
+                        <span className="relative h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" aria-label="Live" />
                       )}
                     </Link>
+                  );
+                  return collapsed ? (
+                    <Tooltip key={item.label} content={item.label} side="right">
+                      {link}
+                    </Tooltip>
+                  ) : (
+                    link
                   );
                 })}
               </div>
@@ -228,16 +235,22 @@ export function Sidebar({
             );
           })}
         </div>
+        </LayoutGroup>
       </div>
 
       <div className="relative border-t border-border p-2" ref={profileMenuRef}>
+        <AnimatePresence>
         {profileOpen && (
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.14 }}
             className={`absolute bottom-full z-50 mb-2 rounded-xl border border-border bg-card p-2 shadow-float ${collapsed ? "left-2 w-56" : "left-2 right-2"}`}
           >
             <div className="border-b border-white/[0.06] px-3 py-2">
               <p className="truncate text-xs font-medium text-zinc-100">{user.email}</p>
-              <div className="mt-1 flex items-center space-x-2">
+              <div className="mt-1 flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a]" />
                 <span className="font-mono text-xs text-zinc-500">{workspace.slug} · {roleLabel}</span>
               </div>
@@ -247,7 +260,7 @@ export function Sidebar({
               <Link
                 href={`/${workspace.slug}/settings`}
                 onClick={() => setProfileOpen(false)}
-                className="flex items-center space-x-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
+                className="press flex items-center gap-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               >
                 <Settings2 className="h-4 w-4" />
                 <span>Workspace Settings</span>
@@ -255,7 +268,7 @@ export function Sidebar({
               <Link
                 href="/onboarding"
                 onClick={() => setProfileOpen(false)}
-                className="flex items-center space-x-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
+                className="press flex items-center gap-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               >
                 <Plus className="h-4 w-4" />
                 <span>Create New Workspace</span>
@@ -266,19 +279,20 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-xs font-medium text-[#e5484d] transition hover:bg-[#e5484d]/10"
+                className="press flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-[#e5484d] hover:bg-[#e5484d]/10"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Sign Out</span>
               </button>
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
 
         <button
           type="button"
           onClick={() => setProfileOpen(!profileOpen)}
-          className={`flex w-full items-center rounded-md p-2 text-left transition hover:bg-white/[0.04] ${collapsed ? "justify-center" : "space-x-3"} ${profileOpen ? "bg-white/[0.06]" : ""}`}
+          className={`press flex w-full items-center rounded-md p-2 text-left hover:bg-white/[0.04] ${collapsed ? "justify-center" : "gap-3"} ${profileOpen ? "bg-white/[0.06]" : ""}`}
         >
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-200">
             {userInitials}
@@ -297,19 +311,27 @@ export function Sidebar({
   return (
     <>
       <aside
-        className={`hidden lg:block fixed inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out ${collapsed ? "w-16" : "w-60"}`}
+        className={`hidden lg:block fixed inset-y-0 left-0 z-40 transition-[width] duration-300 ease-in-out ${collapsed ? "w-16" : "w-60"}`}
       >
         {renderContent(collapsed)}
       </aside>
 
-      {mobileOpen && (
-        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex lg:hidden">
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onMobileClose} />
-          <div className="relative h-full w-72 max-w-[85vw] border-r border-white/[0.06] bg-background shadow-float">
-            {renderContent(false)}
+      <AnimatePresence>
+        {mobileOpen && (
+          <div role="dialog" aria-modal="true" aria-label="Navigation" className="fixed inset-0 z-50 flex lg:hidden">
+            <motion.div className="fixed inset-0 bg-black/70" aria-hidden="true" onClick={onMobileClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} />
+            <motion.div
+              className="relative h-full w-72 max-w-[85vw] border-r border-white/[0.06] bg-background shadow-float"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", bounce: 0, visualDuration: 0.3 }}
+            >
+              {renderContent(false, "drawer")}
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </>
   );
 }
