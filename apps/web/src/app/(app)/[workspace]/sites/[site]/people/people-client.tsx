@@ -828,7 +828,7 @@ function ProfileDrawer({
                 </button>
               </div>
             ) : sessions.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-500">
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-zinc-500">
                 No events recorded for this person yet.
               </div>
             ) : (

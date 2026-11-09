@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Segmented } from "@/components/ui/segmented";
 import { Filter, LogOut, Route as RouteIcon, X } from "lucide-react";
 import type { JourneySegment, RouteSummary, TraceStep } from "@trackme/analytics";
 import {
@@ -343,20 +344,10 @@ export function isJourneySegment(value: string | undefined): value is JourneySeg
 
 export function SegmentTabs(ctx: JourneyContext) {
   return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium">
-      {(Object.keys(SEGMENT_LABELS) as JourneySegment[]).map((key) => (
-        <Link
-          key={key}
-          href={journeyHref({ ...ctx, segment: key }, ctx.route)}
-          scroll={false}
-          className={`rounded-[5px] px-3 py-2 transition-colors ${
-            key === ctx.segment ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-          }`}
-        >
-          {SEGMENT_LABELS[key]}
-        </Link>
-      ))}
-    </div>
+    <Segmented
+      label="Break down by"
+      items={(Object.keys(SEGMENT_LABELS) as JourneySegment[]).map((key) => ({ href: journeyHref({ ...ctx, segment: key }, ctx.route), label: SEGMENT_LABELS[key], active: key === ctx.segment }))}
+    />
   );
 }
 

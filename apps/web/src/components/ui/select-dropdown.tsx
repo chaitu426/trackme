@@ -60,8 +60,8 @@ export function SelectDropdown<T extends string | number>({
         className={`
           w-full flex items-center justify-between px-4 py-3 rounded-xl border text-xs font-medium
           bg-white/[0.02] transition duration-150 ease-in-out cursor-pointer
-          ${isDisabled ? "cursor-not-allowed opacity-50 border-white/10 bg-white/[0.03]" : "hover:border-white/20 hover:bg-white/[0.03]"}
-          ${isOpen ? "border-white/20 ring-2 ring-white/[0.2]" : "border-white/10"}
+          ${isDisabled ? "cursor-not-allowed opacity-50 border-border bg-white/[0.03]" : "hover:border-white/20 hover:bg-white/[0.03]"}
+          ${isOpen ? "border-white/20 ring-2 ring-white/[0.2]" : "border-border"}
         `}
       >
         <span className={selectedOption ? "text-zinc-50" : "text-zinc-400"}>
@@ -77,7 +77,7 @@ export function SelectDropdown<T extends string | number>({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute left-0 right-0 z-50 mt-2 max-h-60 overflow-auto rounded-xl border border-white/10 bg-card p-1 shadow-float"
+          className="absolute left-0 right-0 z-50 mt-2 max-h-60 overflow-auto rounded-xl border border-border bg-card p-1 shadow-float"
         >
           {options.map((option) => {
             const isSelected = option.value === value;

@@ -222,7 +222,7 @@ function EmptyState({ filtered, base, filters }: { filtered: boolean; base: stri
           snippet and tag the build with <code className="font-mono">data-release</code>, so each issue shows which release brought it.
         </p>
       </div>
-      <div className="mx-auto flex max-w-xl items-center gap-2 rounded-lg border border-white/10 bg-black/40 p-3 text-left">
+      <div className="mx-auto flex max-w-xl items-center gap-2 rounded-lg border border-border bg-black/40 p-3 text-left">
         <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-zinc-300">{snippet}</code>
         <CopyButton text={snippet} variant="ghost" />
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { NativeSelect } from "@/components/ui/field";
+import { inputCompactClass, NativeSelect } from "@/components/ui/field";
 import { useState } from "react";
 import {
   Trash2,
@@ -264,7 +264,7 @@ export function GoalsManager({
           {showCreateForm ? (
             <form
               onSubmit={handleCreate}
-              className="space-y-4 rounded-xl border border-white/10 bg-zinc-900/60 p-5 text-xs"
+              className="space-y-4 rounded-xl border border-border bg-card p-5 text-xs"
             >
               <div className="text-sm font-medium text-zinc-200">Define New Conversion Goal</div>
 
@@ -304,7 +304,7 @@ export function GoalsManager({
                       placeholder="e.g. /pricing, /thank-you, /checkout/*"
                       value={pathPattern}
                       onChange={(e) => setPathPattern(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-card p-3 font-mono text-zinc-200 outline-none focus:border-white/[0.1]"
+                      className={`${inputCompactClass} w-full font-mono`}
                     />
                   </div>
                 ) : (
@@ -316,7 +316,7 @@ export function GoalsManager({
                       placeholder="e.g. signup_clicked, upgrade_plan"
                       value={eventName}
                       onChange={(e) => setEventName(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-card p-3 font-mono text-zinc-200 outline-none focus:border-white/[0.1]"
+                      className={`${inputCompactClass} w-full font-mono`}
                     />
                   </div>
                 )}
@@ -355,7 +355,7 @@ export function GoalsManager({
 
           {/* Goals List */}
           {goals.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-xs text-zinc-400">
+            <p className="rounded-xl border border-dashed border-border bg-white/[0.02] p-8 text-center text-xs text-zinc-400">
               No conversion goals defined yet. Create your first goal to measure key business milestones.
             </p>
           ) : (
@@ -382,21 +382,21 @@ export function GoalsManager({
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             placeholder="Goal name"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
+                            className={inputCompactClass}
                           />
                           <input
                             type="text"
                             value={editPattern}
                             onChange={(e) => setEditPattern(e.target.value)}
                             placeholder="Path or event"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs font-mono text-zinc-100"
+                            className={`${inputCompactClass} font-mono`}
                           />
                           <input
                             type="number"
                             value={editTargetValue}
                             onChange={(e) => setEditTargetValue(e.target.value)}
                             placeholder="Target value ($)"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
+                            className={inputCompactClass}
                           />
                         </div>
                         <div className="flex items-center gap-2 pt-1">

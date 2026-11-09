@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTabs } from "@/components/motion/primitives";
 import { NativeSelect } from "@/components/ui/field";
 import * as React from "react";
 import { Clock, Layers, SlidersHorizontal } from "lucide-react";
@@ -139,21 +140,7 @@ function SegmentBreakdown({
           </CardTitle>
           <CardDescription>Share of each group that reaches every step. Red is below the funnel average.</CardDescription>
         </div>
-        <div className="flex items-center gap-0.5 overflow-x-auto rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium">
-          {SEGMENTS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => onSegment(s.key)}
-              aria-pressed={segment === s.key}
-              className={`shrink-0 rounded-[5px] px-3 py-2 transition-colors ${
-                segment === s.key ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <PillTabs kind="radio" size="sm" label="Segment" value={segment} onChange={onSegment} items={SEGMENTS.map((s) => ({ id: s.key, label: s.label }))} />
       </CardHeader>
 
       {loading ? (

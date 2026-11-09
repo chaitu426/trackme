@@ -226,7 +226,7 @@ function NoIdentifiedUsers() {
           signs in and their later visits are linked, so you can see how many return after a day, a week or a month.
         </p>
       </div>
-      <div className="mx-auto flex max-w-sm items-center gap-2 rounded-lg border border-white/10 bg-black/40 p-3 text-left">
+      <div className="mx-auto flex max-w-sm items-center gap-2 rounded-lg border border-border bg-black/40 p-3 text-left">
         <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-zinc-300">{snippet}</code>
         <CopyButton text={snippet} variant="ghost" />
       </div>

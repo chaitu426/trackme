@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTabs } from "@/components/motion/primitives";
 import * as React from "react";
 import { Pause, Play, SkipBack, SkipForward, Zap } from "lucide-react";
 import type { UserTimelineEvent } from "@trackme/analytics";
@@ -235,21 +236,7 @@ export function SessionReplay({ events }: { events: UserTimelineEvent[] }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-md border border-white/[0.08] p-0.5" role="group" aria-label="Playback speed">
-            {SPEEDS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={speed === s}
-                onClick={() => setSpeed(s)}
-                className={`rounded px-2 py-0.5 font-mono text-xs transition-colors ${
-                  speed === s ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                {s}×
-              </button>
-            ))}
-          </div>
+          <PillTabs kind="radio" size="sm" label="Playback speed" value={String(speed)} onChange={(v) => setSpeed(Number(v) as typeof speed)} items={SPEEDS.map((v) => ({ id: String(v), label: <span className="font-mono">{v}×</span> }))} />
           <span className="font-mono text-xs tabular-nums text-zinc-500">
             {offset(step.t)} / {offset(realTotal)}
           </span>

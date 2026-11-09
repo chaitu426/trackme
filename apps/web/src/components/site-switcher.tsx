@@ -52,7 +52,7 @@ export function SiteSwitcher({
           <div
             role="dialog"
             aria-label="Switch site"
-            className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-white/10 bg-card p-2 shadow-2xl"
+            className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-border bg-card p-2 shadow-float"
           >
             <div className="flex items-center justify-between px-3 pb-2 pt-1">
               <p className="text-xs font-medium text-zinc-500">

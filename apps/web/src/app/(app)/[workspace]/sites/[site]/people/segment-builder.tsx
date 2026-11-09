@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTabs } from "@/components/motion/primitives";
 import * as React from "react";
 import { inputCompactClass, NativeSelect } from "@/components/ui/field";
 import { ModalFrame } from "@/components/ui/dialog";
@@ -213,21 +214,7 @@ export function SegmentBuilder({
               <h3 className="text-xs font-medium text-zinc-400">Who</h3>
               <div className="flex items-center gap-2 text-xs text-zinc-500">
                 Match
-                <div className="flex rounded-md border border-white/[0.08] p-0.5" role="group" aria-label="Match mode">
-                  {(["all", "any"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      aria-pressed={definition.match === m}
-                      onClick={() => setDefinition((d) => ({ ...d, match: m }))}
-                      className={`rounded px-2 py-0.5 font-medium transition-colors ${
-                        definition.match === m ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
+                <PillTabs kind="radio" size="sm" label="Match mode" value={definition.match} onChange={(m) => setDefinition((d) => ({ ...d, match: m }))} items={[{ id: "all", label: "all" }, { id: "any", label: "any" }]} />
                 of these
               </div>
             </div>

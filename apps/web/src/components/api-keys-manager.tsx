@@ -97,7 +97,7 @@ export function ApiKeysManager({
       <div className="space-y-4">
         {/* Just Created Token Banner */}
         {justCreated && (
-          <div className="p-4 rounded-xl bg-[#4cc38a]/10/80 border border-[#4cc38a] text-xs space-y-2 animate-in fade-in-0 duration-200">
+          <div className="p-4 rounded-xl bg-[#4cc38a]/10/80 border border-[#4cc38a] text-xs space-y-2 animate-fade-in">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-[#4cc38a] font-medium">
                 <CheckCircle2 className="w-4 h-4 text-[#4cc38a]" />
@@ -116,7 +116,7 @@ export function ApiKeysManager({
 
         {/* List of keys */}
         {keys.length === 0 ? (
-          <div className="text-center py-8 px-4 rounded-xl border border-dashed border-white/10 bg-white/[0.03]/50">
+          <div className="text-center py-8 px-4 rounded-xl border border-dashed border-border bg-white/[0.03]/50">
             <KeyRound className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
             <p className="text-xs font-medium text-zinc-300">No API keys created</p>
             <p className="text-xs text-zinc-400 mt-0.5">
@@ -128,7 +128,7 @@ export function ApiKeysManager({
             {keys.map((key) => (
               <div
                 key={key.id}
-                className="p-4 rounded-xl bg-white/[0.03] border border-white/10 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-white/[0.03]/80"
+                className="p-4 rounded-xl bg-white/[0.03] border border-border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-white/[0.03]/80"
               >
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center space-x-2">
@@ -146,7 +146,7 @@ export function ApiKeysManager({
 
                 {/* Revoke confirmation / action */}
                 {revokingId === key.id ? (
-                  <div className="flex items-center space-x-2 animate-in fade-in-0 duration-150">
+                  <div className="flex items-center space-x-2 animate-fade-in">
                     <span className="text-xs text-[#e5484d] font-medium">Revoke key?</span>
                     <Button
                       variant="danger"

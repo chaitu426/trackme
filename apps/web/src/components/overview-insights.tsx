@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTabs } from "@/components/motion/primitives";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,22 +22,7 @@ function Tabs<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div role="tablist" className="flex items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={tab.id === value}
-          onClick={() => onChange(tab.id)}
-          className={`rounded-[5px] px-3 py-1 text-xs font-medium transition-colors ${
-            tab.id === value ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <PillTabs kind="tabs" size="sm" label="View" value={value} onChange={onChange} items={tabs} />
   );
 }
 

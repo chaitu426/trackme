@@ -127,7 +127,7 @@ export default async function ReleaseReportPage({
           </ul>
         )}
         {report.rollbackSuggested && report.previousRelease && (
-          <p className="mt-3 border-t border-white/10 pt-3 text-xs text-zinc-200">
+          <p className="mt-3 border-t border-border pt-3 text-xs text-zinc-200">
             If this is hurting users right now, rolling back to <span className="font-mono">{report.previousRelease}</span> is worth considering while you
             investigate. This comes from the numbers on this page, not from a diagnosis of the cause.
           </p>

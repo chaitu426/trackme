@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTabs } from "@/components/motion/primitives";
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
 import { inputCompactClass } from "@/components/ui/field";
@@ -190,29 +191,16 @@ export function FunnelsClient({
 
       {/* Funnel selector */}
       {funnels.length > 1 && (
-        <div
-          role="tablist"
-          aria-label="Funnels"
-          className="flex w-full max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 sm:w-fit"
-        >
-          {funnels.map((f) => (
-            <button
-              key={f.id}
-              role="tab"
-              aria-selected={activeFunnel?.id === f.id}
-              type="button"
-              onClick={() => void loadFunnel(f)}
-              className={`flex shrink-0 items-center gap-2 rounded-[5px] px-3 py-2 text-xs font-medium transition-colors ${
-                activeFunnel?.id === f.id
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                  : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-              }`}
-            >
-              {f.name}
-              <span className="font-mono text-xs text-zinc-500">{f.steps.length}</span>
-            </button>
-          ))}
-        </div>
+        <PillTabs
+          kind="tabs"
+          label="Funnels"
+          value={activeFunnel?.id ?? ""}
+          onChange={(id) => {
+            const next = funnels.find((f) => f.id === id);
+            if (next) void loadFunnel(next);
+          }}
+          items={funnels.map((f) => ({ id: f.id, label: <span className="flex items-center gap-2">{f.name}<span className="font-mono text-xs text-zinc-500">{f.steps.length}</span></span> }))}
+        />
       )}
 
       {activeFunnel ? (
@@ -784,23 +772,7 @@ function CreateFunnelDialog({
                           placeholder="Step name"
                           className={`${input} flex-1`}
                         />
-                        <div className="flex shrink-0" role="group" aria-label={`Step ${i + 1} type`}>
-                          {(["pageview", "custom_event"] as const).map((type) => (
-                            <button
-                              key={type}
-                              type="button"
-                              aria-pressed={s.type === type}
-                              onClick={() => update(i, { type })}
-                              className={`px-3 py-2 text-xs font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
-                                s.type === type
-                                  ? "bg-zinc-800 text-zinc-100"
-                                  : "border border-white/[0.08] text-zinc-500 hover:text-zinc-300"
-                              }`}
-                            >
-                              {type === "pageview" ? "Page" : "Event"}
-                            </button>
-                          ))}
-                        </div>
+                        <PillTabs kind="radio" size="sm" label={`Step ${i + 1} type`} value={s.type} onChange={(type) => update(i, { type })} items={[{ id: "pageview", label: "Page" }, { id: "custom_event", label: "Event" }]} className="shrink-0" />
                       </div>
                       <div className="flex items-center gap-2">
                         <input

@@ -213,7 +213,7 @@ export function UserTimeline({
           </button>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-500">
+        <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-zinc-500">
           {filter === "all"
             ? "Nothing in the last 90 days. The timeline starts when a person is identified."
             : `No ${FILTERS.find((f) => f.id === filter)!.label.toLowerCase()} in the last 90 days.`}

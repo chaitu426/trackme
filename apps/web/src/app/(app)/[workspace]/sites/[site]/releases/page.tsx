@@ -54,7 +54,7 @@ export default async function ReleasesPage({ params }: { params: Promise<{ works
               different releases, this page can compare them. Reporting the deploy from CI makes the start time exact.
             </p>
           </div>
-          <div className="mx-auto flex max-w-xl items-center gap-2 rounded-lg border border-white/10 bg-black/40 p-3 text-left">
+          <div className="mx-auto flex max-w-xl items-center gap-2 rounded-lg border border-border bg-black/40 p-3 text-left">
             <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-zinc-300">
               {`<script defer src="…/tracker.js" data-site="YOUR_SITE_KEY" data-endpoint="…" data-release="web@1.4.2"></script>`}
             </code>

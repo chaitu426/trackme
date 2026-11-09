@@ -52,11 +52,11 @@ export function OrganizationSwitcher({
         <div
           role="dialog"
           aria-label="Switch organization"
-          className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-lg border border-white/10 bg-card p-2 shadow-float"
+          className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-lg border border-border bg-card p-2 shadow-float"
         >
           <div className="px-3 pb-2 pt-2">
             <p className="text-xs font-medium text-zinc-600">Organizations</p>
-            <div className="mt-2 flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-border bg-white/[0.03] px-3 py-2">
               <Search className="h-4 w-4 text-zinc-500" />
               <input
                 ref={inputRef}

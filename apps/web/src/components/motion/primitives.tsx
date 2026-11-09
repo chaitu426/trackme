@@ -107,6 +107,7 @@ export function PillTabs<T extends string>({
   kind = "tabs",
   className,
   itemClassName,
+  size = "md",
 }: {
   items: PillItem<T>[];
   value: T;
@@ -115,6 +116,7 @@ export function PillTabs<T extends string>({
   kind?: "tabs" | "radio";
   className?: string;
   itemClassName?: string;
+  size?: "sm" | "md";
 }) {
   const group = React.useId();
   return (
@@ -130,7 +132,8 @@ export function PillTabs<T extends string>({
               {...(kind === "tabs" ? { "aria-selected": active } : { "aria-checked": active })}
               onClick={() => onChange(item.id)}
               className={cn(
-                "press relative inline-flex h-8 shrink-0 items-center justify-center rounded-md px-3 text-sm",
+                size === "sm" ? "h-7 px-2.5 text-xs" : "h-8 px-3 text-sm",
+                "press relative inline-flex shrink-0 items-center justify-center rounded-md",
                 active ? "font-medium text-zinc-50" : "text-zinc-400 hover:text-zinc-100",
                 itemClassName
               )}

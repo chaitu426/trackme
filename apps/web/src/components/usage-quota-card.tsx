@@ -50,7 +50,7 @@ export function UsageQuotaCard({ usage }: { usage: WorkspaceUsage }) {
         </div>
 
         {/* Progress Track */}
-        <div className="h-2 w-full overflow-hidden rounded-full border border-white/10 bg-white/[0.06]">
+        <div className="h-2 w-full overflow-hidden rounded-full border border-border bg-white/[0.06]">
           <div
             className={`grain h-full rounded-full transition-colors duration-700 ${barColor}`}
             style={{ width: `${Math.min(percentageUsed, 100)}%` }}
