@@ -107,6 +107,9 @@ importers:
       '@trackme/object-store':
         specifier: workspace:*
         version: link:../../packages/object-store
+      '@trackme/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

@@ -14,6 +14,8 @@ const PUBLIC_API_PREFIXES = [
   "/api/v1/deploys",
   // Same CI key as deploys (write:deploys); the route checks it.
   "/api/v1/sourcemaps",
+  // Payment gateways post signed webhooks with no session; the route verifies the signature.
+  "/api/v1/webhooks/payments",
   // Browsers post CSP violation reports without credentials.
   "/api/security/csp-report",
   // Authenticates itself with METRICS_TOKEN (404 when unset); Prometheus has no session.
