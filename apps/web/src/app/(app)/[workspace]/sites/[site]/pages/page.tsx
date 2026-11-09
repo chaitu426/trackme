@@ -34,7 +34,7 @@ export default async function SitePagesReport({
   const { workspace, site } = context;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Page Performance" art="ridge" actions={<RangeSwitcher range={range} />}>
         How each page performs: views, time spent, bounces and exits on <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>

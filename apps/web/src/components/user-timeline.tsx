@@ -1,8 +1,9 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, Copy, FileText, Loader2, MousePointerClick, Pin } from "lucide-react";
+import { AlertTriangle, Check, Copy, FileText, MousePointerClick, Pin } from "lucide-react";
 import type { TimelineItem, UserSummary } from "@trackme/analytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime } from "@/lib/format";
@@ -272,7 +273,7 @@ export function UserTimeline({
           disabled={loadingMore}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.08] py-2 text-xs text-zinc-300 transition-colors hover:bg-white/[0.04] disabled:opacity-60"
         >
-          {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {loadingMore && <MatrixSpinner />}
           Load older
         </button>
       )}

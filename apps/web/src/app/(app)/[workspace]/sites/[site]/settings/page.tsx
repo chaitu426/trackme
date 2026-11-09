@@ -43,7 +43,7 @@ export default async function SiteSettingsPage({ params }: { params: Promise<{ w
   const snippet = `<script defer src="${resolveTrackerScriptUrl()}"${trackerIntegrityAttrs()} data-site="${site.publicKey}" data-endpoint="${env.INGESTION_URL}/v1/batch"></script>`;
 
   return (
-    <div className="w-full space-y-6 text-left">
+    <div className="stagger w-full space-y-6 text-left">
       <PageHeader title="Site Settings" art="gauge">
         Tracking snippet and privacy settings for <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>

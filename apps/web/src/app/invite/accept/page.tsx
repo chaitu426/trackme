@@ -1,10 +1,11 @@
 "use client";
 
+import { MatrixLoader } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Activity, ArrowRight, Check, Crown, Eye, EyeOff, Loader2, Lock, Users, type LucideIcon } from "lucide-react";
+import { Activity, ArrowRight, Check, Crown, Eye, EyeOff, Lock, Users, type LucideIcon } from "lucide-react";
 import { GlyphField } from "@trackme/landing";
 import { Field, TextInput } from "@/components/ui/field";
 import { StepPanel, DrawCheck, Notice } from "@/components/motion/primitives";
@@ -281,9 +282,8 @@ export default function InviteAcceptPage() {
             )}
 
             {phase === "accepting" && (
-              <div className="flex flex-col items-center gap-4 py-10 text-center" role="status">
-                <Loader2 className="size-6 animate-spin text-zinc-300" aria-hidden="true" />
-                <p className="text-sm text-zinc-400">Setting up your access</p>
+              <div className="flex justify-center py-10">
+                <MatrixLoader label="Setting up your access" />
               </div>
             )}
 

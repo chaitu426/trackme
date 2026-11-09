@@ -1,9 +1,10 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRightLeft, Clock, Loader2, LogOut, Mail, RefreshCw, Send, Trash2, UserPlus, Users, X } from "lucide-react";
+import { ArrowRightLeft, Clock, LogOut, Mail, RefreshCw, Send, Trash2, UserPlus, Users, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
@@ -242,7 +243,7 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
                   disabled={isInviting || !inviteEmail.trim()}
                   className="press inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:bg-white disabled:pointer-events-none disabled:opacity-50"
                 >
-                  {isInviting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Send className="size-4" aria-hidden="true" />}
+                  {isInviting ? <MatrixSpinner /> : <Send className="size-4" aria-hidden="true" />}
                   {isInviting ? "Sending" : "Send invite"}
                 </button>
               </form>
@@ -297,7 +298,7 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
                                 aria-label="Resend invite"
                                 className="press grid size-8 place-items-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100 disabled:opacity-40"
                               >
-                                {resending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="size-4" aria-hidden="true" />}
+                                {resending ? <MatrixSpinner /> : <RefreshCw className="size-4" aria-hidden="true" />}
                               </button>
                               <ConfirmAction icon={Trash2} title="Revoke invite" confirmLabel="Revoke" onConfirm={() => inviteManager.revokeInvite(invite.id)} />
                             </div>

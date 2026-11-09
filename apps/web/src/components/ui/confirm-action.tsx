@@ -1,8 +1,9 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Loader2, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -78,7 +79,7 @@ export function ConfirmAction({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
           >
-            {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Icon className="size-4" aria-hidden="true" />}
+            {busy ? <MatrixSpinner /> : <Icon className="size-4" aria-hidden="true" />}
           </motion.button>
         )}
       </AnimatePresence>

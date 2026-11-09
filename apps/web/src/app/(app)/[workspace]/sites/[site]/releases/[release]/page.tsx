@@ -63,7 +63,7 @@ export default async function ReleaseReportPage({
     report = await loadReleaseReport(site.id, release, hours);
   } catch {
     return (
-      <div className="w-full space-y-5 text-left">
+      <div className="stagger w-full space-y-5 text-left">
         <Card className="py-12 text-center">
           <p className="text-sm text-zinc-300">This report is temporarily unavailable.</p>
           <Link href={`${base}/releases/${encodeURIComponent(release)}`} className="mt-3 inline-block text-xs text-zinc-400 hover:text-zinc-100">Retry</Link>

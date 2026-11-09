@@ -1,5 +1,6 @@
 "use client";
 
+import { MatrixLoader } from "@/components/ui/matrix-loader";
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -16,11 +17,7 @@ function GlobeLoader() {
       aria-live="polite"
       className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#0c0c0c]"
     >
-      <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-zinc-300" />
-      <div className="text-center">
-        <p className="text-xs font-medium text-zinc-300">Loading globe</p>
-        <p className="mt-0.5 text-xs text-zinc-600">Preparing the 3D map, this only takes a moment</p>
-      </div>
+      <MatrixLoader label="Preparing the map" />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import { PillTabs } from "@/components/motion/primitives";
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
@@ -10,7 +11,6 @@ import {
   Plus,
   Trash2,
   TrendingDown,
-  Loader2,
   AlertCircle,
   X,
   ArrowUp,
@@ -177,7 +177,7 @@ export function FunnelsClient({
   }
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Funnels" art="steps" actions={<button
           type="button"
           onClick={() => setModalOpen(true)}
@@ -875,7 +875,7 @@ function CreateFunnelDialog({
             disabled={saving || (touched && !valid)}
             className="inline-flex h-8 items-center gap-2 rounded-lg bg-zinc-100 px-4 text-xs font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {saving ? <MatrixSpinner /> : <Check className="h-4 w-4" />}
             {saving ? "Creating…" : "Create funnel"}
           </button>
         </div>

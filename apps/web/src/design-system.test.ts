@@ -21,7 +21,7 @@ const RULES: Array<{ name: string; pattern: RegExp; use: string; allow?: string[
   { name: "borders off the token", pattern: /border-white\/10(?![\d\[])/, use: "border-border" },
   { name: "a raw select", pattern: /<select\b/, use: "NativeSelect from ui/field, or SelectDropdown", allow: ["ui/field.tsx"] },
   { name: "hue colours (the palette is graphite plus the success, warning and danger greens, ambers and reds)", pattern: /\b(?:bg|text|border|ring|from|to)-(?:violet|indigo|purple|fuchsia|pink|rose|emerald|teal|cyan|sky|blue)-\d{2,3}/, use: "text-[#4cc38a], text-amber-400, text-[#e5484d] or neutral zinc" },
-  { name: "colour gradients", pattern: /\bbg-gradient-to-[a-z]+\b[^"'`]*\b(?:from|via|to)-(?!transparent|\[#0f0f10\])/, use: "flat surfaces; a gradient only fades a neutral to transparent" },
+  { name: "colour gradients", pattern: /\bbg-gradient-to-[a-z]+\b[^"'`]*\b(?:from|via|to)-(?!transparent|background|\[#0f0f10\])/, use: "flat surfaces; a gradient only fades a neutral to transparent" },
 ];
 
 function files(dir: string): string[] {

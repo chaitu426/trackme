@@ -1,8 +1,9 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, EyeOff, RotateCcw, Loader2 } from "lucide-react";
+import { Check, EyeOff, RotateCcw } from "lucide-react";
 import type { ErrorAction, ErrorStatus } from "@trackme/contracts";
 
 const BUTTON =
@@ -47,7 +48,7 @@ export function ErrorStatusActions({
     }
   }
 
-  const spinner = (action: ErrorAction) => (busy === action ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null);
+  const spinner = (action: ErrorAction) => (busy === action ? <MatrixSpinner /> : null);
 
   return (
     <div className="flex flex-wrap items-center gap-2">

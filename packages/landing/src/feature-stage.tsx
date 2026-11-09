@@ -3,10 +3,14 @@
 import * as React from "react";
 import {
   ArrowUpRight,
+  Bug,
+  CreditCard,
   Filter,
   Gauge,
   MapPinned,
   Radio,
+  Repeat2,
+  Rocket,
   Target,
   TrendingUp,
   UserCheck,
@@ -21,7 +25,8 @@ interface Feature {
   label: string;
   icon: LucideIcon;
   variant: GlyphVariant;
-  view: DemoViewId;
+  /** The demo view this opens. Features without a demo view show no button. */
+  view?: DemoViewId;
   title: string;
   body: string;
   readout: [string, string][];
@@ -153,6 +158,62 @@ const FEATURES: Feature[] = [
       ["account_created", "874"],
     ],
   },
+  {
+    id: "errors",
+    label: "Error tracking",
+    icon: Bug,
+    variant: "pulse",
+    title: "Fix what breaks, first",
+    body: "Errors grouped by cause, with the release that introduced them and the stack mapped back to your source.",
+    readout: [
+      ["Cannot read 'items'", "412 · web@1.2.0"],
+      ["GET /api/cart 500", "96 · new"],
+      ["Request timed out", "18"],
+      ["analytics is not defined", "resolved"],
+    ],
+  },
+  {
+    id: "releases",
+    label: "Release impact",
+    icon: Rocket,
+    variant: "ridge",
+    title: "See what a deploy did",
+    body: "Errors, conversion and load time before and after a release. A verdict only appears when there is enough traffic to trust it.",
+    readout: [
+      ["web@1.2.0", "Regressed"],
+      ["Sessions with an error", "+535%"],
+      ["Safari", "1.1% → 32%"],
+      ["Rollback", "suggested"],
+    ],
+  },
+  {
+    id: "retention",
+    label: "Retention",
+    icon: Repeat2,
+    variant: "steps",
+    title: "Who comes back",
+    body: "Weekly cohorts of the people you identified, and how many return, for any event you choose.",
+    readout: [
+      ["Week 0", "100%"],
+      ["Week 1", "46%"],
+      ["Week 2", "34%"],
+      ["Week 4", "27%"],
+    ],
+  },
+  {
+    id: "payments",
+    label: "Payments",
+    icon: CreditCard,
+    variant: "gauge",
+    title: "Know why a payment failed",
+    body: "Razorpay and Stripe webhooks: revenue, success rate by method, gateway incidents and the failure codes behind them. Never card numbers.",
+    readout: [
+      ["Success rate", "90.9%"],
+      ["card · 3DS failed", "41"],
+      ["upi · collect expired", "27"],
+      ["Gateway timeout", "26"],
+    ],
+  },
 ];
 
 const INTERVAL = 6500;
@@ -224,13 +285,15 @@ export function FeatureStage() {
             </p>
             <h3 className="mt-3 text-balance text-[28px] font-medium leading-9 tracking-[-0.02em] text-zinc-50">{f.title}</h3>
             <p className="mt-3 text-[15px] leading-6 text-zinc-400">{f.body}</p>
-            <button
-              type="button"
-              onClick={() => openDemoView(f.view)}
-              className="mt-5 inline-flex h-9 items-center gap-1 rounded-lg border border-white/[0.12] bg-[#19191b]/80 px-3 text-sm text-zinc-100 transition-colors duration-150 hover:border-white/[0.25]"
-            >
-              Open in the demo <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
-            </button>
+            {f.view && (
+              <button
+                type="button"
+                onClick={() => openDemoView(f.view!)}
+                className="mt-5 inline-flex h-9 items-center gap-1 rounded-lg border border-white/[0.12] bg-[#19191b]/80 px-3 text-sm text-zinc-100 transition-colors duration-150 hover:border-white/[0.25]"
+              >
+                Open in the demo <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            )}
           </div>
 
           <div className="mt-8 w-full max-w-sm rounded-xl border border-white/[0.1] bg-[#141415]/90 p-4 font-mono text-[13px] shadow-[0_16px_40px_-16px_rgba(0,0,0,0.8)]">

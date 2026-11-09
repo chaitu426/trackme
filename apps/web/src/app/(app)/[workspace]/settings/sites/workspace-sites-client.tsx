@@ -61,7 +61,7 @@ export function WorkspaceSitesClient({ workspace, initialSites, trackerScriptUrl
   const onlyOne = sitesList.length <= 1;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader
         title="Websites"
         art="stream"

@@ -1,10 +1,11 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import { PillTabs } from "@/components/motion/primitives";
 import * as React from "react";
 import { inputCompactClass, NativeSelect } from "@/components/ui/field";
 import { ModalFrame } from "@/components/ui/dialog";
-import { AlertCircle, Check, Loader2, Plus, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, Plus, Trash2, X } from "lucide-react";
 import {
   EMPTY_SEGMENT,
   isCompleteCondition,
@@ -310,7 +311,7 @@ export function SegmentBuilder({
                       {preview ? `${preview.total.toLocaleString()}${preview.capped ? "+" : ""}` : "–"}
                     </span>
                     <span className="text-xs text-zinc-500">{preview?.total === 1 ? "person matches" : "people match"}</span>
-                    {previewing && <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />}
+                    {previewing && <MatrixSpinner className="text-zinc-500" />}
                   </p>
                   {incomplete && <p className="mt-1 text-xs text-zinc-600">Rules that are not filled in yet are ignored.</p>}
                 </div>
@@ -345,7 +346,7 @@ export function SegmentBuilder({
             disabled={saving || (touched && !valid)}
             className="inline-flex h-8 items-center gap-2 rounded-lg bg-zinc-100 px-4 text-xs font-medium text-zinc-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {saving ? <MatrixSpinner /> : <Check className="h-4 w-4" />}
             {saving ? "Saving…" : "Save segment"}
           </button>
         </div>

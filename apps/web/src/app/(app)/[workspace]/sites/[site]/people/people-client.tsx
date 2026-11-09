@@ -1,5 +1,6 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
@@ -9,7 +10,6 @@ import {
   Search,
   Code,
   X,
-  Loader2,
   ChevronRight,
   Check,
   Copy,
@@ -317,7 +317,7 @@ export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSear
   const searching = search.trim().length > 0;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="User Profiles" art="stream" actions={<button
           type="button"
           onClick={copyIdentifySnippet}
@@ -473,7 +473,7 @@ export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSear
               className="h-9 w-full rounded-lg border border-white/[0.1] bg-sidebar pl-9 pr-8 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-white/[0.3]"
             />
             {isSearching ? (
-              <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-zinc-400" />
+              <MatrixSpinner className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             ) : (
               searching && (
                 <button

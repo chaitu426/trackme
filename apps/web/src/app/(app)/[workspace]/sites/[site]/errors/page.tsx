@@ -42,7 +42,7 @@ export default async function ErrorTrackingPage({
   const { from, to } = rangeDates(filters.range);
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader
         title="Error Tracking"
         art="pulse"

@@ -66,7 +66,7 @@ export default async function OverviewDashboardPage({
   const dataKey = `${range}:${country ?? ""}:${device ?? ""}`;
 
   return (
-    <div className="w-full space-y-6 text-left">
+    <div className="stagger w-full space-y-6 text-left">
       <PageHeader
         title="Overview"
         art="ridge"

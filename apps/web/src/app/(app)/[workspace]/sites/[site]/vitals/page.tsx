@@ -113,7 +113,7 @@ export default async function SiteWebVitalsPage({
   const { workspace, site } = context;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Web Vitals" art="gauge" actions={<RangeSwitcher range={range} extraQuery={`&metric=${metric}`} />}>
         Real-visitor p75 performance for <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>

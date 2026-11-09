@@ -58,7 +58,7 @@ export default async function UserJourneysPage({
   const extraQuery = `&segment=${segment}${routeKey ? `&route=${encodeURIComponent(routeKey)}` : ""}`;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="User Journeys" art="stream" actions={<RangeSwitcher range={range} extraQuery={extraQuery} />}>
         Follow visitors page by page through <span className="font-mono text-zinc-300">{site.domain}</span>: where they start, where they go and where they leave
       </PageHeader>

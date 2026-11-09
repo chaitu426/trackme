@@ -160,7 +160,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
               Analytics that counts visits, <span className="text-zinc-500">not people.</span>
             </h1>
             <p className="rise mt-6 max-w-[540px] text-[17px] leading-7 text-zinc-300 [animation-delay:120ms] sm:text-lg sm:leading-[28px]">
-              {product} gives product and engineering teams live traffic, funnels, user journeys and Web Vitals from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.
+              {product} gives product and engineering teams live traffic, funnels, errors, release impact and payments from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.
             </p>
             <div className="rise mt-8 flex flex-wrap gap-3 [animation-delay:180ms]">
               <SmartLink href={primaryHref} className={primaryButton}>

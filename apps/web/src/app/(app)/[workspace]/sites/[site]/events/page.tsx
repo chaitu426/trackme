@@ -41,7 +41,7 @@ export default async function SiteEventsAndGoalsPage({
   const { workspace, site } = context;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Goals & Events" art="pulse" actions={<RangeSwitcher range={range} />}>
         Conversions, custom actions and SDK events on <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>

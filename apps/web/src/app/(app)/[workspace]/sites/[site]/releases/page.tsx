@@ -31,7 +31,7 @@ export default async function ReleasesPage({ params }: { params: Promise<{ works
   }
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Release Impact" art="steps">
         Did a deploy make <span className="font-mono text-zinc-300">{site.domain}</span> better or worse? Pick a release to compare its first hours with the
         build it replaced.

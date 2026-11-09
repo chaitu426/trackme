@@ -1,8 +1,8 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -90,7 +90,7 @@ export function PaymentGatewayCard({ siteId, g }: { siteId: string; g: GatewaySt
               disabled={secret.length < 8 || state === "saving"}
               className="press inline-flex h-10 items-center gap-2 rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:bg-white disabled:pointer-events-none disabled:opacity-50"
             >
-              {state === "saving" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+              {state === "saving" && <MatrixSpinner />}
               {g.connected ? "Update secret" : "Connect"}
             </button>
           </form>

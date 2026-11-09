@@ -1,5 +1,6 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import { useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useRouter } from "next/navigation";
@@ -10,7 +11,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Zap,
-  Loader2,
   UserPlus,
   Trash2,
   Send,
@@ -418,7 +418,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                   <button type="button" onClick={handleCreateWorkspaceAndSite} disabled={pending || !domain.trim()} className={primary}>
                     {pending ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Creating…
+                        <MatrixSpinner /> Creating…
                       </>
                     ) : (
                       <>
@@ -491,7 +491,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                   <div className="mt-5 flex flex-col items-start justify-between gap-3 border-t border-white/[0.08] pt-4 text-sm sm:flex-row sm:items-center">
                     <span className="text-zinc-400">Not deployed yet?</span>
                     <button type="button" onClick={handleSendTestEvent} disabled={sendingTestEvent} className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.12] bg-raised px-3 text-xs text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors duration-150 hover:border-white/[0.24] disabled:opacity-60">
-                      {sendingTestEvent ? <Loader2 className="h-4 w-4 animate-spin" /> : testEventSent ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Zap className="h-4 w-4" />}
+                      {sendingTestEvent ? <MatrixSpinner /> : testEventSent ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Zap className="h-4 w-4" />}
                       {testEventSent ? "Test event sent" : "Send a test event"}
                     </button>
                   </div>
@@ -549,7 +549,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                           className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
                         >
                           <div className="flex min-w-0 items-center gap-3">
-                            {s.state === "sending" && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />}
+                            {s.state === "sending" && <MatrixSpinner className="shrink-0 text-zinc-400" />}
                             {s.state === "sent" && <DrawCheck size={16} className="shrink-0" />}
                             {s.state === "error" && <XCircle className="h-4 w-4 shrink-0 text-[#e5484d]" />}
                             <div className="min-w-0">
@@ -591,7 +591,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                     <ArrowLeft className="h-4 w-4" /> Back
                   </button>
                   <button type="button" onClick={handleComplete} disabled={launching} className={primary}>
-                    {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {launching ? <MatrixSpinner /> : null}
                     {launching ? "Opening dashboard…" : "Open dashboard"}
                     {!launching && <ArrowRight className="h-4 w-4" />}
                   </button>

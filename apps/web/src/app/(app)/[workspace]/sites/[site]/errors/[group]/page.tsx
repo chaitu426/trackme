@@ -103,7 +103,7 @@ export default async function ErrorIssuePage({
   }));
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <Link href={`${base}/errors`} className="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-100">
         <ArrowLeft className="h-3.5 w-3.5" /> All issues
       </Link>

@@ -39,7 +39,7 @@ export default async function RetentionPage({
   const base = `/${workspace.slug}/sites/${site.domain}/retention`;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader
         title="Retention & Cohorts"
         art="steps"

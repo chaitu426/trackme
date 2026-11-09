@@ -1,7 +1,8 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import React, { useRef, useState, useEffect } from "react";
-import { Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
+import { RefreshCw, CheckCircle2 } from "lucide-react";
 
 interface OtpInputProps {
   email: string;
@@ -221,7 +222,7 @@ export function OtpVerificationModal({
         >
           {loading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <MatrixSpinner />
               Verifying…
             </>
           ) : (

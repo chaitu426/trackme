@@ -36,7 +36,7 @@ export default async function SiteAcquisitionReport({
   const { workspace, site } = context;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Acquisition" art="ridge" actions={<RangeSwitcher range={range} />}>
         Channels, referrers and campaign links driving traffic to <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>

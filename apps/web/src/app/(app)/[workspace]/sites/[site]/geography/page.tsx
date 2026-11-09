@@ -40,7 +40,7 @@ export default async function AudienceGeographyPage({
   }
   const { workspace, site } = context;
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Audience Geography" art="globe" actions={<RangeSwitcher range={range} extraQuery={selectedCountry ? `&country=${selectedCountry}` : ""} />}>
         Where visitors come from, by country, for <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>

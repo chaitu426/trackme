@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger";
@@ -38,7 +38,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
 ) {
   return (
     <button ref={ref} type={type} disabled={disabled || loading} aria-busy={loading || undefined} className={cn(buttonBase, buttonVariants[variant], buttonSizes[size], className)} {...props}>
-      {loading && <Loader2 className="animate-spin" aria-hidden="true" />}
+      {loading && <MatrixSpinner />}
       {children}
     </button>
   );
