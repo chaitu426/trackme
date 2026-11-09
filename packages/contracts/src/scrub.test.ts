@@ -26,6 +26,12 @@ test("card numbers are removed only when they pass the Luhn check", () => {
   assert.equal(scrubText("card 4242 4242 4242 4242 declined"), "card [card] declined");
   assert.equal(scrubText("card 4242-4242-4242-4242"), "card [card]");
   assert.equal(scrubText("order 1234567890123456"), "order 1234567890123456");
+  // Digits glued on after a card must not hide it.
+  assert.equal(scrubText("card=4242424242424242 500"), "card=[card] 500");
+  assert.equal(scrubText("4242 4242 4242 4242 500"), "[card] 500");
+  assert.equal(scrubText("pay 4242424242424242 and 5555555555554444"), "pay [card] and [card]");
+  // A long unbroken number is an id, not a card.
+  assert.equal(scrubText("id 4242424242424242424242"), "id 4242424242424242424242");
 });
 
 test("ordinary technical text is left alone", () => {

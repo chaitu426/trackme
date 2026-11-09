@@ -6,7 +6,7 @@ import { DataError } from "../errors.js";
  * ClickHouse JSONEachRow DateTime64 parsing rejects the trailing `Z` on ISO
  * strings. Convert to `YYYY-MM-DD HH:MM:SS.mmm` (UTC) before insert.
  */
-function toClickHouseDateTime64(iso: string): string {
+export function toClickHouseDateTime64(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     throw new DataError(`Invalid timestamp for ClickHouse insert: ${iso}`);

@@ -32,7 +32,8 @@ const RULES: Array<[RegExp, string | ((match: string, ...groups: string[]) => st
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, "[email]"],
 ];
 
-const CARD = /(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])/g;
+/** A run of 13 or more digits, possibly grouped with single spaces or dashes. */
+const CARD_RUN = /\d(?:[ -]?\d){12,}/g;
 
 /** Luhn check, so a long order number is not mistaken for a card. */
 function luhn(digits: string): boolean {
@@ -50,11 +51,48 @@ function luhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-export function scrubText(input: string): string {
-  let out = input.replace(CARD, (match) => {
-    const digits = match.replace(/[ -]/g, "");
-    return digits.length >= 13 && digits.length <= 19 && luhn(digits) ? "[card]" : match;
+/**
+ * Replaces card numbers inside a run of digits. A run with spaces or dashes may have other digits glued to it
+ * ("4242 4242 4242 4242 500"), so every 13 to 19 digit window is tried and the first that passes Luhn goes.
+ * An unbroken run is only a card if the whole run is 13 to 19 digits: a longer one is an id, not a card.
+ */
+function redactCards(text: string): string {
+  return text.replace(CARD_RUN, (run) => {
+    const digits: string[] = [];
+    const at: number[] = [];
+    for (let i = 0; i < run.length; i += 1) {
+      if (run[i]! >= "0" && run[i]! <= "9") {
+        digits.push(run[i]!);
+        at.push(i);
+      }
+    }
+    if (digits.length === run.length) {
+      return digits.length <= 19 && luhn(digits.join("")) ? "[card]" : run;
+    }
+    let out = "";
+    let copied = 0;
+    for (let i = 0; i + 13 <= digits.length; ) {
+      let hit = 0;
+      for (let len = Math.min(19, digits.length - i); len >= 13; len -= 1) {
+        if (luhn(digits.slice(i, i + len).join(""))) {
+          hit = len;
+          break;
+        }
+      }
+      if (hit === 0) {
+        i += 1;
+        continue;
+      }
+      out += run.slice(copied, at[i]) + "[card]";
+      copied = at[i + hit - 1]! + 1;
+      i += hit;
+    }
+    return out + run.slice(copied);
   });
+}
+
+export function scrubText(input: string): string {
+  let out = redactCards(input);
   for (const [pattern, replacement] of RULES) {
     out = out.replace(pattern, replacement as never);
   }
