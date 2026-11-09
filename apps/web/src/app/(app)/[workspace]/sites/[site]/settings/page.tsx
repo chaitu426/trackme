@@ -1,16 +1,13 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { Code2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Code2 } from "lucide-react";
 import { env } from "@trackme/config";
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
-import { requireDashboardSite, listApiKeys, getWorkspaceUsage } from "@/lib/tenancy";
-import { listWorkspaceAuditLogs } from "@/lib/audit";
+import { requireDashboardSite } from "@/lib/tenancy";
 import { resolveTrackerScriptUrl, trackerIntegrityAttrs } from "@/lib/tracker-url";
 import { SitePrivacyForm } from "@/components/site-privacy-form";
-import { ApiKeysManager, type ApiKeySummary } from "@/components/api-keys-manager";
-import { UsageQuotaCard } from "@/components/usage-quota-card";
-import { AuditLogViewer } from "@/components/audit-log-viewer";
 import { CopyButton } from "@/components/ui/copy-button";
 
 export default async function SiteSettingsPage({
@@ -29,34 +26,13 @@ export default async function SiteSettingsPage({
   }
   const { workspace, site } = context;
 
-  const [apiKeyRows, usage, auditLogs] = await Promise.all([
-    listApiKeys(workspace.id),
-    getWorkspaceUsage(workspace.id),
-    listWorkspaceAuditLogs(workspace.id, 15),
-  ]);
-
-  const apiKeys: ApiKeySummary[] = apiKeyRows.map((key) => ({
-    id: key.id,
-    name: key.name,
-    prefix: key.prefix,
-    scopes: key.scopes,
-    lastUsedAt: key.lastUsedAt ? key.lastUsedAt.toISOString() : null,
-    expiresAt: key.expiresAt ? key.expiresAt.toISOString() : null,
-    createdAt: key.createdAt.toISOString(),
-  }));
-
   const snippet = `<script defer src="${resolveTrackerScriptUrl()}"${trackerIntegrityAttrs()} data-site="${site.publicKey}" data-endpoint="${env.INGESTION_URL}/v1/batch"></script>`;
 
   return (
     <div className="space-y-8 max-w-4xl">
       <PageHeader title="Site Settings" art="gauge">
-        Snippet, privacy, API keys and audit logs for <span className="font-mono text-zinc-300">{site.domain}</span>
+        Tracking snippet and privacy settings for <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>
-
-      {/* ── Usage & Quota ── */}
-      <section id="usage" className="space-y-3">
-        <UsageQuotaCard usage={usage} />
-      </section>
 
       {/* ── Tracking Snippet ── */}
       <section id="snippet" className="linear-card p-6 space-y-4">
@@ -95,15 +71,16 @@ export default async function SiteSettingsPage({
         <SitePrivacyForm siteId={site.id} initialSettings={site.settings} />
       </section>
 
-      {/* ── API Keys ── */}
-      <section id="tokens">
-        <ApiKeysManager workspaceId={workspace.id} initialKeys={apiKeys} />
-      </section>
-
-      {/* ── Audit Trail ── */}
-      <section id="audit">
-        <AuditLogViewer logs={auditLogs} />
-      </section>
+      <Link
+        href={`/${workspace.slug}/settings`}
+        className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-card px-4 py-3 text-xs text-zinc-300 transition-colors hover:border-white/[0.16]"
+      >
+        <span>
+          <span className="font-medium text-zinc-100">Looking for API keys, usage or the audit trail?</span>{" "}
+          <span className="text-zinc-400">They apply to the whole workspace, so they live under Organization &amp; Team.</span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-zinc-500" />
+      </Link>
     </div>
   );
 }

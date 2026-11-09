@@ -3,7 +3,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { notFound } from "next/navigation";
 import { Info } from "lucide-react";
 import { type WebVitalSummary } from "@trackme/analytics";
-import { cachedWebVitals } from "@/lib/cached-analytics";
+import Link from "next/link";
+import { cachedVitalsByPage, cachedWebVitals } from "@/lib/cached-analytics";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
@@ -95,12 +96,13 @@ export default async function SiteWebVitalsPage({
   searchParams,
 }: {
   params: Promise<{ workspace: string; site: string }>;
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; metric?: string }>;
 }) {
   const user = await requireUser();
   const { workspace: workspaceSlug, site: siteDomain } = await params;
-  const { range: rawRange } = await searchParams;
+  const { range: rawRange, metric: rawMetric } = await searchParams;
   const range = parseRangeKey(rawRange);
+  const metric = rawMetric && rawMetric.toUpperCase() in METRIC_CONFIGS ? rawMetric.toUpperCase() : "LCP";
 
   let context: Awaited<ReturnType<typeof requireDashboardSite>>;
   try {
@@ -112,7 +114,7 @@ export default async function SiteWebVitalsPage({
 
   return (
     <div className="w-full space-y-5 text-left">
-      <PageHeader title="Web Vitals" art="gauge" actions={<RangeSwitcher range={range} />}>
+      <PageHeader title="Web Vitals" art="gauge" actions={<RangeSwitcher range={range} extraQuery={`&metric=${metric}`} />}>
         Real-visitor p75 performance for <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>
 
@@ -122,13 +124,17 @@ export default async function SiteWebVitalsPage({
         <div className="space-y-1">
           <p className="font-medium text-zinc-100">Google p75 methodology</p>
           <p className="text-zinc-400 leading-relaxed">
-            Google Core Web Vitals criteria require 75% of all real-world user page visits to pass the Good threshold. Metrics are sampled continuously via browser PerformanceObserver APIs and stored in ClickHouse.
+            Google Core Web Vitals criteria require 75% of all real-world user page visits to pass the Good threshold. Metrics are measured in real visitors' browsers, so they reflect actual devices and networks.
           </p>
         </div>
       </div>
 
       <Suspense key={range} fallback={<VitalsSkeleton />}>
         <VitalsGrid workspaceId={workspace.id} siteId={site.id} range={range} />
+      </Suspense>
+
+      <Suspense key={`pages:${range}:${metric}`} fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
+        <PagesNeedingAttention workspaceId={workspace.id} siteId={site.id} range={range} metric={metric} basePath={`/${workspace.slug}/sites/${site.domain}/vitals`} />
       </Suspense>
     </div>
   );
@@ -247,5 +253,93 @@ async function VitalsGrid({ workspaceId, siteId, range }: { workspaceId: string;
           );
         })}
       </div>
+  );
+}
+
+const SEVERITY = { poor: 0, "needs-improvement": 1, good: 2 } as const;
+const MIN_SAMPLES = 5;
+
+/** The pages dragging a metric down: the answer to "my LCP is bad, but where?" */
+async function PagesNeedingAttention({
+  workspaceId,
+  siteId,
+  range,
+  metric,
+  basePath,
+}: {
+  workspaceId: string;
+  siteId: string;
+  range: RangeKey;
+  metric: string;
+  basePath: string;
+}) {
+  const { current } = resolveDateRange(range);
+  const request = buildMetricRequest(workspaceId, siteId, current);
+  let rows: Awaited<ReturnType<typeof cachedVitalsByPage>> = [];
+  let failed = false;
+  try {
+    rows = await cachedVitalsByPage(request, 500);
+  } catch {
+    failed = true;
+  }
+
+  const config = METRIC_CONFIGS[metric]!;
+  const ranked = rows
+    .filter((r) => r.metric === metric && r.samples >= MIN_SAMPLES)
+    .map((r) => ({ ...r, rating: config.getRating(r.p75) }))
+    .sort((a, b) => SEVERITY[a.rating] - SEVERITY[b.rating] || b.p75 - a.p75)
+    .slice(0, 10);
+
+  return (
+    <Card className="reveal">
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-3 text-left">
+        <div>
+          <CardTitle>Pages to fix first</CardTitle>
+          <CardDescription>
+            Slowest pages for {config.fullName}, worst first. Pages need {MIN_SAMPLES}+ samples to be listed.
+          </CardDescription>
+        </div>
+        <div role="tablist" aria-label="Metric" className="flex items-center gap-0.5 rounded-lg border border-white/[0.08] p-0.5 text-xs">
+          {Object.keys(METRIC_CONFIGS).map((key) => (
+            <Link
+              key={key}
+              role="tab"
+              aria-selected={key === metric}
+              href={`${basePath}?range=${range}&metric=${key}`}
+              scroll={false}
+              className={`rounded-md px-2.5 py-1.5 font-medium transition-colors ${
+                key === metric ? "bg-raised text-zinc-50" : "text-zinc-400 hover:text-zinc-100"
+              }`}
+            >
+              {key}
+            </Link>
+          ))}
+        </div>
+      </CardHeader>
+      {failed ? (
+        <p className="py-10 text-center text-xs text-zinc-500">Page-level data is unavailable right now. Try again shortly.</p>
+      ) : ranked.length === 0 ? (
+        <p className="py-10 text-center text-xs text-zinc-500">
+          Not enough {config.name} samples per page in this range yet.
+        </p>
+      ) : (
+        <ul className="divide-y divide-white/[0.05]">
+          {ranked.map((r) => (
+            <li key={r.path} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <span className="min-w-0 truncate font-mono text-xs text-zinc-200" title={r.path}>
+                {r.path}
+              </span>
+              <span className="flex shrink-0 items-center gap-3 font-mono text-xs tabular-nums">
+                <span className="text-zinc-500">{r.samples.toLocaleString()} samples</span>
+                <span className="w-16 text-right text-zinc-100">{config.formatValue(r.p75)}</span>
+                <span className={`w-24 rounded-full border px-2 py-0.5 text-center font-sans ${ratingStyles[r.rating].badge}`}>
+                  {ratingStyles[r.rating].label}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

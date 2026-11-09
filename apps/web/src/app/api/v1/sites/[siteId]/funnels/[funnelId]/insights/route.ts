@@ -47,7 +47,8 @@ async function handleGet(
     const segment: FunnelSegment = isSegment(segmentParam) ? segmentParam : "device";
 
     const now = new Date();
-    const from = request.nextUrl.searchParams.get("from") || new Date(now.getTime() - 30 * 86_400_000).toISOString();
+    const days = Math.min(31, Math.max(1, Number.parseInt(request.nextUrl.searchParams.get("days") ?? "30", 10) || 30));
+    const from = request.nextUrl.searchParams.get("from") || new Date(now.getTime() - days * 86_400_000).toISOString();
     const to = request.nextUrl.searchParams.get("to") || now.toISOString();
     const steps = (funnel.steps as unknown as FunnelStepDefinition[]) || [];
 

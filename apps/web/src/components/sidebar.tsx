@@ -5,29 +5,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
-  BarChart2,
-  TrendingUp,
-  Target,
-  Gauge,
-  Radio,
-  Settings2,
+  ChevronDown,
   LogOut,
   BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  MapPinned,
+  Settings2,
   Users,
   Globe,
-  UserCheck,
-  Filter,
-  Waypoints,
-  FileText,
+  type LucideIcon,
 } from "lucide-react";
+import { NAV_SUITES, SITE_SETTINGS_ITEM, parseFeatureFlags, visibleSuites } from "@/lib/nav";
+
+const SUITES_STORAGE_KEY = "trackme_sidebar_closed_suites";
 interface SidebarProps {
   workspace: { id: string; name: string; slug: string };
   sites: { id: string; domain: string; displayName: string }[];
   primarySiteDomain: string;
+  /** Feature flags switched on (FEATURE_FLAGS); flagged nav items stay hidden without them. */
+  featureFlags: string[];
   user: { id: string; email: string };
   role: string;
   mobileOpen: boolean;
@@ -40,6 +37,7 @@ export function Sidebar({
   workspace,
   sites,
   primarySiteDomain,
+  featureFlags,
   user,
   role,
   mobileOpen,
@@ -70,28 +68,34 @@ export function Sidebar({
     onMobileClose();
   }, [pathname, onMobileClose]);
 
-  const navGroups = [
+  // With no website yet there is no site to open: send site-scoped items to the page that adds one,
+  // instead of a broken /sites//realtime URL.
+  const siteBase = primarySiteDomain ? `/${workspace.slug}/sites/${primarySiteDomain}` : null;
+  const siteHref = (section: string) => (siteBase ? `${siteBase}/${section}` : `/${workspace.slug}/settings/sites`);
+
+  type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "live" | "new"; scoped?: boolean };
+  type NavGroup = { id: string; title: string; items: NavItem[] };
+
+  const flags = React.useMemo(() => parseFeatureFlags(featureFlags.join(",")), [featureFlags]);
+  const navGroups: NavGroup[] = [
+    ...visibleSuites(NAV_SUITES, flags).map((suite) => ({
+      id: suite.id,
+      title: suite.title,
+      items: suite.items.map((item): NavItem => ({
+        href: item.workspace ? `/${workspace.slug}/${item.path}` : siteHref(item.path),
+        label: item.label,
+        icon: item.icon,
+        ...(item.badge ? { badge: item.badge } : {}),
+        ...(item.workspace ? {} : { scoped: true }),
+      })),
+    })),
     {
-      title: "Analytics",
-      items: [
-        { href: `/${workspace.slug}/overview`, label: "Overview", icon: BarChart2, exact: true },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/realtime`, label: "Realtime", icon: Radio, badge: "live" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/people`, label: "User Profiles", icon: UserCheck, badge: "new" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/journeys`, label: "User Journeys", icon: Waypoints, badge: "new" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/funnels`, label: "Funnels", icon: Filter, badge: "new" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/pages`, label: "Page Performance", icon: FileText },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/acquisition`, label: "Acquisition", icon: TrendingUp },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/geography`, label: "Audience Geography", icon: MapPinned },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/events`, label: "Goals & Events", icon: Target },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/vitals`, label: "Web Vitals", icon: Gauge },
-      ],
-    },
-    {
+      id: "workspace",
       title: "Workspace",
       items: [
         { href: `/${workspace.slug}/settings`, label: "Organization & Team", icon: Users },
         { href: `/${workspace.slug}/settings/sites`, label: `Websites (${sites.length})`, icon: Globe },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/settings`, label: "Site Settings", icon: Settings2 },
+        { href: siteHref(SITE_SETTINGS_ITEM.path), label: SITE_SETTINGS_ITEM.label, icon: SITE_SETTINGS_ITEM.icon, scoped: true },
         { href: "/legal/privacy", label: "Privacy Policy", icon: BookOpen },
       ],
     },
@@ -102,6 +106,36 @@ export function Sidebar({
   const allHrefs = navGroups.flatMap((group) => group.items.map((item) => item.href));
   const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const activeHref = allHrefs.filter(matches).sort((a, b) => b.length - a.length)[0];
+  const activeSuiteId = navGroups.find((group) => group.items.some((item) => item.href === activeHref))?.id;
+
+  // Suites the user folded away, remembered across visits. Opening a page inside a folded suite unfolds it.
+  const [closedSuites, setClosedSuites] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SUITES_STORAGE_KEY) ?? "[]");
+      if (Array.isArray(saved)) {
+        setClosedSuites(saved.filter((id): id is string => typeof id === "string" && id !== activeSuiteId));
+      }
+    } catch {
+      // storage unavailable or corrupt: start with everything open
+    }
+  }, []);
+  const persistClosed = (next: string[]) => {
+    setClosedSuites(next);
+    try {
+      localStorage.setItem(SUITES_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // not persisted this time
+    }
+  };
+  React.useEffect(() => {
+    if (activeSuiteId && closedSuites.includes(activeSuiteId)) {
+      persistClosed(closedSuites.filter((id) => id !== activeSuiteId));
+    }
+    // Only a page change should unfold a suite, not the user folding the one they are on.
+  }, [activeHref]);
+  const toggleSuite = (id: string) =>
+    persistClosed(closedSuites.includes(id) ? closedSuites.filter((x) => x !== id) : [...closedSuites, id]);
 
   const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 
@@ -141,21 +175,30 @@ export function Sidebar({
         </div>
 
         <div className="max-h-[calc(100vh-180px)] space-y-6 overflow-y-auto px-2 py-4">
-          {navGroups.map((group) => (
-            <div key={group.title} className="space-y-2">
+          {navGroups.map((group) => {
+            const open = collapsed || !closedSuites.includes(group.id);
+            return (
+            <div key={group.id} className="space-y-1">
               {!collapsed && (
-                <div className="px-3 text-xs text-zinc-500">
-                  {group.title}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSuite(group.id)}
+                  aria-expanded={open}
+                  aria-controls={`suite-${group.id}`}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-1 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+                >
+                  <span>{group.title}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${open ? "" : "-rotate-90"}`} />
+                </button>
               )}
-              <div className="space-y-0.5">
+              <div id={`suite-${group.id}`} hidden={!open} className="space-y-0.5">
                 {group.items.map((item) => {
-                  const isActive = item.href === activeHref;
+                  const isActive = item.href === activeHref && !(item.scoped && !siteBase);
                   const Icon = item.icon;
 
                   return (
                     <Link
-                      key={item.href}
+                      key={item.label}
                       href={item.href}
                       title={collapsed ? item.label : undefined}
                       className={`
@@ -186,7 +229,8 @@ export function Sidebar({
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -205,7 +249,7 @@ export function Sidebar({
 
             <div className="space-y-0.5 py-1 text-xs font-medium">
               <Link
-                href={`/${workspace.slug}/sites/${primarySiteDomain}/settings`}
+                href={`/${workspace.slug}/settings`}
                 onClick={() => setProfileOpen(false)}
                 className="flex items-center space-x-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               >

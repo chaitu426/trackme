@@ -33,10 +33,12 @@ export function FunnelInsightsPanel({
   siteId,
   funnelId,
   analysis,
+  days,
 }: {
   siteId: string;
   funnelId: string;
   analysis: FunnelAnalysisResult;
+  days: number;
 }) {
   const [segment, setSegment] = React.useState<FunnelSegment>("device");
   const [data, setData] = React.useState<FunnelInsights | null>(null);
@@ -45,7 +47,7 @@ export function FunnelInsightsPanel({
   const cache = React.useRef(new Map<string, FunnelInsights>());
 
   React.useEffect(() => {
-    const key = `${funnelId}:${segment}`;
+    const key = `${funnelId}:${segment}:${days}`;
     const hit = cache.current.get(key);
     if (hit) {
       setData(hit);
@@ -56,7 +58,7 @@ export function FunnelInsightsPanel({
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    fetch(`/api/v1/sites/${siteId}/funnels/${funnelId}/insights?segment=${segment}`, { signal: controller.signal })
+    fetch(`/api/v1/sites/${siteId}/funnels/${funnelId}/insights?segment=${segment}&days=${days}`, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as FunnelInsights;
@@ -71,7 +73,7 @@ export function FunnelInsightsPanel({
         setLoading(false);
       });
     return () => controller.abort();
-  }, [siteId, funnelId, segment]);
+  }, [siteId, funnelId, segment, days]);
 
   return (
     <div className="space-y-5">
@@ -219,7 +221,7 @@ function SegmentBreakdown({
               })}
               <tr>
                 <th className="sticky left-0 z-10 border-t border-white/[0.1] bg-card px-4 py-3 text-xs font-medium text-zinc-400">
-                  All visitors
+                  All sessions
                 </th>
                 {steps.map((step, i) => (
                   <td key={step.order} className="border-t border-white/[0.1] px-3 py-3">

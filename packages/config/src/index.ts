@@ -107,6 +107,8 @@ const EnvironmentSchema = z.object({
     .default("true"),
   /** Analytics read source: v1 (legacy tables), v2 (events_v2 + aggregates), shadow (run both, return v1, log differences). */
   ANALYTICS_READ: z.enum(["v1", "v2", "shadow"]).default("v1"),
+  /** Comma-separated suite features switched on in the dashboard (see apps/web/src/lib/nav.ts). Unbuilt or unapproved features stay hidden. */
+  FEATURE_FLAGS: z.string().default(""),
   /** Event worker write target: off (legacy tables), shadow (legacy + events_ingest), only (events_ingest). */
   WORKER_WRITE_V2: z.enum(["off", "shadow", "only"]).default("shadow"),
   /** How often the worker samples consumer-group lag from the Kafka admin API. */

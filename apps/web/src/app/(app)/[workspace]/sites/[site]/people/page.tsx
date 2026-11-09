@@ -38,6 +38,7 @@ export default async function SitePeoplePage({
       stats={{
         total: stats.total,
         active7d: stats.active7d,
+        avgEvents: stats.avgEvents,
       }}
     />
   );

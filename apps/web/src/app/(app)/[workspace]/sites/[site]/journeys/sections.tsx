@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, Route as RouteIcon, X } from "lucide-react";
+import { Filter, LogOut, Route as RouteIcon, X } from "lucide-react";
 import type { JourneySegment, RouteSummary, TraceStep } from "@trackme/analytics";
 import {
   cachedJourneyGraph,
@@ -235,6 +235,18 @@ export async function RouteDetail(ctx: JourneyContext) {
           {formatNumber(entered)} sessions began this route; {formatNumber(completed)} ({pct(completed, entered)}%) followed it to the end
         </CardDescription>
       </CardHeader>
+
+      {route.every((p) => p.startsWith("/")) && route.length >= 2 && (
+        <div className="mt-3 flex justify-end">
+          <Link
+            href={`${ctx.basePath.replace(/\/journeys$/, "/funnels")}?${route.map((p) => `path=${encodeURIComponent(p)}`).join("&")}`}
+            className="inline-flex items-center gap-2 rounded-md border border-white/[0.14] bg-white/[0.07] px-2.5 py-1.5 text-xs font-medium text-zinc-100 transition-colors hover:bg-white/[0.12]"
+          >
+            <Filter className="h-3.5 w-3.5" />
+            Turn this route into a funnel
+          </Link>
+        </div>
+      )}
 
       {leak && (
         <p className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs leading-relaxed text-zinc-300">

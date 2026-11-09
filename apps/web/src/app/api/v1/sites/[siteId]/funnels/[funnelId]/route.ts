@@ -38,9 +38,10 @@ async function handleGet(
 
     // Parse date range from query params (default to last 30 days)
     const now = new Date();
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const days = Math.min(31, Math.max(1, Number.parseInt(request.nextUrl.searchParams.get("days") ?? "30", 10) || 30));
+    const windowStart = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const from = request.nextUrl.searchParams.get("from") || thirtyDaysAgo.toISOString();
+    const from = request.nextUrl.searchParams.get("from") || windowStart.toISOString();
     const to = request.nextUrl.searchParams.get("to") || now.toISOString();
 
     const steps = (funnel.steps as unknown as FunnelStepDefinition[]) || [];

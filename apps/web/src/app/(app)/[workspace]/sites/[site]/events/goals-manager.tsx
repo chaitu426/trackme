@@ -45,12 +45,14 @@ export function GoalsManager({
   const [editTargetValue, setEditTargetValue] = useState("");
 
   // Summary stats
-  const totalConversions = goals.reduce((acc, g) => acc + (g.conversions || 0), 0);
+  // Only goals that are switched on count towards the headline numbers.
+  const activeGoals = goals.filter((g) => g.enabled !== false);
+  const totalConversions = activeGoals.reduce((acc, g) => acc + (g.conversions || 0), 0);
   const avgConvRate =
-    goals.length > 0
-      ? (goals.reduce((acc, g) => acc + (g.conversionRate || 0), 0) / goals.length).toFixed(1)
+    activeGoals.length > 0
+      ? (activeGoals.reduce((acc, g) => acc + (g.conversionRate || 0), 0) / activeGoals.length).toFixed(1)
       : "0.0";
-  const activeCount = goals.filter((g) => g.enabled !== false).length;
+  const activeCount = activeGoals.length;
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -210,7 +212,7 @@ export function GoalsManager({
           <div className="text-2xl font-medium text-zinc-100">
             {totalConversions.toLocaleString()}
           </div>
-          <p className="text-xs text-zinc-500 mt-1">Across all active conversion rules</p>
+          <p className="text-xs text-zinc-500 mt-1">Sum across active goals; a visit that hits two goals counts twice</p>
         </div>
 
         <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
@@ -221,7 +223,7 @@ export function GoalsManager({
           <div className="text-2xl font-medium text-[#4cc38a]">
             {avgConvRate}%
           </div>
-          <p className="text-xs text-zinc-500 mt-1">Weighted conversion efficiency</p>
+          <p className="text-xs text-zinc-500 mt-1">Simple average of active goals</p>
         </div>
 
         <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
@@ -240,9 +242,9 @@ export function GoalsManager({
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>Conversion Goals & Funnels</CardTitle>
+              <CardTitle>Conversion Goals</CardTitle>
               <CardDescription>
-                Measure high-value visitor milestones, signup completions, and target values.
+                Count the visits that reach a page or fire an event. For multi-step paths, use Funnels.
               </CardDescription>
             </div>
             <Button

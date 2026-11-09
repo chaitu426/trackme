@@ -1,4 +1,4 @@
-import { db, siteUserProfiles, and, eq, inArray } from "@trackme/db";
+import { db, siteUserProfiles, and, eq, inArray, ilike, or } from "@trackme/db";
 import type { ProfileRow } from "@trackme/analytics";
 
 /**
@@ -25,4 +25,25 @@ export async function overlayServerProfiles(siteId: string, rows: ProfileRow[]):
       traits: { ...row.traits, ...((o.traits as Record<string, unknown>) ?? {}) },
     };
   });
+}
+
+/**
+ * Distinct ids whose server-supplied name, email or id contains the search text. Event-derived
+ * search cannot see these values, so the people search unions them in. Capped; one indexed-by-site query.
+ */
+export async function findServerProfileIds(siteId: string, search: string): Promise<string[]> {
+  const term = search.trim();
+  if (!term) return [];
+  const pattern = `%${term.replace(/[\\%_]/g, "\\$&")}%`;
+  const rows = await db
+    .select({ distinctId: siteUserProfiles.distinctId })
+    .from(siteUserProfiles)
+    .where(
+      and(
+        eq(siteUserProfiles.siteId, siteId),
+        or(ilike(siteUserProfiles.name, pattern), ilike(siteUserProfiles.email, pattern), ilike(siteUserProfiles.distinctId, pattern))
+      )
+    )
+    .limit(200);
+  return rows.map((r) => r.distinctId);
 }

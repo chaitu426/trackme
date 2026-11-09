@@ -22,11 +22,18 @@ async function loadSuggestions(workspaceId: string, siteId: string): Promise<Fun
 
 export default async function SiteFunnelsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspace: string; site: string }>;
+  searchParams: Promise<{ path?: string | string[] }>;
 }) {
   const user = await requireUser();
   const { workspace: workspaceSlug, site: siteDomain } = await params;
+  const { path: rawPaths } = await searchParams;
+  // Paths handed over by the Journeys page ("Turn into a funnel"). Page paths only, bounded.
+  const prefillPaths = (Array.isArray(rawPaths) ? rawPaths : rawPaths ? [rawPaths] : [])
+    .filter((p) => p.startsWith("/") && p.length <= 512)
+    .slice(0, 8);
 
   let context: Awaited<ReturnType<typeof requireDashboardSite>>;
   try {
@@ -89,6 +96,7 @@ export default async function SiteFunnelsPage({
       initialAnalysis={initialAnalysis}
       initialAnalysisError={initialAnalysisError}
       suggestions={suggestions}
+      prefillPaths={prefillPaths}
     />
   );
 }

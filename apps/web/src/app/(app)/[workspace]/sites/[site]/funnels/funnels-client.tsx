@@ -43,6 +43,8 @@ interface FunnelsClientProps {
   initialAnalysisError?: string | null;
   /** Pages and custom events already seen on the site, for autocompleting step targets. */
   suggestions?: Promise<FunnelSuggestions>;
+  /** Pages to start a new funnel from (e.g. a route picked on the Journeys page). Opens the create dialog. */
+  prefillPaths?: string[];
 }
 
 const MAX_STEPS = 8;
@@ -87,6 +89,9 @@ const TEMPLATES: { id: string; label: string; hint: string; name: string; steps:
   },
 ];
 
+const FUNNEL_WINDOWS = [7, 14, 30] as const;
+const DEFAULT_DAYS = 30;
+
 export function FunnelsClient({
   site,
   initialFunnels,
@@ -94,27 +99,29 @@ export function FunnelsClient({
   initialAnalysis,
   initialAnalysisError = null,
   suggestions,
+  prefillPaths = [],
 }: FunnelsClientProps) {
   const [funnels, setFunnels] = React.useState<FunnelItem[]>(initialFunnels);
   const [activeFunnel, setActiveFunnel] = React.useState<FunnelItem | null>(initialActiveFunnel);
   const [analysis, setAnalysis] = React.useState<FunnelAnalysisResult | null>(initialAnalysis);
   const [analysisError, setAnalysisError] = React.useState<string | null>(initialAnalysisError);
   const [loadingAnalysis, setLoadingAnalysis] = React.useState(false);
-  const [modalOpen, setModalOpen] = React.useState(false);
+  const [modalOpen, setModalOpen] = React.useState(prefillPaths.length >= 2);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [days, setDays] = React.useState<number>(DEFAULT_DAYS);
 
   // Analyses fetched this session, keyed by funnel, so flipping between funnels is instant.
   // Refresh bypasses it (force); deleting a funnel drops its entry.
   const analysisCache = React.useRef(new Map<string, FunnelAnalysisResult>());
   React.useEffect(() => {
-    if (initialActiveFunnel && initialAnalysis) analysisCache.current.set(initialActiveFunnel.id, initialAnalysis);
+    if (initialActiveFunnel && initialAnalysis) analysisCache.current.set(`${initialActiveFunnel.id}:${DEFAULT_DAYS}`, initialAnalysis);
   }, [initialActiveFunnel, initialAnalysis]);
 
-  async function loadFunnel(funnel: FunnelItem, force = false) {
+  async function loadFunnel(funnel: FunnelItem, force = false, windowDays = days) {
     setActiveFunnel(funnel);
     setConfirmDelete(false);
     setAnalysisError(null);
-    const hit = force ? undefined : analysisCache.current.get(funnel.id);
+    const hit = force ? undefined : analysisCache.current.get(`${funnel.id}:${windowDays}`);
     if (hit) {
       setAnalysis(hit);
       setLoadingAnalysis(false);
@@ -122,14 +129,14 @@ export function FunnelsClient({
     }
     setLoadingAnalysis(true);
     try {
-      const res = await fetch(`/api/v1/sites/${site.id}/funnels/${funnel.id}`);
+      const res = await fetch(`/api/v1/sites/${site.id}/funnels/${funnel.id}?days=${windowDays}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setAnalysis(null);
         setAnalysisError(data.detail || data.message || "Analytics is temporarily unavailable. Retry in a moment.");
         return;
       }
-      analysisCache.current.set(funnel.id, data.analysis);
+      analysisCache.current.set(`${funnel.id}:${windowDays}`, data.analysis);
       setAnalysis(data.analysis);
     } catch {
       setAnalysis(null);
@@ -143,7 +150,7 @@ export function FunnelsClient({
     try {
       const res = await fetch(`/api/v1/sites/${site.id}/funnels/${id}`, { method: "DELETE" });
       if (res.ok) {
-        analysisCache.current.delete(id);
+        for (const key of [...analysisCache.current.keys()]) if (key.startsWith(`${id}:`)) analysisCache.current.delete(key);
         const remaining = funnels.filter((f) => f.id !== id);
         setFunnels(remaining);
         setConfirmDelete(false);
@@ -217,6 +224,11 @@ export function FunnelsClient({
           onCancelDelete={() => setConfirmDelete(false)}
           onDelete={() => void handleDeleteFunnel(activeFunnel.id)}
           onRefresh={() => void loadFunnel(activeFunnel, true)}
+          days={days}
+          onDaysChange={(next) => {
+            setDays(next);
+            void loadFunnel(activeFunnel, false, next);
+          }}
         />
       ) : (
         <Card className="px-6 py-12">
@@ -227,7 +239,7 @@ export function FunnelsClient({
             <div className="space-y-1">
               <h3 className="text-sm font-medium text-zinc-200">No funnels yet</h3>
               <p className="text-xs leading-relaxed text-zinc-400">
-                A funnel is an ordered list of pages or events. You will see how many visitors make it through each step, and exactly
+                A funnel is an ordered list of pages or events. You will see how many sessions make it through each step, and exactly
                 where the rest leave.
               </p>
             </div>
@@ -247,6 +259,7 @@ export function FunnelsClient({
         <CreateFunnelDialog
           siteId={site.id}
           suggestions={suggestions}
+          prefillPaths={prefillPaths}
           onClose={() => setModalOpen(false)}
           onCreated={handleCreated}
         />
@@ -280,6 +293,8 @@ function FunnelView({
   onCancelDelete,
   onDelete,
   onRefresh,
+  days,
+  onDaysChange,
 }: {
   siteId: string;
   funnel: FunnelItem;
@@ -291,6 +306,8 @@ function FunnelView({
   onCancelDelete: () => void;
   onDelete: () => void;
   onRefresh: () => void;
+  days: number;
+  onDaysChange: (days: number) => void;
 }) {
   const steps = analysis?.steps ?? [];
   const worst = steps.reduce<FunnelStepResult | null>(
@@ -323,7 +340,7 @@ function FunnelView({
         <SummaryTile
           label="Biggest drop-off"
           value={worst ? `${worst.dropOffRate}%` : "–"}
-          hint={worst && worstPrev ? `${worstPrev.name} → ${worst.name}` : hasTraffic ? "No visitors lost" : "Needs traffic"}
+          hint={worst && worstPrev ? `${worstPrev.name} → ${worst.name}` : hasTraffic ? "No sessions lost" : "Needs traffic"}
           accent={worst ? "text-[#e5484d]" : undefined}
         />
       </div>
@@ -333,10 +350,26 @@ function FunnelView({
           <div className="min-w-0">
             <CardTitle className="truncate">{funnel.name}</CardTitle>
             <CardDescription>
-              {funnel.description || `${funnel.steps.length} steps, in order, per visitor`}
+              {funnel.description || `${funnel.steps.length} steps, in order, counted per session over the last ${days} days`}
             </CardDescription>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <div role="group" aria-label="Time window" className="mr-1 flex h-8 items-center gap-0.5 rounded-lg border border-white/[0.08] p-0.5">
+              {FUNNEL_WINDOWS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={days === d}
+                  disabled={loading}
+                  onClick={() => days !== d && onDaysChange(d)}
+                  className={`h-full rounded-md px-2.5 text-xs transition-colors disabled:opacity-60 ${
+                    days === d ? "bg-raised font-medium text-zinc-50" : "text-zinc-400 hover:text-zinc-100"
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={onRefresh}
@@ -411,13 +444,13 @@ function FunnelView({
 
         {!loading && !error && analysis && !hasTraffic && (
           <p className="mt-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs leading-relaxed text-zinc-500">
-            No visitor has reached step 1 in the last 30 days. Counts appear here as soon as someone does.
+            No session has reached step 1 in the last {days} days. Counts appear here as soon as someone does.
           </p>
         )}
       </Card>
 
       {!loading && !error && analysis && hasTraffic && steps.length >= 2 && (
-        <FunnelInsightsPanel key={funnel.id} siteId={siteId} funnelId={funnel.id} analysis={analysis} />
+        <FunnelInsightsPanel key={funnel.id} siteId={siteId} funnelId={funnel.id} analysis={analysis} days={days} />
       )}
     </div>
   );
@@ -518,18 +551,25 @@ function normalizeTarget(type: StepDraft["type"], value: string): string {
 function CreateFunnelDialog({
   siteId,
   suggestions,
+  prefillPaths,
   onClose,
   onCreated,
 }: {
   siteId: string;
   suggestions: Promise<FunnelSuggestions> | undefined;
+  prefillPaths: string[];
   onClose: () => void;
   onCreated: (funnel: FunnelItem) => void;
 }) {
-  const [template, setTemplate] = React.useState("signup");
-  const [name, setName] = React.useState(TEMPLATES[0]!.name);
-  const [description, setDescription] = React.useState("");
-  const [steps, setSteps] = React.useState<StepDraft[]>(TEMPLATES[0]!.steps);
+  const fromRoute = prefillPaths.length >= 2;
+  const [template, setTemplate] = React.useState(fromRoute ? "blank" : "signup");
+  const [name, setName] = React.useState(fromRoute ? "Route funnel" : TEMPLATES[0]!.name);
+  const [description, setDescription] = React.useState(fromRoute ? "Built from a route on the Journeys page" : "");
+  const [steps, setSteps] = React.useState<StepDraft[]>(
+    fromRoute
+      ? prefillPaths.slice(0, MAX_STEPS).map((path) => ({ name: path === "/" ? "Home" : path, type: "pageview" as const, target: path }))
+      : TEMPLATES[0]!.steps
+  );
   const [touched, setTouched] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
@@ -810,6 +850,19 @@ function CreateFunnelDialog({
                           </button>
                         </div>
                       </div>
+                      {!error && s.type === "pageview" && s.target.trim() && (
+                        <p className="text-xs text-zinc-500">
+                          {normalizeTarget(s.type, s.target) === "/"
+                            ? "Matches every page, so this step is reached by any pageview."
+                            : (
+                              <>
+                                Matches <span className="font-mono text-zinc-400">{normalizeTarget(s.type, s.target)}</span> and
+                                every page that starts with it (for example{" "}
+                                <span className="font-mono text-zinc-400">{normalizeTarget(s.type, s.target).replace(/\/$/, "")}/…</span>).
+                              </>
+                            )}
+                        </p>
+                      )}
                       {error && <p className="text-xs text-[#e5484d]">{error}</p>}
                     </div>
                   </li>
@@ -820,14 +873,14 @@ function CreateFunnelDialog({
 
           {/* Plain-language summary */}
           <p className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-xs leading-relaxed text-zinc-500">
-            Counts visitors who{" "}
+            Counts sessions that{" "}
             {steps
               .filter((s) => s.target.trim())
               .map((s, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && " then "}
                   <span className="font-mono text-zinc-300">
-                    {s.type === "pageview" ? "view " : "trigger "}
+                    {s.type === "pageview" ? "view a page starting with " : "trigger "}
                     {normalizeTarget(s.type, s.target)}
                   </span>
                 </React.Fragment>

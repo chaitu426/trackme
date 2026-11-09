@@ -255,7 +255,10 @@ export async function TopSources(props: SectionProps) {
 }
 
 export async function TopPages(props: SectionProps) {
-  const topPages = await cachedBreakdown(requests(props).current, "path");
+  const r = requests(props);
+  const [topPages, totals] = await Promise.all([cachedBreakdown(r.current, "path"), cachedOverview(r.current)]);
+  // Rows are ranked by pageviews, so their share is a share of pageviews (the breakdown's own percentage is of visitors).
+  const totalPageviews = Math.max(totals.pageviews, 1);
   return (
         <Card className="reveal">
           <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
@@ -270,7 +273,7 @@ export async function TopPages(props: SectionProps) {
               items={topPages.items.map((item) => ({
                 name: item.name,
                 value: item.pageviews,
-                percentage: item.percentage,
+                percentage: Math.min(100, (item.pageviews / totalPageviews) * 100),
               }))}
               empty="No pageviews recorded in this range yet."
               valueFormatter={formatNumber}

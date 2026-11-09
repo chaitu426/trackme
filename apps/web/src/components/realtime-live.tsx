@@ -6,13 +6,29 @@ import { useEffect, useRef, useState } from "react";
 import { Radio } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RankingList } from "@/components/ui/ranking-list";
-import { formatNumber } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { formatNumber, formatRelativeTime } from "@/lib/format";
 import type { RealtimeSnapshot } from "@/lib/realtime";
+
+export type RealtimeEvent = {
+  eventId: string;
+  type: string;
+  eventName: string;
+  path: string;
+  country: string;
+  browser: string;
+  os: string;
+  occurredAt: string;
+};
 
 type Props = {
   siteId: string;
   initial: RealtimeSnapshot;
+  initialEvents: RealtimeEvent[];
 };
+
+/** Fewest milliseconds between two refetches of the event tail, however fast snapshots arrive. */
+const EVENTS_MIN_INTERVAL_MS = 3_000;
 
 type VisitorTrend =
   | { direction: "up" | "down"; percent: number }
@@ -23,14 +39,41 @@ function formatTrendPercent(percent: number): string {
   return percent >= 10 ? percent.toFixed(0) : percent.toFixed(1);
 }
 
-export function RealtimeLive({ siteId, initial }: Props) {
+export function RealtimeLive({ siteId, initial, initialEvents }: Props) {
   const [snapshot, setSnapshot] = useState<RealtimeSnapshot>(initial);
+  const [events, setEvents] = useState<RealtimeEvent[]>(initialEvents);
+  const [, setTick] = useState(0);
   const [connected, setConnected] = useState(false);
   const [visitorTrend, setVisitorTrend] = useState<VisitorTrend | null>(null);
   const previousVisitors = useRef(initial.activeVisitors);
 
   useEffect(() => {
     const source = new EventSource(`/api/v1/sites/${siteId}/realtime/stream`);
+    let lastFetch = 0;
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    let inflight: AbortController | null = null;
+
+    // The stream only carries visitor counts, so the event tail is refetched when it changes,
+    // at most once per EVENTS_MIN_INTERVAL_MS.
+    const loadEvents = async () => {
+      pending = null;
+      lastFetch = Date.now();
+      inflight?.abort();
+      inflight = new AbortController();
+      try {
+        const res = await fetch(`/api/v1/sites/${siteId}/realtime/events`, { signal: inflight.signal });
+        if (!res.ok) return;
+        const body = (await res.json()) as { events?: RealtimeEvent[] };
+        if (body.events) setEvents(body.events);
+      } catch {
+        // keep the previous tail; the next snapshot retries
+      }
+    };
+    const scheduleEvents = () => {
+      if (pending) return;
+      const wait = Math.max(0, lastFetch + EVENTS_MIN_INTERVAL_MS - Date.now());
+      pending = setTimeout(() => void loadEvents(), wait);
+    };
 
     const onSnapshot = (event: MessageEvent<string>) => {
       try {
@@ -50,6 +93,7 @@ export function RealtimeLive({ siteId, initial }: Props) {
         }
         setSnapshot(data);
         setConnected(true);
+        scheduleEvents();
       } catch {
         // ignore malformed frames
       }
@@ -59,10 +103,18 @@ export function RealtimeLive({ siteId, initial }: Props) {
     source.onerror = () => {
       setConnected(false);
     };
+    // Re-render every 10s so "12s ago" labels keep counting between snapshots.
+    const ticker = setInterval(() => setTick((n) => n + 1), 10_000);
+    // A returning visitor's pageview does not change the visitor counts, so also refresh on a timer.
+    const poll = setInterval(scheduleEvents, 15_000);
 
     return () => {
       source.removeEventListener("snapshot", onSnapshot as EventListener);
       source.close();
+      clearInterval(ticker);
+      clearInterval(poll);
+      if (pending) clearTimeout(pending);
+      inflight?.abort();
     };
   }, [siteId]);
 
@@ -117,10 +169,10 @@ export function RealtimeLive({ siteId, initial }: Props) {
 
           <div className="relative flex items-center justify-between rounded-lg border border-white/[0.08] bg-sidebar px-3 py-2 text-xs text-zinc-400">
             <span className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a]" />
+              <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-[#4cc38a]" : "bg-zinc-500"}`} />
               Event stream
             </span>
-            <span className="font-mono text-xs text-zinc-300">active</span>
+            <span className="font-mono text-xs text-zinc-300">{connected ? "connected" : "reconnecting…"}</span>
           </div>
         </Card>
 
@@ -149,6 +201,43 @@ export function RealtimeLive({ siteId, initial }: Props) {
           </div>
         </Card>
       </div>
+
+      <Card className="mt-4">
+        <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
+          <div>
+            <CardTitle>Event Stream Log</CardTitle>
+            <CardDescription>Newest events first · updates as visitors arrive</CardDescription>
+          </div>
+          <span className="font-mono text-xs font-medium text-zinc-500">Last {events.length || 20}</span>
+        </CardHeader>
+        <div className="space-y-1 pt-2 font-mono text-xs">
+          {events.length === 0 ? (
+            <p className="py-8 text-center font-sans text-xs text-zinc-500">
+              No events yet. They appear here within seconds of a visit.
+            </p>
+          ) : (
+            events.map((e) => (
+              <div
+                key={e.eventId}
+                className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 transition hover:bg-white/[0.04]"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="w-14 shrink-0 text-zinc-500">{formatRelativeTime(e.occurredAt)}</span>
+                  <Badge variant={e.type === "custom" ? "outline" : "default"} className="shrink-0 text-xs">
+                    {e.type === "custom" ? `custom:${e.eventName}` : e.type}
+                  </Badge>
+                  <span className="min-w-0 truncate text-zinc-200">{e.path}</span>
+                </div>
+                <div className="hidden shrink-0 items-center gap-2 text-xs text-zinc-500 sm:flex">
+                  <span className="rounded bg-white/[0.04] px-2 py-0.5 font-medium text-zinc-400">{e.country || "??"}</span>
+                  <span>·</span>
+                  <span>{[e.browser, e.os].filter(Boolean).join(" / ") || "Unknown"}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
     </>
   );
 }

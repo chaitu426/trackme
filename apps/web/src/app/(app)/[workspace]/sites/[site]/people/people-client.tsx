@@ -43,7 +43,7 @@ export interface UserProfileItem {
 interface PeopleClientProps {
   site: { id: string; domain: string };
   initialProfiles: UserProfileItem[];
-  stats: { total: number; active7d: number };
+  stats: { total: number; active7d: number; avgEvents: number };
 }
 
 const IDENTIFY_SNIPPET = `// In your frontend code once the user logs in:
@@ -291,8 +291,6 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
     setTimeout(() => setCopiedSnippet(false), 2000);
   }
 
-  const avgEvents =
-    profiles.length > 0 ? Math.round(profiles.reduce((acc, p) => acc + (p.totalEvents || 1), 0) / profiles.length) : 0;
   const searching = search.trim().length > 0;
 
   return (
@@ -323,8 +321,8 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
         />
         <StatsCard
           title="Avg events per user"
-          value={stats.total > 0 ? avgEvents.toLocaleString() : "–"}
-          subtitle="Lifetime events per profile"
+          value={stats.total > 0 ? stats.avgEvents.toLocaleString() : "–"}
+          subtitle="Lifetime average across all identified users"
         />
       </div>
 
@@ -368,7 +366,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
             type="button"
             onClick={() => setBuilderOpen(true)}
             disabled={segmentsStatus === "unavailable"}
-            title={segmentsStatus === "unavailable" ? "Saved segments need a one-time database update" : undefined}
+            title={segmentsStatus === "unavailable" ? "Saved segments are unavailable right now" : undefined}
             className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.08] px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
@@ -378,8 +376,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
 
         {segmentsStatus === "unavailable" && (
           <p className="text-xs text-zinc-600">
-            Saved segments are not set up for this database yet. Run{" "}
-            <code className="font-mono text-zinc-400">node packages/db/apply-segments.mjs</code> once.
+            Saved segments are unavailable right now. Everything else on this page still works; try again shortly or contact your administrator.
           </p>
         )}
 

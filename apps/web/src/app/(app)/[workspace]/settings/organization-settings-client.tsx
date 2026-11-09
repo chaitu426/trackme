@@ -204,7 +204,7 @@ export function OrganizationSettingsClient({
   return (
     <div className="w-full space-y-8 animate-in fade-in duration-300">
       <PageHeader title="Organization & Team" art="pulse">
-        Manage the profile, team members, access roles and invitations for {workspace.name}.
+        Manage the team, access roles, invitations, API keys and usage for {workspace.name}.
       </PageHeader>
 
       {actionError && (

@@ -32,6 +32,7 @@
   },
   "globalEnv": [
     "NODE_ENV",
+    "FEATURE_FLAGS",
     "PORT",
     "DATABASE_URL",
     "CLICKHOUSE_URL",

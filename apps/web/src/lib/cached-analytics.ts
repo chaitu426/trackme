@@ -5,6 +5,8 @@ import {
   getTimeSeries,
   getTopJourneys,
   getWebVitalsSummary,
+  getPageEngagement,
+  getWebVitalsByPage,
   getJourneyFlowRows,
   getJourneyRoutes,
   getJourneySegmentRows,
@@ -68,3 +70,9 @@ export const cachedJourneySegments = (request: MetricQueryRequest, segment: Jour
 /** The same flow, trimmed for the Overview: four steps, the top three pages in each. */
 export const cachedJourneyGraphCompact = (request: MetricQueryRequest) =>
   through("jflow", request, "v1:compact", async (query) => buildFlowGraph(await getJourneyFlowRows(query), 3, 4));
+
+export const cachedPageEngagement = (request: MetricQueryRequest, limit: number) =>
+  through("pageeng", request, `v1:${limit}`, (query) => getPageEngagement(query, limit));
+
+export const cachedVitalsByPage = (request: MetricQueryRequest, limit: number) =>
+  through("vitalspage", request, `v1:${limit}`, (query) => getWebVitalsByPage(query, limit));

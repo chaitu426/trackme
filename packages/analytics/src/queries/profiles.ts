@@ -95,19 +95,37 @@ async function run<T = RawRow>(client: Client, query: string, params: Params): P
 
 /** Newest activity first. Asks for one extra row so the caller can tell whether another page exists. */
 export async function listProfiles(
-  q: { workspaceId: string; siteId: string; search?: string; limit: number; offset: number },
+  q: {
+    workspaceId: string;
+    siteId: string;
+    search?: string;
+    /** People to include even when the search text is not in their event-derived traits (matched elsewhere, e.g. server-supplied names). */
+    alsoIds?: string[];
+    limit: number;
+    offset: number;
+  },
   client: Client = getDashboardClickHouseClient()
 ): Promise<{ profiles: ProfileRow[]; hasMore: boolean }> {
   const search = q.search?.trim();
   const having = search
     ? `positionCaseInsensitiveUTF8(distinct_id, {q:String}) > 0
        OR positionCaseInsensitiveUTF8(JSONExtractString(tr, 'name'), {q:String}) > 0
-       OR positionCaseInsensitiveUTF8(JSONExtractString(tr, 'email'), {q:String}) > 0`
+       OR positionCaseInsensitiveUTF8(JSONExtractString(tr, 'email'), {q:String}) > 0${
+         q.alsoIds && q.alsoIds.length > 0 ? `
+       OR distinct_id IN {alsoIds:Array(String)}` : ""
+       }`
     : "";
   const rows = await run(
     client,
     `SELECT ${OUT} FROM (${grouped("", having)}) ORDER BY ls DESC LIMIT {limit:UInt32} OFFSET {offset:UInt32}`,
-    { workspaceId: q.workspaceId, siteId: q.siteId, q: search ?? "", limit: q.limit + 1, offset: q.offset }
+    {
+      workspaceId: q.workspaceId,
+      siteId: q.siteId,
+      q: search ?? "",
+      ...(search && q.alsoIds && q.alsoIds.length > 0 ? { alsoIds: q.alsoIds.slice(0, 500) } : {}),
+      limit: q.limit + 1,
+      offset: q.offset,
+    }
   );
   return { profiles: rows.slice(0, q.limit).map(toProfile), hasMore: rows.length > q.limit };
 }
@@ -116,13 +134,14 @@ export async function profileStats(
   workspaceId: string,
   siteId: string,
   client: Client = getDashboardClickHouseClient()
-): Promise<{ total: number; active7d: number }> {
-  const rows = await run<{ total: string | number; active7d: string | number }>(
+): Promise<{ total: number; active7d: number; avgEvents: number }> {
+  const rows = await run<{ total: string | number; active7d: string | number; avg_events: string | number | null }>(
     client,
-    `SELECT count() AS total, countIf(ls >= now() - toIntervalDay(7)) AS active7d FROM (${grouped()})`,
+    `SELECT count() AS total, countIf(ls >= now() - toIntervalDay(7)) AS active7d, avg(ev) AS avg_events FROM (${grouped()})`,
     { workspaceId, siteId }
   );
-  return { total: Number(rows[0]?.total ?? 0), active7d: Number(rows[0]?.active7d ?? 0) };
+  const avg = Number(rows[0]?.avg_events ?? 0);
+  return { total: Number(rows[0]?.total ?? 0), active7d: Number(rows[0]?.active7d ?? 0), avgEvents: Number.isFinite(avg) ? Math.round(avg) : 0 };
 }
 
 export async function getProfile(

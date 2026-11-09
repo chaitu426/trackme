@@ -133,7 +133,11 @@ export async function ShareStrip(props: ShareProps) {
 }
 
 export async function ShareTopPages(props: ShareProps) {
-  const pages = await cachedBreakdown(requests(props).current, "path");
+  const [pages, totals] = await Promise.all([
+    cachedBreakdown(requests(props).current, "path"),
+    cachedOverview(requests(props).current),
+  ]);
+  const totalPageviews = Math.max(totals.pageviews, 1);
   return (
     <Card className="reveal">
       <CardHeader className="flex-row items-start justify-between gap-3">
@@ -144,7 +148,11 @@ export async function ShareTopPages(props: ShareProps) {
         <span className="font-mono text-xs text-zinc-500">Pageviews · share</span>
       </CardHeader>
       <RankingList
-        items={pages.items.map((item) => ({ name: item.name, value: item.pageviews, percentage: item.percentage }))}
+        items={pages.items.map((item) => ({
+          name: item.name,
+          value: item.pageviews,
+          percentage: Math.min(100, (item.pageviews / totalPageviews) * 100),
+        }))}
         empty="No pageviews in this range yet."
         valueFormatter={formatNumber}
         pageSize={8}

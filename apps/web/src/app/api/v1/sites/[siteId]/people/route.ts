@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
 import { db, siteUserProfiles, sites, eq, and, sql } from "@trackme/db";
 import { listProfiles, profileStats } from "@trackme/analytics";
-import { overlayServerProfiles } from "@/lib/profiles";
+import { findServerProfileIds, overlayServerProfiles } from "@/lib/profiles";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { timedRoute } from "@/lib/metrics-registry";
@@ -41,8 +41,9 @@ async function handleGet(
     const offset = Math.max(0, Number(request.nextUrl.searchParams.get("offset") || 0) || 0);
 
     // People are derived from the event stream in ClickHouse; a backend's POST /people adds name/email on top.
+    const alsoIds = search ? await findServerProfileIds(siteId, search) : [];
     const [page, stats] = await Promise.all([
-      listProfiles({ workspaceId: siteRow.workspaceId, siteId, search, limit, offset }),
+      listProfiles({ workspaceId: siteRow.workspaceId, siteId, search, alsoIds, limit, offset }),
       profileStats(siteRow.workspaceId, siteId),
     ]);
     const profiles = (await overlayServerProfiles(siteId, page.profiles)).map((p) => ({ ...p, anonymousId: null }));
