@@ -71,10 +71,73 @@ export const ReleaseSchema = z
   .max(64)
   .regex(/^[A-Za-z0-9][A-Za-z0-9._+@/-]*$/, "release may use letters, digits and . _ + @ / -");
 
+export const ERROR_LEVELS = ["fatal", "error", "warning", "info"] as const;
+export const BREADCRUMB_KINDS = ["navigation", "click", "fetch", "log"] as const;
+
+/** Size caps for the error payload. The Go edge enforces the same numbers (internal/validate). */
+export const ERROR_LIMITS = {
+  type: 128,
+  message: 1024,
+  fingerprint: 128,
+  frames: 50,
+  frameFn: 200,
+  frameFile: 512,
+  breadcrumbs: 20,
+  breadcrumbText: 200,
+  tags: 10,
+  tagKey: 32,
+  tagValue: 200,
+} as const;
+
+export const ErrorFrameSchema = z.object({
+  fn: z.string().max(ERROR_LIMITS.frameFn).optional(),
+  file: z.string().min(1).max(ERROR_LIMITS.frameFile),
+  line: z.number().int().nonnegative().optional(),
+  col: z.number().int().nonnegative().optional(),
+  inApp: z.boolean().optional(),
+});
+
+export const BreadcrumbSchema = z.object({
+  /** Epoch milliseconds. */
+  ts: z.number().int().nonnegative(),
+  k: z.enum(BREADCRUMB_KINDS),
+  /** Already scrubbed by the SDK: `GET /api/orders 500 120ms`, `click button#pay "Pay now"`. */
+  m: z.string().max(ERROR_LIMITS.breadcrumbText),
+});
+
 /**
- * Base versioned tracker event envelope (Schema Version 1)
+ * An error report. Lives beside `properties` rather than inside it because properties are scalar-only
+ * with 256-character values, which a stack trace and breadcrumbs do not fit.
  */
-export const TrackerEventSchema = z.object({
+export const ErrorPayloadSchema = z.object({
+  type: z.string().min(1).max(ERROR_LIMITS.type),
+  message: z.string().max(ERROR_LIMITS.message),
+  level: z.enum(ERROR_LEVELS).optional(),
+  /** Custom grouping key; overrides the computed fingerprint. */
+  fingerprint: z.string().min(1).max(ERROR_LIMITS.fingerprint).optional(),
+  frames: z.array(ErrorFrameSchema).max(ERROR_LIMITS.frames).optional(),
+  breadcrumbs: z.array(BreadcrumbSchema).max(ERROR_LIMITS.breadcrumbs).optional(),
+  tags: z
+    .record(z.string().min(1).max(ERROR_LIMITS.tagKey).regex(/^[a-zA-Z0-9_.-]+$/), z.string().max(ERROR_LIMITS.tagValue))
+    .refine((tags) => Object.keys(tags).length <= ERROR_LIMITS.tags, { message: "At most 10 tags" })
+    .optional(),
+});
+export type ErrorPayload = z.infer<typeof ErrorPayloadSchema>;
+
+/** An `error` event carries an `error` payload, and no other kind does. */
+export function checkErrorKind(event: { type: string; error?: unknown }, ctx: z.RefinementCtx): void {
+  if (event.type === "error" && event.error === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["error"], message: "An error event needs an error payload" });
+  } else if (event.type !== "error" && event.error !== undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["error"], message: "Only error events carry an error payload" });
+  }
+}
+
+/**
+ * Base versioned tracker event envelope (Schema Version 1), before cross-field rules.
+ * Use TrackerEventSchema; this exists so EnrichedEventSchema can extend it.
+ */
+const TrackerEventObject = z.object({
   schemaVersion: z.literal(1),
   eventId: z.string().uuid("eventId must be a valid UUIDv4"),
   type: z.enum(EVENT_TYPES),
@@ -94,7 +157,10 @@ export const TrackerEventSchema = z.object({
   campaign: CampaignSchema.optional(),
   properties: EventPropertiesSchema.optional(),
   webVital: WebVitalMetricSchema.optional(),
+  error: ErrorPayloadSchema.optional(),
 });
+
+export const TrackerEventSchema = TrackerEventObject.superRefine(checkErrorKind);
 
 export type TrackerEvent = z.infer<typeof TrackerEventSchema>;
 
@@ -113,7 +179,7 @@ export type IngestionBatchRequest = z.infer<typeof IngestionBatchRequestSchema>;
 /**
  * Enriched event envelope ready for ClickHouse insertion
  */
-export const EnrichedEventSchema = TrackerEventSchema.extend({
+export const EnrichedEventSchema = TrackerEventObject.extend({
   workspaceId: z.string().uuid(),
   siteId: z.string().uuid(),
   receivedAt: z.string().datetime(),
@@ -124,7 +190,7 @@ export const EnrichedEventSchema = TrackerEventSchema.extend({
   device: z.enum(["desktop", "mobile", "tablet", "bot", "unknown"]),
   isBot: z.boolean().default(false),
   botStatus: z.enum(["human", "known_bot", "heuristic_bot", "rate_limited"]).default("human"),
-});
+}).superRefine(checkErrorKind);
 
 export type EnrichedEvent = z.infer<typeof EnrichedEventSchema>;
 

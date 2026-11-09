@@ -26,6 +26,7 @@ type TrackerEvent struct {
 	Properties       map[string]interface{} `json:"properties,omitempty"`
 	Campaign         map[string]string      `json:"campaign,omitempty"`
 	WebVital         map[string]interface{} `json:"webVital,omitempty"`
+	Error            map[string]interface{} `json:"error,omitempty"`
 }
 
 type EnrichedEvent struct {
