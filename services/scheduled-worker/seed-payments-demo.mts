@@ -16,6 +16,8 @@
 import { env } from "@trackme/config";
 import { db, eq, sites } from "@trackme/db";
 import { getClickHouseClient } from "@trackme/analytics";
+import { classifyPending } from "./src/jobs/payment-failure-classifier.js";
+import { createClickHouseClassifierDeps } from "./src/jobs/payment-failure-classifier.db.js";
 
 const args = process.argv.slice(2);
 const SITE_KEY = args.find((a) => a.startsWith("--site-key="))?.split("=")[1] ?? "site_pub_JI7qJQ5_E0WXH5SRwqJFLx59";
@@ -76,6 +78,7 @@ async function remove(siteId: string): Promise<void> {
   const opts = { clickhouse_settings: { mutations_sync: 2, allow_nondeterministic_mutations: 1 } };
   await ch.command({ query: `ALTER TABLE ${DB}.payment_events DELETE WHERE site_id = '${siteId}' AND startsWith(gateway_event_id, 'demo_')`, ...opts });
   await ch.command({ query: `ALTER TABLE ${DB}.order_session DELETE WHERE site_id = '${siteId}' AND startsWith(order_id, 'order_demo_')`, ...opts });
+  await ch.command({ query: `ALTER TABLE ${DB}.payment_failure_class DELETE WHERE site_id = '${siteId}' AND startsWith(payment_id, 'pay_demo_')`, ...opts });
   console.log("Demo payments removed.");
 }
 
@@ -183,6 +186,15 @@ async function main(): Promise<void> {
   const captured = rows.filter((r) => r.status === "captured").length;
   const failed = rows.filter((r) => r.status === "failed").length;
   console.log(`Seeded ${orders.length} orders: ${captured} captured, ${failed} failed, ${rows.filter((r) => r.status === "refunded").length} refunded, ${rows.filter((r) => r.status === "disputed").length} disputed.`);
+  // The classifier normally runs every minute; run it now so the Failure Doctor has data straight away.
+  const deps = createClickHouseClassifierDeps();
+  let classified = 0;
+  for (let i = 0; i < 20; i += 1) {
+    const done = await classifyPending(deps, { lookbackHours: 24 * 36, limit: 500 });
+    classified += done;
+    if (done === 0) break;
+  }
+  console.log(`Classified ${classified} failed payments.`);
   console.log("Remove with: node --import tsx seed-payments-demo.mts --remove");
 }
 

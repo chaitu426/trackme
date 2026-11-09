@@ -43,7 +43,7 @@ function tickIndexes(n: number, max: number): number[] {
  * same size at any width; the value axis sits in its own gutter. The line draws once. The accent is the current period; the
  * comparison and the grid are neutral steps.
  */
-export function RevenueChart({ points, previous, currency }: { points: RevenuePoint[]; previous: RevenuePoint[]; currency: string }) {
+export function RevenueChart({ points, previous, currency, label = "Revenue per day", unit = "payment" }: { points: RevenuePoint[]; previous: RevenuePoint[]; currency: string; /** What the line is, for screen readers. */ label?: string; /** What one count is called in the tooltip. */ unit?: string }) {
   const [wrap, W] = useWidth<HTMLDivElement>();
   const [hover, setHover] = React.useState<number | null>(null);
   const ref = React.useRef<SVGSVGElement>(null);
@@ -92,7 +92,7 @@ export function RevenueChart({ points, previous, currency }: { points: RevenuePo
           viewBox={`0 0 ${SW} ${H}`}
           role="img"
           tabIndex={0}
-          aria-label={`Revenue per day in ${currency}. Use the arrow keys to move between days.`}
+          aria-label={`${label} in ${currency}. Use the arrow keys to move between days.`}
           className="block touch-pan-y outline-none focus-visible:ring-1 focus-visible:ring-white/30"
           onPointerMove={onMove}
           onPointerLeave={() => setHover(null)}
@@ -147,7 +147,7 @@ export function RevenueChart({ points, previous, currency }: { points: RevenuePo
             <p className="font-mono text-zinc-400">{hp.day}</p>
             <p className="mt-0.5 font-mono text-sm tabular-nums text-zinc-50">{formatMoney(hp.revenueMinor, currency)}</p>
             <p className="text-zinc-500">
-              {hp.paid} payment{hp.paid === 1 ? "" : "s"}
+              {hp.paid} {unit}{hp.paid === 1 ? "" : "s"}
             </p>
             {hv && (
               <p className="mt-1 flex justify-between border-t border-white/[0.06] pt-1 text-zinc-500">
@@ -164,12 +164,14 @@ export function RevenueChart({ points, previous, currency }: { points: RevenuePo
           <span className="h-0.5 w-4 rounded bg-zinc-200" aria-hidden="true" />
           This period
         </span>
-        <span className="inline-flex items-center gap-2">
-          <svg width="16" height="2" aria-hidden="true">
-            <line x1="0" x2="16" y1="1" y2="1" stroke="#6e6e74" strokeWidth="1.5" strokeDasharray="3 3" />
-          </svg>
-          Previous period
-        </span>
+        {previous.length > 0 && (
+          <span className="inline-flex items-center gap-2">
+            <svg width="16" height="2" aria-hidden="true">
+              <line x1="0" x2="16" y1="1" y2="1" stroke="#6e6e74" strokeWidth="1.5" strokeDasharray="3 3" />
+            </svg>
+            Previous period
+          </span>
+        )}
       </div>
     </div>
   );
