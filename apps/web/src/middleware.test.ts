@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { isPublicPath } from "./middleware.js";
+import { bodyLimitFor, isPublicPath, MAX_API_BODY_BYTES } from "./middleware.js";
 
 test("public pages remain reachable without a session", () => {
   assert.equal(isPublicPath("/"), true);
@@ -21,6 +21,7 @@ test("public API endpoints are explicitly allowlisted", () => {
   assert.equal(isPublicPath("/api/v1/invites/accept"), true);
   assert.equal(isPublicPath("/api/v1/invites/accept/preview"), true);
   assert.equal(isPublicPath("/api/v1/deploys"), true);
+  assert.equal(isPublicPath("/api/v1/sourcemaps"), true);
 });
 
 test("non-public API routes are denied by default", () => {
@@ -28,4 +29,10 @@ test("non-public API routes are denied by default", () => {
   assert.equal(isPublicPath("/api/v1/workspaces"), false);
   assert.equal(isPublicPath("/api/v1/sites/abc/settings"), false);
   assert.equal(isPublicPath("/dashboard"), false);
+});
+
+test("only the source map upload may exceed the normal body limit", () => {
+  assert.ok(bodyLimitFor("/api/v1/sourcemaps") > MAX_API_BODY_BYTES);
+  assert.equal(bodyLimitFor("/api/v1/deploys"), MAX_API_BODY_BYTES);
+  assert.equal(bodyLimitFor("/api/v1/sourcemaps/extra"), MAX_API_BODY_BYTES);
 });

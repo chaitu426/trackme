@@ -209,7 +209,7 @@ export function ApiKeysManager({
           onClick={() => void generateKey("deploy")}
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Generate Deploy Key (CI, can only report deploys)</span>
+          <span>Generate Deploy Key (CI: report deploys, upload source maps)</span>
         </Button>
       </div>
     </Card>

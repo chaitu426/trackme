@@ -71,3 +71,6 @@ infra/aiven/certs/
 
 .next-preview/
 apps/web/public/tracker.*.js
+
+# Local object store (source maps) when no bucket is configured
+.data/

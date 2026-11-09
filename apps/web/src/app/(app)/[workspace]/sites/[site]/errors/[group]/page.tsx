@@ -20,6 +20,7 @@ import {
   cachedTags,
 } from "@/lib/errors-view";
 import { fillDays, rangeDates } from "@/lib/errors-url";
+import { symbolicate } from "@/lib/sourcemaps";
 import { parseRangeKey } from "@/lib/date-range";
 import { formatNumber, formatRelativeTime } from "@/lib/format";
 import { ErrorStatusChip, LevelBadge } from "../badges";
@@ -84,7 +85,12 @@ export default async function ErrorIssuePage({
   const status = statuses.get(groupId);
   const base = `/${workspace.slug}/sites/${site.domain}`;
   const selected = occurrences.find((o) => o.eventId === occ) ?? occurrences[0];
-  const frames = selected ? parseJson<Frame[]>(selected.stack, []) : [];
+  const rawFrames = selected ? parseJson<Frame[]>(selected.stack, []) : [];
+  // Minified frames become readable when a source map was uploaded for this release. Without one, the raw trace shows.
+  const { frames, mapped } =
+    selected && rawFrames.length > 0
+      ? await symbolicate(site.id, selected.release, rawFrames).catch(() => ({ frames: rawFrames, mapped: 0 }))
+      : { frames: rawFrames, mapped: 0 };
   const crumbs = selected ? parseJson<Crumb[]>(selected.breadcrumbs, []) : [];
   const errorTime = selected ? Date.parse(selected.occurredAt) : NaN;
   const users = [...new Set(occurrences.map((o) => o.userId).filter(Boolean))];
@@ -158,13 +164,21 @@ export default async function ErrorIssuePage({
         <div className="space-y-4">
           <Card className="overflow-hidden px-0 pb-0">
             <CardHeader className="border-b border-white/[0.06] px-5 pb-3">
-              <CardTitle>Stack trace</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Stack trace
+                {mapped > 0 && <span className="rounded border border-border px-1.5 py-px text-[11px] font-normal text-zinc-300">Source-mapped</span>}
+              </CardTitle>
               <CardDescription>
                 {selected
                   ? `${formatRelativeTime(selected.occurredAt)} · ${selected.release || "no release"} · ${selected.browser || "unknown browser"} · ${selected.path}`
                   : "No detailed occurrence stored yet. Counts are exact; detail is kept for the first 5 events of each day."}
               </CardDescription>
             </CardHeader>
+            {mapped === 0 && frames.length > 0 && selected?.release && (
+              <p className="border-b border-white/[0.04] px-5 py-2 text-xs text-zinc-500">
+                Names look minified? Upload a source map for <span className="font-mono">{selected.release}</span> to read the original code.
+              </p>
+            )}
             {frames.length === 0 ? (
               <p className="px-5 py-8 text-center text-xs text-zinc-500">{selected ? "This report had no stack trace." : "Waiting for a detailed occurrence."}</p>
             ) : (

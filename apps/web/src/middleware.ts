@@ -12,6 +12,8 @@ const PUBLIC_API_PREFIXES = [
   "/api/v1/invites/accept",
   // A CI job reports a deploy with an API key (Authorization: Bearer); the route checks the key itself.
   "/api/v1/deploys",
+  // Same CI key as deploys (write:deploys); the route checks it.
+  "/api/v1/sourcemaps",
   // Browsers post CSP violation reports without credentials.
   "/api/security/csp-report",
   // Authenticates itself with METRICS_TOKEN (404 when unset); Prometheus has no session.
@@ -44,11 +46,17 @@ export function isPublicPath(pathname: string): boolean {
 
 /** No API route takes more than a form-sized JSON body. Rejecting larger ones before any parsing bounds the memory a request can make validation use. */
 export const MAX_API_BODY_BYTES = 1_000_000;
+/** Source maps are the one upload that is legitimately large. The route checks the real size again after reading. */
+export const MAX_SOURCEMAP_BODY_BYTES = 12 * 1024 * 1024;
+
+export function bodyLimitFor(pathname: string): number {
+  return pathname === "/api/v1/sourcemaps" ? MAX_SOURCEMAP_BODY_BYTES : MAX_API_BODY_BYTES;
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/api/") && Number(request.headers.get("content-length") ?? 0) > MAX_API_BODY_BYTES) {
+  if (pathname.startsWith("/api/") && Number(request.headers.get("content-length") ?? 0) > bodyLimitFor(pathname)) {
     return NextResponse.json({ error: "PAYLOAD_TOO_LARGE", message: "Request body is too large." }, { status: 413 });
   }
 

@@ -8,6 +8,7 @@ import { reclaimDeadEdgeQuota } from "./jobs/quota-reclaim.js";
 import { runRetentionCleanup } from "./jobs/retention.js";
 import { runReconciliation } from "./jobs/reconciliation.js";
 import { runErrorRegressions } from "./jobs/error-regressions.js";
+import { runSourceMapRetention } from "./jobs/sourcemap-retention.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
 import { withDistributedLock } from "./lock.js";
 
@@ -109,6 +110,21 @@ cron.schedule("30 3 * * *", async () => {
     );
   } catch (err) {
     console.error("Failed running retention cleanup:", err);
+  }
+});
+
+// 4b. Source map retention: 03:50 UTC daily. Deletes maps older than 90 days from the object store.
+cron.schedule("50 3 * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:sourcemap_retention",
+      600,
+      "Source Map Retention",
+      instrumentJob("sourcemap_retention", () => runSourceMapRetention().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed running source map retention:", err);
   }
 });
 
