@@ -265,7 +265,7 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
 
           <AnimatePresence initial={false}>
             {invites.length > 0 && (
-              <motion.div key="pending" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.24, ease: EASE }} style={{ overflow: "hidden" }}>
+              <motion.div key="pending" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: EASE }}>
                 <Card className="px-0 pb-0">
                   <CardHeader className="border-b border-white/[0.06] px-5 pb-3">
                     <CardTitle>

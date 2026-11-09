@@ -26,13 +26,18 @@ export function RevenueChart({ points, previous, currency }: { points: RevenuePo
   const n = points.length;
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
-  const max = niceMax(Math.max(...points.map((p) => p.revenueMinor), ...previous.map((p) => p.revenueMinor), 1));
+  const max = React.useMemo(() => niceMax(Math.max(...points.map((p) => p.revenueMinor), ...previous.map((p) => p.revenueMinor), 1)), [points, previous]);
 
   const x = (i: number) => PAD.left + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
   const y = (v: number) => PAD.top + innerH - (v / max) * innerH;
-  const line = smoothPath(points.map((p, i) => ({ x: x(i), y: y(p.revenueMinor) })));
-  const prevLine = smoothPath(previous.slice(0, n).map((p, i) => ({ x: x(i), y: y(p.revenueMinor) })));
-  const area = n > 1 ? `${line}L${x(n - 1)},${PAD.top + innerH}L${x(0)},${PAD.top + innerH}Z` : "";
+  // The paths depend only on the data, so hovering (which re-renders on every new day) does not recompute them.
+  const { line, prevLine, area } = React.useMemo(() => {
+    const px = (i: number) => PAD.left + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+    const py = (v: number) => PAD.top + innerH - (v / max) * innerH;
+    const l = smoothPath(points.map((p, i) => ({ x: px(i), y: py(p.revenueMinor) })));
+    const pl = smoothPath(previous.slice(0, n).map((p, i) => ({ x: px(i), y: py(p.revenueMinor) })));
+    return { line: l, prevLine: pl, area: n > 1 ? `${l}L${px(n - 1)},${PAD.top + innerH}L${px(0)},${PAD.top + innerH}Z` : "" };
+  }, [points, previous, n, innerW, innerH, max]);
 
   function onMove(e: React.PointerEvent<SVGSVGElement>) {
     const box = ref.current?.getBoundingClientRect();
@@ -57,7 +62,7 @@ export function RevenueChart({ points, previous, currency }: { points: RevenuePo
         role="img"
         tabIndex={0}
         aria-label={`Revenue per day in ${currency}. Use the arrow keys to move between days.`}
-        className="w-full touch-none outline-none focus-visible:ring-1 focus-visible:ring-white/30"
+        className="w-full touch-pan-y outline-none focus-visible:ring-1 focus-visible:ring-white/30"
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         onBlur={() => setHover(null)}
@@ -103,7 +108,7 @@ export function RevenueChart({ points, previous, currency }: { points: RevenuePo
         <div
           className="pointer-events-none absolute top-2 z-10 -translate-x-1/2 rounded-lg border border-border bg-raised px-3 py-2 text-xs shadow-float"
           style={{ left: `${tipLeft}%` }}
-          role="status"
+          aria-hidden="true"
         >
           <p className="font-mono text-zinc-400">{hp.day}</p>
           <p className="mt-0.5 font-mono text-sm tabular-nums text-zinc-50">{formatMoney(hp.revenueMinor, currency)}</p>

@@ -25,7 +25,7 @@ export function StepPanel({ stepKey, direction = 1, children, className }: { ste
         initial="enter"
         animate="center"
         exit="exit"
-        transition={{ duration: 0.22, ease: EASE }}
+        transition={{ duration: 0.16, ease: EASE }}
       >
         {children}
       </motion.div>
@@ -39,7 +39,7 @@ export function Stagger({ children, className, step = 0.05 }: { children: React.
   return (
     <div className={className}>
       {items.map((child, i) => (
-        <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, ease: EASE, delay: i * step }}>
+        <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, ease: EASE, delay: Math.min(i, 6) * step }}>
           {child}
         </motion.div>
       ))}

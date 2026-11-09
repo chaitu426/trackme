@@ -44,7 +44,7 @@ export function ConfirmAction({
   }, [armed]);
 
   return (
-    <div className={cn("flex items-center", className)}>
+    <div className={cn("relative flex items-center", className)}>
       <AnimatePresence mode="popLayout" initial={false}>
         {armed ? (
           <motion.div key="armed" className="flex items-center gap-1" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 8 }} transition={{ duration: 0.16 }}>
