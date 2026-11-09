@@ -97,6 +97,77 @@ const SCENARIOS: Scenario[] = [
       { tool: "Web analytics", knows: "Conversion moved" },
     ],
   },
+  {
+    id: "recovery",
+    question: "Did customers whose payment failed come back?",
+    tools: [
+      { table: "payment_events", rows: 2016, label: "Finding orders whose first payment failed" },
+      { table: "order_session", rows: 1310, label: "Following each order to a later payment" },
+      { table: "payment_failure_class", rows: 98, label: "Splitting by why it failed" },
+    ],
+    trail: [
+      { kind: "gateway", title: "412 orders failed their first payment", detail: "UPI expiry, bank declines, gateway timeouts" },
+      { kind: "funnel", title: "Most who retried did it within the hour", detail: "Gateway timeouts came back the most, bank declines the least" },
+      { kind: "money", title: "The rest never returned", detail: "Still unpaid after seven days" },
+    ],
+    total: 241300,
+    caption: "never came back",
+    basis: "Value of orders with no successful payment within seven days of the first failure.",
+    sql: "SELECT order_id, min(created_at) AS first_failed, maxIf(created_at, status = 'captured') AS paid_at\nFROM payment_events FINAL\nWHERE site_id = {siteId}\nGROUP BY order_id HAVING countIf(status = 'failed') > 0",
+    silos: [
+      { tool: "Payment gateway", knows: "Failed and captured payments, unlinked" },
+      { tool: "Web analytics", knows: "Sessions, not orders" },
+      { tool: "Your database", knows: "Orders, without why they failed" },
+    ],
+  },
+  {
+    id: "refunds",
+    question: "Are refunds and disputes costing us more than usual?",
+    tools: [
+      { table: "payment_events", rows: 2016, label: "Reading refunds and disputes by week" },
+      { table: "payment_events", rows: 37, label: "Reading the reasons and deadlines" },
+      { table: "events_v2", rows: 4724, label: "Matching them to releases and errors" },
+    ],
+    trail: [
+      { kind: "release", title: "Release 2.4.1 shipped", detail: "Tuesday, 11:20" },
+      { kind: "error", title: "Duplicate-charge reports followed", detail: "A second submit on a slow connection" },
+      { kind: "funnel", title: "Disputes doubled in two weeks", detail: "Most with “charged twice” as the reason" },
+      { kind: "money", title: "Refunds and chargebacks, plus fees", detail: "Three disputes close this week" },
+    ],
+    total: 118600,
+    caption: "refunded or at risk",
+    basis: "Refunded value plus open disputes, before any are won. Disputes with deadlines are listed first.",
+    sql: "SELECT reason, count() AS n, sum(amount) AS value, min(evidence_due) AS due\nFROM payment_events FINAL\nWHERE site_id = {siteId} AND status IN ('refunded','disputed')\nGROUP BY reason ORDER BY value DESC",
+    silos: [
+      { tool: "Payment gateway", knows: "Refunds and disputes, without the cause" },
+      { tool: "Error tracker", knows: "A double-submit bug, without the money" },
+      { tool: "Deploy log", knows: "A release, without the fallout" },
+    ],
+  },
+  {
+    id: "first",
+    question: "What should we fix first this week?",
+    tools: [
+      { table: "leak_sessions", rows: 624, label: "Costing every error in checkout sessions" },
+      { table: "payment_failure_class", rows: 98, label: "Costing every kind of payment failure" },
+      { table: "site_releases", rows: 2, label: "Ranking by money, then by how sure we are" },
+    ],
+    trail: [
+      { kind: "error", title: "1. TypeError on the checkout page", detail: "₹195,970 · high confidence" },
+      { kind: "gateway", title: "2. Razorpay timeouts, 14:00 to 14:40", detail: "₹176,940 · fix is a fallback gateway" },
+      { kind: "error", title: "3. Double submit on slow connections", detail: "₹62,300 · medium confidence" },
+      { kind: "money", title: "Together, the top three", detail: "Everything else costs under ₹10,000 each" },
+    ],
+    total: 435210,
+    caption: "in the top three",
+    basis: "Each cost uses its own estimate and is shown with its confidence. Ranking is by money, not by event count.",
+    sql: "SELECT cause, cost, confidence\nFROM ranked_causes\nWHERE site_id = {siteId} AND day BETWEEN {from} AND {to}\nORDER BY cost DESC LIMIT 10",
+    silos: [
+      { tool: "Error tracker", knows: "Ranks by how many times it fired" },
+      { tool: "Payment gateway", knows: "Ranks by failure count" },
+      { tool: "Your team", knows: "Guesses by who shouted loudest" },
+    ],
+  },
 ];
 
 const GLYPHS = [".", ":", "+", "#"];
