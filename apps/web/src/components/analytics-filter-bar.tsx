@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuPanel } from "@/components/ui/menu-panel";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -93,8 +94,7 @@ export function AnalyticsFilterBar({
           <ChevronDown className={`w-3 h-3 transition-transform ${countryOpen ? "rotate-180" : ""}`} />
         </button>
 
-        {countryOpen && (
-          <div className="absolute left-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card p-1 shadow-float overflow-hidden">
+        <MenuPanel open={countryOpen} className="left-0 top-full mt-2 w-56 overflow-hidden p-1">
             <DropItem
               label="All countries"
               isSelected={!country}
@@ -113,8 +113,7 @@ export function AnalyticsFilterBar({
                 />
               ))}
             </div>
-          </div>
-        )}
+        </MenuPanel>
       </div>
 
       {/* Device dropdown */}
@@ -133,8 +132,7 @@ export function AnalyticsFilterBar({
           <ChevronDown className={`w-3 h-3 transition-transform ${deviceOpen ? "rotate-180" : ""}`} />
         </button>
 
-        {deviceOpen && (
-          <div className="absolute left-0 top-full mt-2 z-50 w-44 rounded-xl border border-border bg-card p-1 shadow-float">
+        <MenuPanel open={deviceOpen} className="left-0 top-full mt-2 w-44 p-1">
             <DropItem
               label="All devices"
               isSelected={!device}
@@ -151,8 +149,7 @@ export function AnalyticsFilterBar({
                 onClick={() => { navigate(country, item); setDeviceOpen(false); }}
               />
             ))}
-          </div>
-        )}
+        </MenuPanel>
       </div>
 
       {/* Clear filters */}

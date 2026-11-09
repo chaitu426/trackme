@@ -361,7 +361,7 @@ function WhatIf({ analysis }: { analysis: FunnelAnalysisResult }) {
             className="w-full"
           >
             {transitions.map((tr, i) => (
-              <option key={tr.index} value={i} className="bg-zinc-900">
+              <option key={tr.index} value={i}>
                 {tr.from.name} → {tr.to.name} ({Math.round(tr.rate * 1000) / 10}% continue)
               </option>
             ))}

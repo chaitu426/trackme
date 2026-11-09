@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
 import { AnimatePresence } from "motion/react";
@@ -624,14 +625,10 @@ function EmptyState({ searching, onCopy, copied }: { searching: boolean; onCopy:
         </div>
         <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-black/40 text-left">
           <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-zinc-300">{IDENTIFY_SNIPPET}</pre>
-          <button
-            type="button"
-            onClick={onCopy}
-            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/[0.1] bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-300 hover:text-white"
-          >
-            {copied ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+          <Button type="button" variant="secondary" size="sm" onClick={onCopy} className="absolute right-2 top-2">
+            {copied ? <Check className="text-[#4cc38a]" /> : <Copy />}
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

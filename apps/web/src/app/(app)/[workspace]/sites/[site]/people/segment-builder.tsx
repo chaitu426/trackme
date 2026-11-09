@@ -248,12 +248,12 @@ export function SegmentBuilder({
             {definition.behavior.map((b, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.015] p-3">
                 <NativeSelect aria-label="Did or did not" value={b.op} onChange={(e) => setBehavior(i, { op: e.target.value as BehaviorCondition["op"] })} className={select}>
-                  <option value="did" className="bg-zinc-900">Did</option>
-                  <option value="did_not" className="bg-zinc-900">Never did</option>
+                  <option value="did">Did</option>
+                  <option value="did_not">Never did</option>
                 </NativeSelect>
                 <NativeSelect aria-label="Page or event" value={b.kind} onChange={(e) => setBehavior(i, { kind: e.target.value as BehaviorCondition["kind"] })} className={select}>
-                  <option value="pageview" className="bg-zinc-900">visit page</option>
-                  <option value="custom_event" className="bg-zinc-900">trigger event</option>
+                  <option value="pageview">visit page</option>
+                  <option value="custom_event">trigger event</option>
                 </NativeSelect>
                 <input
                   aria-label="Page path or event name"
@@ -265,7 +265,7 @@ export function SegmentBuilder({
                 <span className="text-xs text-zinc-500">in the last</span>
                 <NativeSelect aria-label="Time window" value={b.days} onChange={(e) => setBehavior(i, { days: Number(e.target.value) })} className={select}>
                   {[7, 30, 90, 365].map((d) => (
-                    <option key={d} value={d} className="bg-zinc-900">
+                    <option key={d} value={d}>
                       {d} days
                     </option>
                   ))}
@@ -373,7 +373,7 @@ function ConditionRow({
         className={select}
       >
         {FIELDS.map((f) => (
-          <option key={f.key} value={f.key} className="bg-zinc-900">
+          <option key={f.key} value={f.key}>
             {f.label}
           </option>
         ))}
@@ -390,13 +390,13 @@ function ConditionRow({
             className={`${input} w-28 font-mono`}
           />
           <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as typeof condition.op })} className={select}>
-            <option value="eq" className="bg-zinc-900">is</option>
-            <option value="neq" className="bg-zinc-900">is not</option>
-            <option value="contains" className="bg-zinc-900">contains</option>
-            <option value="gt" className="bg-zinc-900">is greater than</option>
-            <option value="lt" className="bg-zinc-900">is less than</option>
-            <option value="exists" className="bg-zinc-900">is set</option>
-            <option value="missing" className="bg-zinc-900">is not set</option>
+            <option value="eq">is</option>
+            <option value="neq">is not</option>
+            <option value="contains">contains</option>
+            <option value="gt">is greater than</option>
+            <option value="lt">is less than</option>
+            <option value="exists">is set</option>
+            <option value="missing">is not set</option>
           </NativeSelect>
           {condition.op !== "exists" && condition.op !== "missing" && (
             <input
@@ -413,8 +413,8 @@ function ConditionRow({
       {(condition.field === "lastSeen" || condition.field === "firstSeen") && (
         <>
           <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "within" | "before" })} className={select}>
-            <option value="within" className="bg-zinc-900">in the last</option>
-            <option value="before" className="bg-zinc-900">more than</option>
+            <option value="within">in the last</option>
+            <option value="before">more than</option>
           </NativeSelect>
           <input
             aria-label="Days"
@@ -432,8 +432,8 @@ function ConditionRow({
       {(condition.field === "sessions" || condition.field === "events") && (
         <>
           <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "gte" | "lte" })} className={select}>
-            <option value="gte" className="bg-zinc-900">at least</option>
-            <option value="lte" className="bg-zinc-900">at most</option>
+            <option value="gte">at least</option>
+            <option value="lte">at most</option>
           </NativeSelect>
           <input
             aria-label="Count"
@@ -449,9 +449,9 @@ function ConditionRow({
       {condition.field === "email" && (
         <>
           <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "exists" | "missing" | "contains" })} className={select}>
-            <option value="exists" className="bg-zinc-900">is set</option>
-            <option value="missing" className="bg-zinc-900">is not set</option>
-            <option value="contains" className="bg-zinc-900">contains</option>
+            <option value="exists">is set</option>
+            <option value="missing">is not set</option>
+            <option value="contains">contains</option>
           </NativeSelect>
           {condition.op === "contains" && (
             <input

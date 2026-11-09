@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuPanel } from "@/components/ui/menu-panel";
 import * as React from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Globe, Settings2, Plus } from "lucide-react";
@@ -48,12 +49,7 @@ export function SiteSwitcher({
           <ChevronDown className="h-4 w-4 shrink-0 text-zinc-600" />
         </button>
 
-        {open && (
-          <div
-            role="dialog"
-            aria-label="Switch site"
-            className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-border bg-card p-2 shadow-float"
-          >
+        <MenuPanel open={open} role="dialog" aria-label="Switch site" className="left-0 top-full mt-2 w-72 overflow-hidden p-2">
             <div className="flex items-center justify-between px-3 pb-2 pt-1">
               <p className="text-xs font-medium text-zinc-500">
                 Websites ({sites.length})
@@ -122,8 +118,7 @@ export function SiteSwitcher({
                 </Link>
               )}
             </div>
-          </div>
-        )}
+        </MenuPanel>
       </div>
 
       {workspaceId && (
