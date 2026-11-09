@@ -37,10 +37,10 @@ export function PageHeaderSkeleton({ controls = true }: { controls?: boolean }) 
 /** Matches StatsCard's footprint (label, figure, change) so the grid does not shift when data arrives. */
 export function StatsCardSkeleton() {
   return (
-    <Card className="flex flex-col gap-4 p-5">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="h-8 w-28" />
-      <Skeleton className="h-4 w-36" />
+    <Card className="grid min-w-0 grid-rows-[20px_36px_16px] content-start gap-y-3 p-5">
+      <Skeleton className="h-4 w-24 self-center" />
+      <Skeleton className="h-8 w-28 self-end" />
+      <Skeleton className="h-3 w-36 self-center" />
     </Card>
   );
 }
