@@ -43,6 +43,19 @@ per-plan retention overrides for the new tables, SDK `release`/`environment` opt
 integration tests (need ClickHouse), ingestion load test.
 
 ## Verification state
-Unit tests pass (contracts and Go fixtures agree, worker row, erasure, deploy scope, nav). The ClickHouse
-migrations were **not** executed here (no ClickHouse available): run `node infra/aiven/migrate-clickhouse.mjs`
-against a scratch database, then `--down`, then up again, before relying on them.
+Verified on 2026-11-09 against the project's Aiven services (Postgres, ClickHouse 26.3), which had no traffic for the
+previous day:
+
+- **Postgres:** `pnpm db:migrate` applied only `0007_site_releases` (8 migrations recorded); columns and both indexes checked.
+- **ClickHouse up:** `migrate-clickhouse.mjs` applied 014 and 015 with no errors.
+- **Pipeline test:** 7 synthetic events (one pageview, identify, 3 errors of which one from a known bot, 2 payments) written
+  to `events_ingest` under a throwaway site id. Results: release and environment reach `events_v2`; the bot event is excluded
+  from every aggregate; `identity_map` links the visitor hash to `user-42`; `session_summary_agg` shows entry page, last
+  release, 2 errors, 2 payments and revenue 49,900 (only the captured payment); the minute, hour and day rollups carry the
+  right per-release counts; pageviews do not enter the suite rollups. All test rows were deleted afterwards.
+- **Rollback:** `--down` twice removed all 10 objects and both columns, restored the original view and cleared the
+  migration records; re-applying brought everything back.
+
+Not covered: behaviour under load (ingestion benchmark), part-creation pressure from the new views at volume, the full
+Kafka-to-worker path (the test wrote to `events_ingest` directly, the table the worker writes), and tenant isolation
+tests. The first live traffic after this point is the real check of the worker path.
