@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/sidebar";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { SiteSwitcher } from "@/components/site-switcher";
 import { CommandPalette, openCommandPalette } from "@/components/command-palette";
+import { AskDock } from "@/components/ask/ask-dock";
 import { Kbd } from "@/components/ui/field";
 import { pageLabelFor } from "@/lib/nav";
 
@@ -138,7 +139,8 @@ export function DashboardShell({
         </header>
 
         <CommandPalette workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites} />
-        <main className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <AskDock workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites.map((x) => x.domain)} />
+        <main className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-28 lg:pt-8">
           {children}
         </main>
       </div>
