@@ -16,10 +16,12 @@ export function RetentionControls({
   base,
   view,
   events,
+  segments,
 }: {
   base: string;
   view: RetentionView;
   events: string[];
+  segments: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
@@ -46,6 +48,13 @@ export function RetentionControls({
         options={options(view.returnEvent, "Any activity")}
         onChange={(name) => go({ returnEvent: name || undefined })}
         className="w-44"
+      />
+      <SelectDropdown
+        ariaLabel="Segment"
+        value={view.segment ?? ""}
+        options={[{ value: "", label: "Everyone identified" }, ...segments.map((s) => ({ value: s.id, label: s.name }))]}
+        onChange={(id) => go({ segment: id || undefined })}
+        className="w-48"
       />
     </div>
   );

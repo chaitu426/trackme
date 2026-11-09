@@ -15,6 +15,13 @@ test("events and granularity are read, arrays take the first value", () => {
   });
 });
 
+test("a segment id is kept only when it looks like one", () => {
+  const id = "11111111-2222-3333-4444-555555555555";
+  assert.deepEqual(parseRetentionView({ segment: id }), { granularity: "week", segment: id });
+  assert.deepEqual(parseRetentionView({ segment: "x; DROP" }), { granularity: "week" });
+  assert.equal(retentionHref("/r", parseRetentionView({ segment: id })), `/r?segment=${id}`);
+});
+
 test("links leave out defaults and can clear an event", () => {
   const view = parseRetentionView({});
   assert.equal(retentionHref("/r", view), "/r");

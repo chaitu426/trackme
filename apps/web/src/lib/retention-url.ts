@@ -8,6 +8,8 @@ export interface RetentionView {
   cohortEvent?: string;
   /** Count a user as retained when they do this event, instead of any activity. */
   returnEvent?: string;
+  /** Only users in this saved segment (its id). */
+  segment?: string;
 }
 
 type Raw = Record<string, string | string[] | undefined>;
@@ -21,10 +23,12 @@ export function parseRetentionView(raw: Raw): RetentionView {
   };
   const cohortEvent = text("cohortEvent");
   const returnEvent = text("returnEvent");
+  const segment = first(raw.segment);
   return {
     granularity: g === "day" || g === "month" ? g : "week",
     ...(cohortEvent ? { cohortEvent } : {}),
     ...(returnEvent ? { returnEvent } : {}),
+    ...(segment && /^[0-9a-f-]{36}$/i.test(segment) ? { segment } : {}),
   };
 }
 
@@ -36,6 +40,7 @@ export function retentionHref(base: string, view: RetentionView, change: ViewCha
   if (next.granularity && next.granularity !== "week") params.set("g", next.granularity);
   if (next.cohortEvent) params.set("cohortEvent", next.cohortEvent);
   if (next.returnEvent) params.set("returnEvent", next.returnEvent);
+  if (next.segment) params.set("segment", next.segment);
   const query = params.toString();
   return query ? `${base}?${query}` : base;
 }

@@ -10,6 +10,8 @@ import { RetentionControls } from "@/components/retention-controls";
 import { requireUser } from "@/lib/auth";
 import { requireDashboardSite } from "@/lib/tenancy";
 import { cached } from "@/lib/query-cache";
+import { getSavedSegment, listSavedSegments } from "@/lib/saved-segments";
+import { matchSegment, SEGMENT_USER_CAP } from "@/lib/segments";
 import { cohortWindow, parseRetentionView, periodLabel, WINDOW, type RetentionView } from "@/lib/retention-url";
 import { formatNumber } from "@/lib/format";
 
@@ -51,7 +53,7 @@ export default async function RetentionPage({
       </PageHeader>
 
       <Suspense key={JSON.stringify(view)} fallback={<TableCardSkeleton rows={6} cols={8} />}>
-        <CohortCard siteId={site.id} view={view} />
+        <CohortCard siteId={site.id} workspaceId={workspace.id} view={view} />
       </Suspense>
     </div>
   );
@@ -61,10 +63,13 @@ async function Controls({ siteId, base, view }: { siteId: string; base: string; 
   const events = await cached(key("events", siteId, 0), TTL_SECONDS, () => getRetentionEvents(siteId))
     .then((rows) => rows.map((row) => row.name))
     .catch(() => []);
-  return <RetentionControls base={base} view={view} events={events} />;
+  const segments = await listSavedSegments(siteId)
+    .then((list) => list.map(({ id, name }) => ({ id, name })))
+    .catch(() => []);
+  return <RetentionControls base={base} view={view} events={events} segments={segments} />;
 }
 
-async function CohortCard({ siteId, view }: { siteId: string; view: RetentionView }) {
+async function CohortCard({ siteId, workspaceId, view }: { siteId: string; workspaceId: string; view: RetentionView }) {
   const periods = WINDOW[view.granularity];
   const { from, to } = cohortWindow(view.granularity);
   const query = {
@@ -79,9 +84,25 @@ async function CohortCard({ siteId, view }: { siteId: string; view: RetentionVie
 
   let cohorts: CohortRow[];
   let identified: number;
+  let segmentNote: { name: string; users: number; capped: boolean } | null = null;
   try {
+    // A segment narrows the cohorts to the users it matches. Its definition is read for this site only.
+    let userIds: string[] | undefined;
+    if (view.segment) {
+      const segment = await getSavedSegment(siteId, view.segment);
+      if (segment) {
+        const matched = await cached(key("segment", siteId, [view.segment, segment.definition]), TTL_SECONDS, async () => {
+          const { rows, capped } = await matchSegment(workspaceId, siteId, segment.definition, SEGMENT_USER_CAP);
+          return { ids: rows.map((row) => row.distinctId), capped };
+        });
+        userIds = matched.ids;
+        segmentNote = { name: segment.name, users: matched.ids.length, capped: matched.capped };
+      }
+    }
+    const filtered = { ...query, ...(userIds ? { userIds } : {}) };
+    const cohortKey = [filtered.granularity, from, to, filtered.cohort, filtered.returnEvent ?? null, view.segment ?? null, userIds?.length ?? null];
     [cohorts, identified] = await Promise.all([
-      cached(key("cohorts", siteId, query), TTL_SECONDS, () => getRetention(query)),
+      cached(key("cohorts", siteId, cohortKey), TTL_SECONDS, () => getRetention(filtered)),
       cached(key("users", siteId, 0), TTL_SECONDS, () => countIdentifiedUsers(siteId)),
     ]);
   } catch {
@@ -114,6 +135,14 @@ async function CohortCard({ siteId, view }: { siteId: string; view: RetentionVie
           so they cannot be followed across days and are not counted. Call <code className="font-mono">trackme.identify()</code> to include someone.
         </CardDescription>
       </CardHeader>
+
+      {segmentNote && (
+        <p className="border-b border-white/[0.06] px-5 py-2 text-xs text-zinc-400">
+          Segment <span className="font-medium text-zinc-200">{segmentNote.name}</span>: {formatNumber(segmentNote.users)}
+          {segmentNote.capped ? "+" : ""} identified {segmentNote.users === 1 ? "user" : "users"}
+          {segmentNote.capped ? `. Only the ${formatNumber(SEGMENT_USER_CAP)} most recently active were used, so the chart is a sample.` : "."}
+        </p>
+      )}
 
       {totalSize === 0 ? (
         <p className="px-5 py-12 text-center text-xs text-zinc-500">
