@@ -30,3 +30,5 @@ export * from "./queries/payments.js";
 export { detectIncidents, binomialTail, type HealthBucket, type Incident } from "./payments-health.js";
 export * from "./queries/payment-failures.js";
 export * from "./queries/payment-recovery.js";
+export * from "./queries/revenue-leaks.js";
+export { estimateLeak, MIN_AFFECTED, MIN_CONTROL, type Confidence, type LeakEstimate, type LeakInput } from "./revenue-leak.js";

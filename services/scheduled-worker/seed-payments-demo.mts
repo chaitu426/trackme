@@ -24,6 +24,8 @@ const SITE_KEY = args.find((a) => a.startsWith("--site-key="))?.split("=")[1] ??
 const REMOVE = args.includes("--remove");
 const RESEED = args.includes("--reseed");
 const DB = "growth_analytics";
+/** Demo checkout sessions for the Revenue Leaks page use session hashes from 2^62 up, far from any real hash, so --remove finds exactly them. */
+const LEAK_DEMO_BASE = "4611686018427387904";
 const DAY = 86_400_000;
 const NOW = Date.now();
 const DEPLOY_CUR = NOW - 2.5 * DAY;
@@ -88,6 +90,7 @@ async function remove(siteId: string): Promise<void> {
   await ch.command({ query: `ALTER TABLE ${DB}.payment_events DELETE WHERE site_id = '${siteId}' AND startsWith(gateway_event_id, 'demo_')`, ...opts });
   await ch.command({ query: `ALTER TABLE ${DB}.order_session DELETE WHERE site_id = '${siteId}' AND startsWith(order_id, 'order_demo_')`, ...opts });
   await ch.command({ query: `ALTER TABLE ${DB}.payment_failure_class DELETE WHERE site_id = '${siteId}' AND startsWith(payment_id, 'pay_demo_')`, ...opts });
+  await ch.command({ query: `ALTER TABLE ${DB}.leak_sessions DELETE WHERE site_id = '${siteId}' AND session_hash >= ${LEAK_DEMO_BASE}`, ...opts });
   console.log("Demo payments removed.");
 }
 
@@ -218,6 +221,29 @@ async function main(): Promise<void> {
   const captured = rows.filter((r) => r.status === "captured").length;
   const failed = rows.filter((r) => r.status === "failed").length;
   console.log(`Seeded ${orders.length} orders: ${captured} captured, ${failed} failed, ${rows.filter((r) => r.status === "refunded").length} refunded, ${rows.filter((r) => r.status === "disputed").length} disputed.`);
+  // Revenue Leaks: the real checkout sessions here are too few for any one issue to reach the minimum, so add demo sessions around the
+  // seeded error groups: one that costs a lot of conversions, one that costs some, and ordinary sessions without either.
+  const groups = (await (await ch.query({ query: `SELECT toString(group_id) AS gid, anyLast(title) AS title FROM ${DB}.error_groups WHERE site_id = {site:UUID} GROUP BY group_id ORDER BY sum(events) DESC LIMIT 6`, query_params: { site: site.id }, format: "JSONEachRow" })).json()) as Array<{ gid: string; title: string }>;
+  const cur = ((await (await ch.query({ query: `SELECT currency AS c FROM ${DB}.payment_events WHERE site_id = {site:UUID} AND status = 'captured' GROUP BY c ORDER BY count() DESC LIMIT 1`, query_params: { site: site.id }, format: "JSONEachRow" })).json()) as Array<{ c: string }>)[0]?.c ?? "INR";
+  const amount = cur === "USD" ? [2900, 9900, 900] : [239900, 799900, 49900];
+  const leak: Array<Record<string, unknown>> = [];
+  let k = 0;
+  const addSessions = (count: number, convRate: number, errorGroups: string[]) => {
+    for (let i = 0; i < count; i += 1) {
+      const paid = rand() < convRate;
+      leak.push({
+        workspace_id: site.workspaceId, site_id: site.id, day: new Date(NOW - Math.floor(between(0, 30)) * DAY).toISOString().slice(0, 10),
+        session_hash: (BigInt(LEAK_DEMO_BASE) + BigInt(k++)).toString(), paid: paid ? 1 : 0, amount_minor: paid ? pick(amount) : 0, currency: paid ? cur : "", error_groups: errorGroups,
+      });
+    }
+  };
+  if (groups[0]) addSessions(110, 0.22, [groups[0].gid]);
+  if (groups[1]) addSessions(52, 0.54, [groups[1].gid]);
+  if (groups[2]) addSessions(26, 0.62, [groups[2].gid]);
+  addSessions(320, 0.7, []);
+  await ch.insert({ table: `${DB}.leak_sessions`, format: "JSONEachRow", values: leak, clickhouse_settings: { date_time_input_format: "best_effort" } });
+  console.log(`Added ${leak.length} demo checkout sessions for Revenue Leaks.`);
+
   // The classifier normally runs every minute; run it now so the Failure Doctor has data straight away.
   const deps = createClickHouseClassifierDeps();
   let classified = 0;

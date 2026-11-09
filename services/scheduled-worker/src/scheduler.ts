@@ -10,6 +10,7 @@ import { runReconciliation } from "./jobs/reconciliation.js";
 import { runErrorRegressions } from "./jobs/error-regressions.js";
 import { runSourceMapRetention } from "./jobs/sourcemap-retention.js";
 import { runPaymentPayloadRetention } from "./jobs/payment-payload-retention.js";
+import { runRevenueLeakRollup } from "./jobs/revenue-leak-rollup.js";
 import { classifyPending } from "./jobs/payment-failure-classifier.js";
 import { createClickHouseClassifierDeps } from "./jobs/payment-failure-classifier.db.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
@@ -155,6 +156,21 @@ cron.schedule("* * * * *", async () => {
     );
   } catch (err) {
     console.error("Failed classifying payment failures:", err);
+  }
+});
+
+// Revenue-Leak Detector: hourly at :20, recompute today and yesterday of leak_sessions (one row per checkout session).
+cron.schedule("20 * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:revenue_leak_rollup",
+      900,
+      "Revenue Leak Rollup",
+      instrumentJob("revenue_leak_rollup", () => runRevenueLeakRollup().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed running revenue leak rollup:", err);
   }
 });
 
