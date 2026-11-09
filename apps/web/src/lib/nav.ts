@@ -1,5 +1,6 @@
 import {
   BarChart2,
+  CreditCard,
   FileText,
   Filter,
   Gauge,
@@ -66,6 +67,11 @@ export const NAV_SUITES: NavSuite[] = [
       { path: "errors", label: "Error Tracking", icon: Bug },
       { path: "releases", label: "Release Impact", icon: Rocket },
     ],
+  },
+  {
+    id: "payments",
+    title: "Payments & Revenue",
+    items: [{ path: "payments/connect", label: "Integrations", icon: CreditCard }],
   },
 ];
 

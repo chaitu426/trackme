@@ -422,6 +422,14 @@ export class GrowthTracker {
   }
 
   /**
+   * A checkout milestone as the shopper's browser saw it: `trackPayment("initiated", { orderId, amount, currency, method })`.
+   * The order id is what ties the gateway's webhook to this session. Never pass card or UPI details.
+   */
+  public trackPayment(stage: string, properties?: EventProperties): void {
+    this.trackEvent("payment_" + stage, properties);
+  }
+
+  /**
    * Records a named funnel step without attaching a person-level identifier.
    * Funnel and step names are constrained by the same safe property rules as
    * every other custom event.
@@ -577,7 +585,7 @@ export class GrowthTracker {
 }
 
 const QUEUEABLE = [
-  "trackPageview", "trackNavigation", "trackEvent", "trackGoal", "trackFunnelStep",
+  "trackPageview", "trackNavigation", "trackEvent", "trackGoal", "trackFunnelStep", "trackPayment",
   "identify", "reset", "grantConsent", "denyConsent", "captureException", "captureMessage", "setTag",
 ];
 
