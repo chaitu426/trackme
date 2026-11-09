@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,13 +15,13 @@ import {
   Trash2,
   Send,
   RefreshCw,
-  CheckCircle2,
   XCircle,
   Clock,
 } from "lucide-react";
 import { GlyphField } from "@trackme/landing";
 import { FirstEventVerifier } from "@/components/first-event-verifier";
 import { useInviteManager } from "@/hooks/use-invite-manager";
+import { DrawCheck, Notice, PillTabs, StepPanel } from "@/components/motion/primitives";
 
 type CreatedWorkspace = {
   workspace: { id: string; name: string; slug: string };
@@ -51,7 +52,13 @@ const STEPS = [
 
 export function OnboardingForm({ existing }: { existing: { id: string; name: string; slug: string }[] }) {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentStep, setStep] = useState<number>(1);
+  const [direction, setDirection] = useState<1 | -1>(1);
+  const [errorNonce, setErrorNonce] = useState(0);
+  const setCurrentStep = (next: number) => {
+    setDirection(next >= currentStep ? 1 : -1);
+    setStep(next);
+  };
 
   // Step 1: Org Data
   const [orgName, setOrgName] = useState("");
@@ -91,6 +98,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
   function handleNextFromOrg() {
     if (!orgName.trim()) {
       setError("Please provide an organization or company name.");
+      setErrorNonce((n) => n + 1);
       return;
     }
     setError(null);
@@ -101,6 +109,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
   async function handleCreateWorkspaceAndSite() {
     if (!domain.trim()) {
       setError("Please provide a valid website domain.");
+      setErrorNonce((n) => n + 1);
       return;
     }
 
@@ -126,6 +135,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
       setCurrentStep(3);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error creating workspace.");
+      setErrorNonce((n) => n + 1);
     } finally {
       setPending(false);
     }
@@ -276,9 +286,9 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
   const input =
     "h-10 w-full rounded-lg border border-white/[0.1] bg-card px-3 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors duration-150 hover:border-white/[0.18] focus:border-white/[0.35]";
   const primary =
-    "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#ededed] px-5 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60";
+    "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#ededed] px-5 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] press hover:bg-white disabled:pointer-events-none disabled:opacity-60";
   const ghost =
-    "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/[0.1] px-4 text-sm text-zinc-300 transition-colors duration-150 hover:border-white/[0.2] hover:text-zinc-50";
+    "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/[0.1] px-4 text-sm text-zinc-300 press hover:border-white/[0.2] hover:text-zinc-50";
   const current = STEPS[currentStep - 1]!;
 
   const StepHead = ({ title, children }: { title: string; children?: React.ReactNode }) => (
@@ -293,9 +303,9 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
 
   const ErrorNote = () =>
     error ? (
-      <p role="alert" className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+      <Notice nonce={errorNonce} className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
         {error}
-      </p>
+      </Notice>
     ) : null;
 
   return (
@@ -304,33 +314,30 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
       <aside className="relative hidden overflow-hidden border-r border-white/[0.08] bg-sidebar lg:block">
         <div className="relative z-10 p-8">
           <p className="font-mono text-xs text-zinc-500">Set up your workspace</p>
-          <ol className="mt-6 space-y-1">
+          <LayoutGroup id="onboarding-rail"><ol className="mt-6 space-y-1">
             {STEPS.map((s) => {
               const done = currentStep > s.id;
               const active = currentStep === s.id;
               return (
-                <li
-                  key={s.id}
-                  aria-current={active ? "step" : undefined}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-3 transition-colors duration-150 ${
-                    active ? "bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : ""
-                  }`}
-                >
+                <li key={s.id} aria-current={active ? "step" : undefined} className="relative flex items-center gap-3 rounded-lg px-3 py-3">
+                  {active && (
+                    <motion.span layoutId="rail-active" className="absolute inset-0 rounded-lg bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" transition={{ type: "spring", bounce: 0, visualDuration: 0.3 }} />
+                  )}
                   <span
-                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border font-mono text-xs ${
+                    className={`relative grid h-7 w-7 shrink-0 place-items-center rounded-md border font-mono text-xs transition-colors duration-150 ${
                       done ? "border-white/[0.2] bg-white/[0.06] text-zinc-100" : active ? "border-white/[0.3] text-zinc-50" : "border-white/[0.1] text-zinc-500"
                     }`}
                   >
                     {done ? <Check className="h-4 w-4" /> : String(s.id).padStart(2, "0")}
                   </span>
-                  <span className="min-w-0">
+                  <span className="relative min-w-0">
                     <span className={`block text-sm ${active ? "font-medium text-zinc-50" : done ? "text-zinc-300" : "text-zinc-500"}`}>{s.label}</span>
                     <span className="block text-xs text-zinc-500">{s.desc}</span>
                   </span>
                 </li>
               );
             })}
-          </ol>
+          </ol></LayoutGroup>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-64" aria-hidden="true">
           <GlyphField variant="stream" cell={9} strength={0.7} />
@@ -344,7 +351,9 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
           <div className="mb-8 lg:hidden" aria-hidden="true">
             <div className="flex gap-1">
               {STEPS.map((s) => (
-                <span key={s.id} className={`h-0.5 flex-1 rounded-full ${currentStep >= s.id ? "bg-zinc-200" : "bg-white/[0.12]"}`} />
+                <span key={s.id} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/[0.12]">
+                  <motion.span className="block h-full origin-left bg-zinc-200" initial={false} animate={{ scaleX: currentStep >= s.id ? 1 : 0 }} transition={{ type: "spring", bounce: 0, visualDuration: 0.35 }} />
+                </span>
               ))}
             </div>
             <p className="mt-3 font-mono text-xs text-zinc-500">{current.label}</p>
@@ -364,6 +373,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
             </div>
           )}
 
+          <StepPanel stepKey={currentStep} direction={direction}>
           {/* STEP 1: ORGANIZATION */}
           {currentStep === 1 && (
             <div>
@@ -426,28 +436,19 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
             <div>
               <StepHead title="Install the tag">One script tag in your page head. It loads deferred and tracks single-page navigation by itself.</StepHead>
               <div className="space-y-5">
-                <div role="tablist" aria-label="Where to add the tag" className="flex gap-0.5 overflow-x-auto rounded-lg border border-white/[0.1] p-0.5">
-                  {[
+                <PillTabs
+                  kind="tabs"
+                  label="Where to add the tag"
+                  value={snippetTab}
+                  onChange={setSnippetTab}
+                  items={[
                     { id: "html", label: "HTML" },
                     { id: "nextjs", label: "Next.js" },
                     { id: "react", label: "React / Vite" },
                     { id: "vue", label: "Vue / Nuxt" },
                     { id: "gtm", label: "Tag Manager" },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={snippetTab === tab.id}
-                      onClick={() => setSnippetTab(tab.id as typeof snippetTab)}
-                      className={`inline-flex h-8 shrink-0 items-center rounded-md px-3 text-sm transition-colors duration-150 ${
-                        snippetTab === tab.id ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "text-zinc-400 hover:text-zinc-100"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                  ]}
+                />
 
                 <div className="overflow-hidden rounded-xl border border-white/[0.1] bg-sidebar">
                   <div className="flex h-11 items-center justify-between border-b border-white/[0.08] pl-4 pr-2">
@@ -512,27 +513,18 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
             <div>
               <StepHead title="Invite your team">Optional. Paste emails separated by commas or spaces. Each person gets a link that works for 7 days.</StepHead>
               <div className="space-y-5">
-                <div role="radiogroup" aria-label="Role" className="grid grid-cols-3 gap-2">
-                  {[
-                    { role: "admin", label: "Admin", desc: "Full control" },
-                    { role: "member", label: "Member", desc: "Read and edit" },
-                    { role: "viewer", label: "Viewer", desc: "Read only" },
-                  ].map((r) => (
-                    <button
-                      key={r.role}
-                      type="button"
-                      role="radio"
-                      aria-checked={inviteRole === r.role}
-                      onClick={() => setInviteRole(r.role as typeof inviteRole)}
-                      className={`rounded-lg border px-3 py-2.5 text-left transition-colors duration-150 ${
-                        inviteRole === r.role ? "border-white/[0.3] bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "border-white/[0.1] hover:border-white/[0.2]"
-                      }`}
-                    >
-                      <span className={`block text-sm ${inviteRole === r.role ? "font-medium text-zinc-50" : "text-zinc-300"}`}>{r.label}</span>
-                      <span className="mt-0.5 block text-xs text-zinc-500">{r.desc}</span>
-                    </button>
-                  ))}
-                </div>
+                <PillTabs
+                  kind="radio"
+                  label="Role"
+                  value={inviteRole}
+                  onChange={setInviteRole}
+                  className="[&>button]:h-auto [&>button]:flex-1 [&>button]:justify-start [&>button]:py-2.5 [&>button]:text-left"
+                  items={[
+                    { id: "admin", label: <span><span className="block text-sm">Admin</span><span className="mt-0.5 block text-xs font-normal text-zinc-500">Full control</span></span> },
+                    { id: "member", label: <span><span className="block text-sm">Member</span><span className="mt-0.5 block text-xs font-normal text-zinc-500">Read and edit</span></span> },
+                    { id: "viewer", label: <span><span className="block text-sm">Viewer</span><span className="mt-0.5 block text-xs font-normal text-zinc-500">Read only</span></span> },
+                  ]}
+                />
 
                 <form onSubmit={handleAddAndSendInvites} className="flex gap-2">
                   <input type="text" aria-label="Email addresses" placeholder="alice@acme.com, bob@acme.com" value={inviteInput} onChange={(e) => setInviteInput(e.target.value)} className={`${input} flex-1`} />
@@ -543,13 +535,22 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
 
                 {inviteStatuses.length > 0 ? (
                   <ul className="divide-y divide-white/[0.07] overflow-hidden rounded-xl border border-white/[0.1] bg-card">
+                    <AnimatePresence initial={false}>
                     {inviteStatuses.map((s) => {
                       const expiry = s.expiresAt ? inviteManager.getExpiryMeta(s.expiresAt) : null;
                       return (
-                        <li key={s.email} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                        <motion.li
+                          key={s.email}
+                          layout="position"
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: 16 }}
+                          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                          className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
+                        >
                           <div className="flex min-w-0 items-center gap-3">
                             {s.state === "sending" && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />}
-                            {s.state === "sent" && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#4cc38a]" />}
+                            {s.state === "sent" && <DrawCheck size={16} className="shrink-0" />}
                             {s.state === "error" && <XCircle className="h-4 w-4 shrink-0 text-[#e5484d]" />}
                             <div className="min-w-0">
                               <span className="block truncate text-zinc-100">{s.email}</span>
@@ -573,9 +574,10 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
-                        </li>
+                        </motion.li>
                       );
                     })}
+                    </AnimatePresence>
                   </ul>
                 ) : (
                   <div className="flex items-center gap-3 rounded-xl border border-dashed border-white/[0.14] px-4 py-4 text-sm text-zinc-500">
@@ -597,6 +599,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
               </div>
             </div>
           )}
+          </StepPanel>
         </div>
       </main>
     </div>
