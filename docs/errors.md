@@ -1,8 +1,8 @@
 # Error Tracking: as built (Phase 1A, backend)
 
 Plan: [`phase1-plan.md`](phase1-plan.md). Foundation: [`suite-foundation.md`](suite-foundation.md).
-**Status:** the pipeline from the edge to storage is built and verified. The SDK module, issue status and
-regression job, source maps and the dashboard pages are **not** built yet, so nothing sends errors today.
+**Status:** the SDK, the pipeline from the edge to storage and the storage are built and verified. Issue status,
+the regression job, source maps and the dashboard pages are **not** built yet.
 
 ## Event shape
 An event with `type: "error"` carries an `error` object (and no other kind may):
@@ -55,7 +55,9 @@ Migration 016 applied, rolled back and re-applied on the project's Aiven ClickHo
 a bot error and a pageview: one issue, 4 distinct users, per-release daily counts, 5 of 8 detail rows kept, no secret
 in storage; test rows removed. **Not verified:** the full Kafka path, load, and tenant isolation tests.
 
+## SDK
+Built and verified in a real browser: see [`sdk.md`](sdk.md) (options, API, what is collected, sizes).
+
 ## Still to build in 1A
 Issue status (Postgres) and the once-a-minute regression job; source maps (`POST /api/v1/sourcemaps`, object store,
-de-minify); the lazy SDK module (capture, breadcrumbs, dedupe, `captureException`/`captureMessage`/`setTag`) and the
-`web-vitals` lazy split; the Error Tracking list and issue pages behind the `errors` flag.
+de-minify); the Error Tracking list and issue pages behind the `errors` flag.

@@ -18,7 +18,7 @@
     }
   },
   "scripts": {
-    "build": "rimraf dist && tsup && node scripts/build-versioned-tracker.mjs && node scripts/check-bundle-size.mjs",
+    "build": "rimraf dist && tsup && node scripts/build-iife.mjs && node scripts/build-versioned-tracker.mjs && node scripts/check-bundle-size.mjs",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",

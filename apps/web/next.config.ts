@@ -88,9 +88,12 @@ const nextConfig: NextConfig = {
       { source: "/tracker.js", headers: trackerCache },
       { source: "/t/v1/tracker.js", headers: trackerCache },
       { source: "/t/:version/tracker.:rest.js", headers: trackerImmutable },
+      // Lazy chunks (web vitals, error capture): content-named, so they cache forever, and loaded with SRI from beside tracker.js.
+      { source: "/tracker.:rest.js", headers: trackerImmutable },
+      { source: "/t/v1/tracker.:rest.js", headers: trackerImmutable },
       { source: "/t/manifest.json", headers: trackerCache },
       // The tracker is loaded by other sites; every other response gets the security headers.
-      { source: "/((?!tracker\\.js|t/).*)", headers: security },
+      { source: "/((?!tracker\\.|t/).*)", headers: security },
     ];
   },
   webpack(config) {

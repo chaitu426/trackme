@@ -10,6 +10,8 @@ const MAX_PROPS = 50;
 const MAX_PROP_KEY = 64;
 const MAX_PROP_VALUE = 256;
 const PROP_KEY = /^[a-zA-Z0-9_.-]+$/;
+const RELEASE = /^[A-Za-z0-9][A-Za-z0-9._+@/-]{0,63}$/;
+const ENVIRONMENTS = ["production", "staging", "development"];
 
 const warned = new Set<string>();
 
@@ -72,6 +74,16 @@ export function limitEvent(event: TrackerEvent): TrackerEvent {
       if (value) campaign[key] = cut(value, MAX_CAMPAIGN_VALUE);
     }
     next.campaign = campaign as TrackerEvent["campaign"];
+  }
+  // The edge rejects the whole event for a bad release or environment, so a typo in the snippet would silently
+  // stop all analytics. Drop the label instead and say so once.
+  if (next.release !== undefined && !RELEASE.test(next.release)) {
+    warnOnce(`release "${String(next.release).slice(0, 32)}" ignored (letters, digits and . _ + @ / -, up to 64 characters)`);
+    delete next.release;
+  }
+  if (next.environment !== undefined && !ENVIRONMENTS.includes(next.environment)) {
+    warnOnce(`environment "${String(next.environment).slice(0, 32)}" ignored (use production, staging or development)`);
+    delete next.environment;
   }
   if (next.properties) next.properties = limitProperties(next.properties, "event properties");
   if (next.userTraits) next.userTraits = limitProperties(next.userTraits, "identify traits");

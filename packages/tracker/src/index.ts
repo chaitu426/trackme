@@ -1,15 +1,31 @@
-import { TrackerEvent, EventProperties } from "@trackme/contracts";
+import type { TrackerEvent, EventProperties, ErrorPayload } from "@trackme/contracts";
 import { generateUUID, getSessionId, getSessionSource, getVisitorPseudonym, resetVisit, type SessionSource } from "./session.js";
 import { Transport } from "./transport.js";
 import { listenToRouteChanges } from "./spa.js";
-import { observeWebVitals } from "./vitals.js";
+import { loadChunk, rememberScript } from "./lazy.js";
 import { EngagementClock } from "./engagement.js";
 import { isSameSite, listenForLinkClicks, listenForScrollDepth } from "./autocapture.js";
 import { limitEvent } from "./limits.js";
+import type { ErrorCapture } from "./errors/attach.js";
 
 declare const __TRACKER_VERSION__: string;
+/** Set by the build: true for the standalone script, false for the npm build. Must stay a bare constant so the unused branch is dropped. */
+declare const __LAZY__: boolean;
 
 const TRACKER_VERSION = __TRACKER_VERSION__ as string;
+
+type VitalsModule = typeof import("./vitals.js");
+// Web vitals are a separate file: standalone, a script next to tracker.js; npm, a dynamic import.
+const loadVitals = (): Promise<VitalsModule | null> =>
+  typeof __LAZY__ !== "undefined" && __LAZY__
+    ? loadChunk<VitalsModule>("vitals")
+    : import("./vitals.js").catch(() => null);
+
+type ErrorsModule = typeof import("./errors/attach.js");
+const loadErrors = (): Promise<ErrorsModule | null> =>
+  typeof __LAZY__ !== "undefined" && __LAZY__
+    ? loadChunk<ErrorsModule>("errors")
+    : import("./errors/attach.js").catch(() => null);
 const DEFAULT_TRACKER_ENDPOINT = "http://localhost:3001/v1/batch";
 
 export interface TrackerConfig {
@@ -28,6 +44,16 @@ export interface TrackerConfig {
    * the secret server-side instead of embedding it in public HTML.
    */
   signingSecret?: string;
+  /** Capture uncaught errors, rejected promises and failed requests (loads the error module). */
+  errors?: boolean;
+  /** With errors on, also report 4xx responses. */
+  errors4xx?: boolean;
+  /** With errors on, also report console.error calls. */
+  errorsConsole?: boolean;
+  /** Build label on every event, e.g. "web@1.4.2". Invalid values are dropped, never sent. */
+  release?: string;
+  /** "production" (default), "staging" or "development". */
+  environment?: string;
 }
 
 export interface PageviewOptions {
@@ -113,6 +139,9 @@ export class GrowthTracker {
   private clock: EngagementClock | null = null;
   private scrollDepth: { reset: () => void; stop: () => void } | null = null;
   private teardown: Array<() => void> = [];
+  private errorApi: ErrorCapture | null = null;
+  /** Error calls made before the error module finished loading; replayed once it has. */
+  private errorCalls: Array<(api: ErrorCapture) => void> = [];
   /** The page the document was loaded on. Web vitals describe it, whatever route the visitor is on when they leave. */
   private landing: { url: string; path: string } | null = null;
 
@@ -223,6 +252,7 @@ export class GrowthTracker {
       this.spaUnlisten = listenToRouteChanges((newPath, previousPath) => {
         // Close out the page being left before the next one opens.
         this.sendEngagement(previousPath);
+        this.errorApi?.navigated(newPath);
         this.scrollDepth?.reset();
         this.trackNavigation(newPath);
       });
@@ -257,10 +287,31 @@ export class GrowthTracker {
     window.addEventListener("pageshow", onPageShow);
     this.lifecycleUnlisten = () => window.removeEventListener("pageshow", onPageShow);
 
-    if (this.config.collectWebVitals) {
-      observeWebVitals((metric) => {
-        this.trackWebVital(metric);
+    if (this.config.errors) {
+      void loadErrors().then((mod) => {
+        // The visitor may have declined analytics while the module was loading.
+        if (!mod || !this.isInitialized) return;
+        const api = mod.createErrorCapture({
+          send: (error) => this.sendError(error),
+          endpoint: this.config.endpoint,
+          capture4xx: this.config.errors4xx,
+          captureConsole: this.config.errorsConsole,
+        });
+        this.errorApi = api;
+        this.teardown.push(() => {
+          api.stop();
+          this.errorApi = null;
+        });
+        for (const call of this.errorCalls.splice(0)) call(api);
       });
+    }
+
+    if (this.config.collectWebVitals) {
+      void loadVitals().then((vitals) =>
+        vitals?.observeWebVitals((metric) => {
+          this.trackWebVital(metric);
+        })
+      );
     }
   }
 
@@ -379,6 +430,49 @@ export class GrowthTracker {
     this.trackEvent("funnel_step", { ...(properties || {}), funnel, step });
   }
 
+  /**
+   * Report an error you caught yourself: `trackme.captureException(err, { tags: { step: "pay" } })`.
+   * Needs `errors` on (data-errors="true"); otherwise it does nothing. Never throws.
+   */
+  public captureException(
+    error: unknown,
+    context?: { tags?: Record<string, string>; level?: ErrorPayload["level"]; fingerprint?: string }
+  ): void {
+    this.withErrors((api) => api.captureException(error, context));
+  }
+
+  /** Report a message as an issue, e.g. `captureMessage("Checkout stalled", "warning")`. */
+  public captureMessage(message: string, level?: ErrorPayload["level"]): void {
+    this.withErrors((api) => api.captureMessage(String(message), level));
+  }
+
+  /** Attach a tag (at most 10) to every later error: `setTag("plan", "pro")`. */
+  public setTag(key: string, value: string): void {
+    this.withErrors((api) => api.setTag(key, value));
+  }
+
+  private withErrors(call: (api: ErrorCapture) => void): void {
+    try {
+      if (!this.config.errors || typeof window === "undefined") return;
+      if (this.errorApi) call(this.errorApi);
+      else if (this.errorCalls.length < 20) this.errorCalls.push(call);
+    } catch {
+      // The SDK never throws into the host app.
+    }
+  }
+
+  private sendError(error: ErrorPayload): void {
+    if (typeof window === "undefined" || !this.isInitialized) return;
+    // The address without its query string or fragment, which is where tokens and emails end up.
+    this.transport.enqueue(
+      this.build("error", {
+        error,
+        url: `${window.location.origin}${window.location.pathname}`,
+        path: window.location.pathname,
+      })
+    );
+  }
+
   private trackWebVital(metric: any): void {
     if (typeof window === "undefined" || !this.isInitialized) return;
 
@@ -451,6 +545,8 @@ export class GrowthTracker {
       path: window.location.pathname,
       ...(withIdentity && this.identifiedUserId ? { userId: this.identifiedUserId } : {}),
       ...(withIdentity && this.identifiedUserTraits ? { userTraits: this.identifiedUserTraits } : {}),
+      ...(this.config.release ? { release: this.config.release } : {}),
+      ...(this.config.environment ? { environment: this.config.environment as TrackerEvent["environment"] } : {}),
       ...fields,
     } as TrackerEvent);
   }
@@ -482,7 +578,7 @@ export class GrowthTracker {
 
 const QUEUEABLE = [
   "trackPageview", "trackNavigation", "trackEvent", "trackGoal", "trackFunnelStep",
-  "identify", "reset", "grantConsent", "denyConsent",
+  "identify", "reset", "grantConsent", "denyConsent", "captureException", "captureMessage", "setTag",
 ];
 
 function parseBoolAttr(value: string | null, fallback: boolean): boolean {
@@ -526,8 +622,14 @@ if (typeof document !== "undefined") {
       autoTrackSpa: parseBoolAttr(scriptEl?.getAttribute("data-auto-track-spa") ?? null, true),
       autoEvents: parseBoolAttr(scriptEl?.getAttribute("data-auto-events") ?? null, true),
       requireConsent: parseBoolAttr(scriptEl?.getAttribute("data-require-consent") ?? null, false),
+      errors: parseBoolAttr(scriptEl?.getAttribute("data-errors") ?? null, false),
+      errors4xx: parseBoolAttr(scriptEl?.getAttribute("data-errors-4xx") ?? null, false),
+      errorsConsole: parseBoolAttr(scriptEl?.getAttribute("data-errors-console") ?? null, false),
+      ...(scriptEl?.getAttribute("data-release") ? { release: scriptEl.getAttribute("data-release") as string } : {}),
+      ...(scriptEl?.getAttribute("data-environment") ? { environment: scriptEl.getAttribute("data-environment") as string } : {}),
       ...(signingSecret ? { signingSecret } : {}),
     });
+    rememberScript(scriptEl);
     tracker.init();
     (window as any).growth = tracker;
     (window as any).trackme = tracker;

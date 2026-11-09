@@ -70,3 +70,4 @@ spec.zip
 infra/aiven/certs/
 
 .next-preview/
+apps/web/public/tracker.*.js
