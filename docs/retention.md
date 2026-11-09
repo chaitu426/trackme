@@ -16,7 +16,7 @@ and legal decision, not built.
 - Rows are cohorts: the day, week (Monday) or month a user first appeared. Columns are the periods that follow.
 - Each cell is the share of the cohort active in that period, shown as a number and shaded by it (the number is never
   only a colour). Hover for "X of Y users".
-- `–` means that period has not happened yet. It is not zero, so a recent cohort never shows a fake drop.
+- `–` means that period has not finished yet (the day, week or month still in progress counts). It is not zero, so a recent cohort never shows a fake drop.
 - Period 0 is the cohort's own period: 100% for "any activity", and lower if you count a specific return event.
 - The bottom row is the average weighted by cohort size, over the cohorts that have reached that period.
 

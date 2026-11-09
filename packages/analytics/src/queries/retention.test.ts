@@ -25,11 +25,11 @@ test("period starts step by day, week and calendar month", () => {
   assert.equal(periodStart("2026-12-01", "month", 2), "2027-02-01");
 });
 
-test("periods that have not happened yet are null, not zero", async () => {
+test("periods that have not finished are null, not zero, including the one in progress", async () => {
   const { client } = fake([{ cohort: "2026-11-08", size: 4 }], [{ cohort: "2026-11-08", period: 0, users: 4 }, { cohort: "2026-11-08", period: 1, users: 2 }]);
   const [row] = await getRetention({ ...base, from: "2026-11-08", to: "2026-11-08", periods: 3 }, client);
-  // Nov 8 + 1 day = Nov 9 (today, has happened), + 2 = Nov 10 (future).
-  assert.deepEqual(row, { cohort: "2026-11-08", size: 4, retained: [4, 2, null, null] });
+  // Nov 8 is over; Nov 9 is today (still running, so not a real number yet); later days have not happened.
+  assert.deepEqual(row, { cohort: "2026-11-08", size: 4, retained: [4, null, null, null] });
 });
 
 test("a period with nobody active is 0 when it has happened", async () => {

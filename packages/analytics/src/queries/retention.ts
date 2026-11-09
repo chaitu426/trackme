@@ -151,9 +151,10 @@ export async function getRetention(
     return {
       cohort: s.cohort,
       size: Number(s.size),
-      // A period that starts after today has not happened: null, so the chart cannot show a false drop to zero.
+      // A period that has not finished (it started today or later, or is still running) is null, so the chart
+      // cannot show a false drop to zero for the week or month in progress.
       retained: Array.from({ length: periods + 1 }, (_, k) =>
-        periodStart(s.cohort, q.granularity, k) > today ? null : (row?.get(k) ?? 0)
+        periodStart(s.cohort, q.granularity, k + 1) > today ? null : (row?.get(k) ?? 0)
       ),
     };
   });
