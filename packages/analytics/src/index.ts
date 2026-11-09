@@ -20,3 +20,4 @@ export * from "./queries/funnel-insights.js";
 export * from "./queries/segment-behavior.js";
 export * from "./queries/profiles.js";
 export * from "./queries/page-insights.js";
+export * from "./queries/errors.js";

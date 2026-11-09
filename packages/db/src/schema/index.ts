@@ -17,3 +17,4 @@ export * from "./alert-rules.js";
 export * from "./segments.js";
 
 export * from "./releases.js";
+export * from "./error-status.js";
