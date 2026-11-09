@@ -54,17 +54,27 @@ export function PortalMenu({
   className?: string;
   onEscape?: () => void;
 } & Pick<React.HTMLAttributes<HTMLDivElement>, "role" | "aria-label">) {
-  const [box, setBox] = React.useState<{ left: number; top?: number; bottom?: number; width: number } | null>(null);
+  type Box = { left: number; top?: number; bottom?: number; width: number };
+  const [box, setBox] = React.useState<Box | null>(null);
+  // Callers pass a fresh function every render. Keep it in a ref so the measuring effect does not re-run (and re-measure,
+  // and re-render) forever: that loop made the menu slow to open and sometimes not open at all.
+  const anchorRef = React.useRef(anchor);
+  anchorRef.current = anchor;
 
   React.useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
-      const rect = anchor()?.getBoundingClientRect();
+      const rect = anchorRef.current()?.getBoundingClientRect();
       if (!rect) return;
       const vh = window.innerHeight;
-      if (placement === "above-start") setBox({ left: rect.left, bottom: vh - rect.top + 8, width: rect.width });
-      else if (placement === "right-end") setBox({ left: rect.right + 8, bottom: vh - rect.bottom, width: rect.width });
-      else setBox({ left: rect.left, top: rect.bottom + 8, width: rect.width });
+      const next: Box =
+        placement === "above-start"
+          ? { left: rect.left, bottom: vh - rect.top + 8, width: rect.width }
+          : placement === "right-end"
+            ? { left: rect.right + 8, bottom: vh - rect.bottom, width: rect.width }
+            : { left: rect.left, top: rect.bottom + 8, width: rect.width };
+      // Same numbers: keep the old object, so React does not render again.
+      setBox((prev) => (prev && prev.left === next.left && prev.top === next.top && prev.bottom === next.bottom && prev.width === next.width ? prev : next));
     };
     place();
     window.addEventListener("resize", place);
@@ -73,7 +83,7 @@ export function PortalMenu({
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };
-  }, [open, anchor, placement]);
+  }, [open, placement]);
 
   React.useEffect(() => {
     if (!open || !onEscape) return;
