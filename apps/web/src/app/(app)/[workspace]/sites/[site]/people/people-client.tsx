@@ -22,6 +22,7 @@ import { StatsCard } from "@/components/ui/stats-card";
 import { MatrixArt } from "@/components/ui/matrix-art";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SessionReplay } from "@/components/session-replay";
+import { UserTimeline } from "@/components/user-timeline";
 import { SegmentBuilder, type SavedSegment } from "./segment-builder";
 import { describeBehavior, describeCondition } from "@/lib/segment-schema";
 import { formatRelativeTime } from "@/lib/format";
@@ -45,6 +46,7 @@ interface PeopleClientProps {
   initialProfiles: UserProfileItem[];
   /** A search the page was opened with; the list is already filtered to it. */
   initialSearch?: string;
+  workspaceSlug: string;
   stats: { total: number; active7d: number; avgEvents: number };
 }
 
@@ -85,7 +87,7 @@ function Avatar({ label, size = "md" }: { label: string; size?: "md" | "lg" }) {
   );
 }
 
-export function PeopleClient({ site, initialProfiles, initialSearch = "", stats }: PeopleClientProps) {
+export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSearch = "", stats }: PeopleClientProps) {
   const [profiles, setProfiles] = React.useState<UserProfileItem[]>(initialProfiles);
   const [search, setSearch] = React.useState(initialSearch);
   const [isSearching, setIsSearching] = React.useState(false);
@@ -262,6 +264,15 @@ export function PeopleClient({ site, initialProfiles, initialSearch = "", stats 
       // leave it in place; the user can try again
     }
   }
+
+  // Reached through a link to one person (an error's affected users, a copied link): open their profile directly.
+  const autoOpened = React.useRef(false);
+  React.useEffect(() => {
+    if (autoOpened.current || !initialSearch || initialProfiles.length !== 1) return;
+    autoOpened.current = true;
+    void openUserDrawer(initialProfiles[0]!);
+    // Runs once on arrival.
+  }, []);
 
   // Timelines already opened this session, so reopening a profile is instant.
   const timelineCache = React.useRef(new Map<string, UserTimelineEvent[]>());
@@ -570,6 +581,7 @@ export function PeopleClient({ site, initialProfiles, initialSearch = "", stats 
       {selectedUser && (
         <ProfileDrawer
           user={selectedUser}
+          site={{ id: site.id, domain: site.domain, workspaceSlug }}
           timeline={timeline}
           loading={loadingTimeline}
           error={timelineError}
@@ -667,6 +679,7 @@ function isGoalEvent(event: UserTimelineEvent): boolean {
 
 function ProfileDrawer({
   user,
+  site,
   timeline,
   loading,
   error,
@@ -674,6 +687,7 @@ function ProfileDrawer({
   onClose,
 }: {
   user: UserProfileItem;
+  site: { id: string; domain: string; workspaceSlug: string };
   timeline: UserTimelineEvent[];
   loading: boolean;
   error: boolean;
@@ -682,6 +696,7 @@ function ProfileDrawer({
 }) {
   const closeRef = React.useRef<HTMLButtonElement>(null);
   const [copiedId, setCopiedId] = React.useState(false);
+  const [view, setView] = React.useState<"timeline" | "sessions">("timeline");
   const label = displayNameOf(user);
   const traits = Object.entries(user.traits || {});
   const sessions = React.useMemo(() => groupBySession(timeline), [timeline]);
@@ -778,7 +793,27 @@ function ProfileDrawer({
             </section>
           )}
 
+          <div role="tablist" aria-label="Activity view" className="flex w-fit items-center gap-0.5 rounded-lg border border-white/[0.08] p-0.5 text-xs">
+            {(["timeline", "sessions"] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={view === id}
+                onClick={() => setView(id)}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === id ? "bg-raised text-zinc-50" : "text-zinc-400 hover:text-zinc-100"}`}
+              >
+                {id === "timeline" ? "Timeline" : "Sessions & replay"}
+              </button>
+            ))}
+          </div>
+
+          {view === "timeline" && (
+            <UserTimeline siteId={site.id} distinctId={user.distinctId} workspaceSlug={site.workspaceSlug} siteDomain={site.domain} />
+          )}
+
           {/* Journey */}
+          {view === "sessions" && (
           <section className="space-y-3">
             <div className="flex items-end justify-between">
               <h3 className="text-xs font-medium text-zinc-400">Journey</h3>
@@ -823,6 +858,7 @@ function ProfileDrawer({
               </ol>
             )}
           </section>
+          )}
         </div>
       </aside>
     </div>

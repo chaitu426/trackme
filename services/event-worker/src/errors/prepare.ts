@@ -69,7 +69,18 @@ export function prepareErrorEvents(batch: EnrichedEvent[]): PreparedErrors {
     const environment = event.environment ?? "production";
     const userId = event.userId ?? "";
 
-    events.push({ ...event, properties: { groupId: gid, errorType: error.type, level } });
+    // The event's own properties are replaced by what identifies the issue. The user id stays, so per-user reports
+    // (retention, the user timeline) can attribute the error; the title lets a timeline row say what happened.
+    events.push({
+      ...event,
+      properties: {
+        groupId: gid,
+        errorType: error.type,
+        level,
+        title: errorTitle(error),
+        ...(userId ? { distinctId: userId } : {}),
+      },
+    });
 
     rows.push({
       workspace_id: event.workspaceId,

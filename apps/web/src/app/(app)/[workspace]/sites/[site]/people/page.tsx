@@ -24,7 +24,7 @@ export default async function SitePeoplePage({
   } catch {
     notFound();
   }
-  const { site } = context;
+  const { workspace, site } = context;
 
   // Identified people come from the event stream (ClickHouse); a backend's POST /people adds name/email on top.
   const [page, stats] = await Promise.all([
@@ -39,6 +39,7 @@ export default async function SitePeoplePage({
   return (
     <PeopleClient
       site={{ id: site.id, domain: site.domain }}
+      workspaceSlug={workspace.slug}
       initialProfiles={initialProfiles}
       initialSearch={initialSearch}
       stats={{

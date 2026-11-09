@@ -60,6 +60,15 @@ test("an error event gets its group and scrubbed detail; other events pass throu
   assert.equal(JSON.parse(occurrence.tags).plan, "pro");
 });
 
+test("the error event keeps its user id and a title, so per-user reports can use it", () => {
+  const [identified] = prepareErrorEvents([event({ userId: "user-42" })]).events;
+  assert.equal(identified!.properties?.distinctId, "user-42");
+  assert.match(String(identified!.properties?.title), /^TypeError: /);
+  assert.ok(!String(identified!.properties?.title).includes("ada@example.com"), "the title is scrubbed");
+  const [anonymous] = prepareErrorEvents([event()]).events;
+  assert.ok(!("distinctId" in (anonymous!.properties ?? {})), "no user id is invented for an anonymous visitor");
+});
+
 test("the same bug twice has the same group id", () => {
   const out = prepareErrorEvents([event(), event({ eventId: "4f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42" })]);
   assert.equal(out.rows[0]!.group_id, out.rows[1]!.group_id);
