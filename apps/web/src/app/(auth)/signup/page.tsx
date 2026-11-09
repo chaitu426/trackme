@@ -4,7 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
-import { AuthShell, AuthTitle, Field, FormError, authPrimary } from "@/components/auth/auth-ui";
+import { AuthShell, AuthTitle, Field, FormError } from "@/components/auth/auth-ui";
+import { PasswordMeter } from "@/components/auth/password-meter";
+import { Button } from "@/components/ui/button";
+import { StepPanel } from "@/components/motion/primitives";
+import { checkPassword } from "@/lib/password-meter";
 import { OtpVerificationModal } from "@/components/auth/otp-input";
 
 export default function SignupPage() {
@@ -12,6 +16,9 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [nameValue, setNameValue] = useState("");
+  const [emailValue, setEmailValue] = useState("");
 
   // Email OTP verification state
   const [verifyingEmail, setVerifyingEmail] = useState(false);
@@ -53,8 +60,11 @@ export default function SignupPage() {
     }
   }
 
+  const report = checkPassword(password, { email: emailValue, name: nameValue });
+
   return (
     <AuthShell alt={{ href: "/login", label: "Sign in" }}>
+      <StepPanel stepKey={verifyingEmail ? "otp" : "form"} direction={verifyingEmail ? 1 : -1}>
       {verifyingEmail ? (
         <OtpVerificationModal
           email={signupEmail}
@@ -70,8 +80,8 @@ export default function SignupPage() {
           <AuthTitle title="Create your workspace">We email a one-time code to confirm your address.</AuthTitle>
 
           <form className="space-y-5" onSubmit={onSubmit}>
-            <Field id="signup-name" label="Full name" icon={User} name="name" type="text" required autoComplete="name" placeholder="Jane Doe" />
-            <Field id="signup-email" label="Work email" icon={Mail} name="email" type="email" required autoComplete="email" placeholder="jane@company.com" />
+            <Field id="signup-name" label="Full name" icon={User} name="name" type="text" required autoComplete="name" placeholder="Jane Doe" onChange={(e) => setNameValue(e.target.value)} />
+            <Field id="signup-email" label="Work email" icon={Mail} name="email" type="email" required autoComplete="email" placeholder="jane@company.com" onChange={(e) => setEmailValue(e.target.value)} />
             <Field
               id="signup-password"
               label="Password"
@@ -82,25 +92,27 @@ export default function SignupPage() {
               minLength={8}
               autoComplete="new-password"
               placeholder="At least 12 characters"
-              hint="Use a number or a symbol as well."
+              onChange={(e) => setPassword(e.target.value)}
               trailing={
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   aria-pressed={showPassword}
-                  className="grid h-7 w-7 place-items-center rounded-md text-zinc-400 transition-colors duration-150 hover:bg-white/[0.06] hover:text-zinc-100"
+                  className="press grid h-7 w-7 place-items-center rounded-md text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               }
             />
 
+            <PasswordMeter report={report} />
+
             {error && <FormError>{error}</FormError>}
 
-            <button type="submit" className={authPrimary} disabled={pending}>
-              {pending ? "Creating account…" : "Create account"}
-            </button>
+            <Button type="submit" className="h-10 w-full" loading={pending}>
+              {pending ? "Creating account" : "Create account"}
+            </Button>
           </form>
 
           <p className="mt-8 text-sm text-zinc-400">
@@ -111,6 +123,7 @@ export default function SignupPage() {
           </p>
         </>
       )}
+      </StepPanel>
     </AuthShell>
   );
 }

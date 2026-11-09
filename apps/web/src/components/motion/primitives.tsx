@@ -81,7 +81,7 @@ export function Collapse({ open, children }: { open: boolean; children: React.Re
 }
 
 /** A message that fades in and shakes once each time `nonce` changes, so a repeated error is noticed again. */
-export function Notice({ nonce, children, className }: { nonce: number; children: React.ReactNode; className?: string }) {
+export function Notice({ nonce, children, className }: { nonce: number | string; children: React.ReactNode; className?: string }) {
   return (
     <motion.div key={nonce} role="alert" className={className} initial={{ opacity: 0, x: 0 }} animate={{ opacity: 1, x: [0, -6, 5, -3, 0] }} transition={{ duration: 0.38, ease: "easeOut" }}>
       {children}

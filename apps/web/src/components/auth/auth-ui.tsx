@@ -2,6 +2,10 @@ import * as React from "react";
 import Link from "next/link";
 import { Activity, ArrowRight, type LucideIcon } from "lucide-react";
 import { GlyphField } from "@trackme/landing";
+import { Notice } from "@/components/motion/primitives";
+import { inputClass } from "@/components/ui/field";
+import { buttonBase, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
  * The frame for sign in and sign up: the form on the left, and on the right the same traffic
@@ -25,7 +29,7 @@ export function AuthShell({
             </span>
             TrackMe
           </Link>
-          <Link href={alt.href} className="inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors duration-150 hover:text-zinc-100">
+          <Link href={alt.href} className="press inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-100">
             {alt.label} <ArrowRight className="h-4 w-4" />
           </Link>
         </header>
@@ -100,7 +104,7 @@ export function Field({ id, label, icon: Icon, aside, trailing, hint, className 
         <input
           id={id}
           {...input}
-          className={`h-10 w-full rounded-lg border border-white/[0.1] bg-card pl-10 ${trailing ? "pr-11" : "pr-3"} text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors duration-150 hover:border-white/[0.18] focus:border-white/[0.35] ${className}`}
+          className={cn(inputClass, "pl-10", trailing ? "pr-11" : "pr-3", className)}
         />
         <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
         {trailing && <div className="absolute right-1.5 top-1/2 -translate-y-1/2">{trailing}</div>}
@@ -112,11 +116,10 @@ export function Field({ id, label, icon: Icon, aside, trailing, hint, className 
 
 export function FormError({ children }: { children: React.ReactNode }) {
   return (
-    <p role="alert" className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+    <Notice nonce={typeof children === "string" ? children : "error"} className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
       {children}
-    </p>
+    </Notice>
   );
 }
 
-export const authPrimary =
-  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60";
+export const authPrimary = cn(buttonBase, buttonVariants.primary, "h-10 w-full gap-2 rounded-lg px-4 text-sm");

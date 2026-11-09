@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, KeyRound, Lock, Mail } from "lucide-react";
-import { AuthShell, AuthTitle, Field, FormError, authPrimary } from "@/components/auth/auth-ui";
+import { AuthShell, AuthTitle, Field, FormError } from "@/components/auth/auth-ui";
 import { OtpVerificationModal } from "@/components/auth/otp-input";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { Button } from "@/components/ui/button";
+import { PillTabs, StepPanel } from "@/components/motion/primitives";
 
 
 export default function LoginPage() {
@@ -109,13 +111,9 @@ export default function LoginPage() {
     }
   }
 
-  const tab = (active: boolean) =>
-    `inline-flex h-full flex-1 items-center justify-center rounded-md px-3 text-sm transition-colors duration-150 ${
-      active ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "text-zinc-400 hover:text-zinc-100"
-    }`;
-
   return (
     <AuthShell alt={{ href: "/signup", label: "Create workspace" }}>
+      <StepPanel stepKey={otpMode ? "otp" : "form"} direction={otpMode ? 1 : -1}>
       {otpMode ? (
         <OtpVerificationModal
           email={otpEmail}
@@ -133,33 +131,23 @@ export default function LoginPage() {
         <>
           <AuthTitle title="Sign in">Use your password, or get a one-time code by email.</AuthTitle>
 
-          <div role="tablist" aria-label="Sign in method" className="mb-6 flex h-10 items-center gap-0.5 rounded-lg border border-white/[0.1] p-0.5">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={authMode === "password"}
-              onClick={() => {
-                setAuthMode("password");
-                setError(null);
-              }}
-              className={tab(authMode === "password")}
-            >
-              Password
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={authMode === "email_code"}
-              onClick={() => {
-                setAuthMode("email_code");
-                setError(null);
-              }}
-              className={tab(authMode === "email_code")}
-            >
-              Email code
-            </button>
-          </div>
+          <PillTabs
+            kind="tabs"
+            label="Sign in method"
+            value={authMode}
+            onChange={(mode) => {
+              setAuthMode(mode);
+              setError(null);
+            }}
+            className="mb-6 h-10 w-full"
+            itemClassName="h-full flex-1"
+            items={[
+              { id: "password", label: "Password" },
+              { id: "email_code", label: "Email code" },
+            ]}
+          />
 
+          <StepPanel stepKey={authMode} direction={authMode === "password" ? -1 : 1}>
           {authMode === "password" ? (
             <form className="space-y-5" onSubmit={onPasswordSubmit}>
               <Field id="login-email" label="Email" icon={Mail} name="email" type="email" required autoComplete="email" placeholder="name@company.com" />
@@ -179,7 +167,7 @@ export default function LoginPage() {
                       setAuthMode("email_code");
                       setError(null);
                     }}
-                    className="text-xs text-zinc-400 transition-colors duration-150 hover:text-zinc-100"
+                    className="press text-xs text-zinc-400 hover:text-zinc-100"
                   >
                     Forgot? Use an email code
                   </button>
@@ -190,7 +178,7 @@ export default function LoginPage() {
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     aria-pressed={showPassword}
-                    className="grid h-7 w-7 place-items-center rounded-md text-zinc-400 transition-colors duration-150 hover:bg-white/[0.06] hover:text-zinc-100"
+                    className="press grid h-7 w-7 place-items-center rounded-md text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -209,9 +197,9 @@ export default function LoginPage() {
 
               {error && <FormError>{error}</FormError>}
 
-              <button type="submit" className={authPrimary} disabled={pending}>
-                {pending ? "Signing in…" : "Sign in"}
-              </button>
+              <Button type="submit" className="h-10 w-full" loading={pending}>
+                {pending ? "Signing in" : "Sign in"}
+              </Button>
             </form>
           ) : (
             <form className="space-y-5" onSubmit={onEmailCodeSubmit}>
@@ -230,12 +218,13 @@ export default function LoginPage() {
 
               {error && <FormError>{error}</FormError>}
 
-              <button type="submit" className={authPrimary} disabled={pending || !emailCodeInput.trim()}>
-                <KeyRound className="h-4 w-4" />
-                {pending ? "Sending code…" : "Send code"}
-              </button>
+              <Button type="submit" className="h-10 w-full" loading={pending} disabled={!emailCodeInput.trim()}>
+                {!pending && <KeyRound />}
+                {pending ? "Sending code" : "Send code"}
+              </Button>
             </form>
           )}
+          </StepPanel>
 
           <p className="mt-8 text-sm text-zinc-400">
             No workspace yet?{" "}
@@ -245,6 +234,7 @@ export default function LoginPage() {
           </p>
         </>
       )}
+      </StepPanel>
     </AuthShell>
   );
 }
