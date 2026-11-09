@@ -66,6 +66,8 @@ const deps: WebhookDeps = {
         customer_ref: e.customerRef,
         session_ref: e.sessionRef,
         user_ref: e.userRef,
+        reason: e.reason,
+        due_by: e.dueBy || "1970-01-01T00:00:00.000Z",
         created_at: e.createdAt,
       })),
       clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1, date_time_input_format: "best_effort" },

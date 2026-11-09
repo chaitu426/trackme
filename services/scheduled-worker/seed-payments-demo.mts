@@ -50,6 +50,7 @@ interface Row {
   workspace_id: string; site_id: string; gateway: string; gateway_event_id: string; payment_id: string; order_id: string;
   status: string; amount_minor: number; currency: string; method: string; failure_code_raw: string; bank: string;
   customer_ref: string; session_ref: string; user_ref: string; created_at: string;
+  reason: string; due_by: string;
 }
 
 interface CheckoutSession { session_hash: string; at: string; browser: string; device: string; country: string; user: string }
@@ -70,6 +71,14 @@ function failure(method: string, ctx: { safari: boolean; outage: boolean; mobile
       : ["customer:collect_request:expired:BAD_REQUEST_ERROR", "bank:payment_authorization:insufficient_funds:BAD_REQUEST_ERROR"]);
   }
   return pick(["bank:payment_authorization:bank_declined:BAD_REQUEST_ERROR", "customer:payment_authentication:abandoned:BAD_REQUEST_ERROR"]);
+}
+
+/** Of the people whose payment failed, some come back and pay: after an outage most do, after a refusal fewer. Same order, new payment. */
+function retryChance(code: string): number {
+  if (code.includes("gateway")) return 0.62;
+  if (code.includes("insufficient")) return 0.18;
+  if (code.includes("abandon")) return 0.1;
+  return 0.34;
 }
 
 async function remove(siteId: string): Promise<void> {
@@ -138,13 +147,26 @@ async function main(): Promise<void> {
       customer_ref: s.user ? `cust_${s.user.slice(-8)}` : "", session_ref: s.session_hash, user_ref: s.user,
     };
     const ev = (suffix: string, status: string, at: number, failure_code_raw = "", amount_minor = amount): Row => ({
-      ...base, gateway_event_id: `demo_${n}_${suffix}`, status, created_at: iso(at), failure_code_raw, amount_minor,
+      ...base, gateway_event_id: `demo_${n}_${suffix}`, status, created_at: iso(at), failure_code_raw, amount_minor, reason: "", due_by: "1970-01-01T00:00:00.000Z",
     });
 
     orders.push({ workspace_id: site.workspaceId, site_id: site.id, order_id: orderId, session_hash: s.session_hash, user_id: s.user, ts: iso(start) });
     rows.push(ev("created", "created", start + 2000));
     if (failed) {
-      rows.push(ev("failed", "failed", start + Math.round(between(15_000, 70_000)), failure(method, { safari: safari && method === "card", outage, mobile })));
+      const code = failure(method, { safari: safari && method === "card", outage, mobile });
+      const failedAt = start + Math.round(between(15_000, 70_000));
+      rows.push(ev("failed", "failed", failedAt, code));
+      if (rand() < retryChance(code)) {
+        // They come back: same order, a new payment, often by another method (a declined card becomes UPI).
+        const retryAt = failedAt + Math.round(outage ? between(5 * 60_000, 90 * 60_000) : between(2 * 60_000, 20 * 3_600_000));
+        const rmethod = rand() < 0.5 ? method : pick(["upi", "card", "netbanking"] as const);
+        if (retryAt < NOW) {
+          const rid = `pay_demo_retry_${id(8)}`;
+          const rb = { ...base, payment_id: rid, method: rmethod };
+          rows.push({ ...rb, gateway_event_id: `demo_${n}_r_created`, status: "created", created_at: iso(retryAt), failure_code_raw: "", reason: "", due_by: "1970-01-01T00:00:00.000Z" });
+          rows.push({ ...rb, gateway_event_id: `demo_${n}_r_captured`, status: "captured", created_at: iso(retryAt + 25_000), failure_code_raw: "", reason: "", due_by: "1970-01-01T00:00:00.000Z" });
+        }
+      }
       continue;
     }
     const captured = start + Math.round(between(15_000, 50_000));
@@ -152,10 +174,11 @@ async function main(): Promise<void> {
     rows.push(ev("captured", "captured", captured));
     if (rand() < 0.045) {
       const at = captured + Math.round(between(1, 6) * DAY);
-      if (at < NOW) rows.push(ev("refund", "refunded", at, "", rand() < 0.7 ? amount : Math.round(amount / 2)));
-    } else if (rand() < 0.004) {
-      const at = captured + Math.round(between(4, 15) * DAY);
-      if (at < NOW) rows.push(ev("dispute", "disputed", at, "", amount));
+      if (at < NOW) rows.push({ ...ev("refund", "refunded", at, "", rand() < 0.7 ? amount : Math.round(amount / 2)), reason: pick(["requested_by_customer", "requested_by_customer", "duplicate", "fraudulent"]) });
+    } else if (rand() < 0.022) {
+      const at = captured + Math.round(between(2, 20) * DAY);
+      // Some disputes are old and past their deadline, some are due in a few days, so the countdown has something to show.
+      if (at < NOW) rows.push({ ...ev("dispute", "disputed", at, "", amount), reason: pick(["product_not_received", "fraudulent", "product_unacceptable", "duplicate"]), due_by: iso(at + 14 * DAY) });
     }
   }
 
@@ -172,10 +195,19 @@ async function main(): Promise<void> {
       workspace_id: site.workspaceId, site_id: site.id, gateway: "razorpay", payment_id: `pay_demo_${id(10)}`, order_id: `order_demo_${String(n).padStart(5, "0")}`,
       amount_minor: amount, currency: "INR", method, bank: method === "upi" ? pick(UPI_PSPS) : pick(BANKS), customer_ref: "", session_ref: "", user_ref: "",
     };
-    const ev = (suffix: string, status: string, at: number, code = ""): Row => ({ ...base, gateway_event_id: `demo_${n}_${suffix}`, status, created_at: iso(at), failure_code_raw: code });
+    const ev = (suffix: string, status: string, at: number, code = ""): Row => ({ ...base, gateway_event_id: `demo_${n}_${suffix}`, status, created_at: iso(at), failure_code_raw: code, reason: "", due_by: "1970-01-01T00:00:00.000Z" });
     rows.push(ev("created", "created", start));
-    if (rand() < (outage ? 0.86 : 0.07)) rows.push(ev("failed", "failed", start + 30_000, failure(method, { safari: false, outage, mobile: method === "upi" })));
-    else rows.push(ev("captured", "captured", start + 30_000));
+    if (rand() < (outage ? 0.86 : 0.07)) {
+      const code = failure(method, { safari: false, outage, mobile: method === "upi" });
+      rows.push(ev("failed", "failed", start + 30_000, code));
+      if (rand() < retryChance(code)) {
+        const retryAt = start + 30_000 + Math.round(outage ? between(10 * 60_000, 80 * 60_000) : between(3 * 60_000, 2 * 3_600_000));
+        const rid = `pay_demo_retry_${id(8)}`;
+        const rb = { ...base, payment_id: rid };
+        rows.push({ ...rb, gateway_event_id: `demo_${n}_r_created`, status: "created", created_at: iso(retryAt), failure_code_raw: "", reason: "", due_by: "1970-01-01T00:00:00.000Z" });
+        rows.push({ ...rb, gateway_event_id: `demo_${n}_r_captured`, status: "captured", created_at: iso(retryAt + 25_000), failure_code_raw: "", reason: "", due_by: "1970-01-01T00:00:00.000Z" });
+      }
+    } else rows.push(ev("captured", "captured", start + 30_000));
   }
 
   for (let i = 0; i < rows.length; i += 2000) {

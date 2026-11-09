@@ -29,3 +29,4 @@ export * from "./release-report.js";
 export * from "./queries/payments.js";
 export { detectIncidents, binomialTail, type HealthBucket, type Incident } from "./payments-health.js";
 export * from "./queries/payment-failures.js";
+export * from "./queries/payment-recovery.js";

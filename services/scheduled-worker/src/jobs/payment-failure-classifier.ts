@@ -59,6 +59,8 @@ export interface ClassifierDeps {
   fetchErrors(pairs: Array<{ siteId: string; sessionHash: string }>, fromMs: number, toMs: number): Promise<ErrorHit[]>;
   fetchOutcomes(pairs: Array<{ siteId: string; gateway: string }>, fromMs: number, toMs: number): Promise<Outcome[]>;
   save(rows: ClassifiedRow[]): Promise<void>;
+  /** Hands the classified failures to whatever follows up (a mailer, a WhatsApp sender). Best effort: it never fails the job. */
+  emit?(rows: ClassifiedRow[]): Promise<void>;
 }
 
 /** An error counts as related when it came in the two minutes before the payment failed. */
@@ -134,5 +136,7 @@ export async function classifyPending(
     };
   });
   await deps.save(rows);
+  // After the rows are safely stored. A failing hand-off must not undo or repeat the classification.
+  if (deps.emit) await deps.emit(rows).catch(() => undefined);
   return rows.length;
 }

@@ -90,3 +90,12 @@ test("a whole batch is classified in one save", async () => {
   assert.equal(await classifyPending(d), 3);
   assert.deepEqual(saved.map((r) => r.category), ["bank_decline", "insufficient_funds", "user_abandon"]);
 });
+
+test("classified failures are handed to the emit hook after they are saved, and a failing hook does not undo the job", async () => {
+  const order: string[] = [];
+  const base = deps([failure()]);
+  const d: ClassifierDeps = { ...base.d, save: async (rows) => void (order.push("save"), base.saved.push(...rows)), emit: async () => { order.push("emit"); throw new Error("mailer down"); } };
+  assert.equal(await classifyPending(d), 1);
+  assert.deepEqual(order, ["save", "emit"]);
+  assert.equal(base.saved.length, 1);
+});

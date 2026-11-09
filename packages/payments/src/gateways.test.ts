@@ -91,7 +91,7 @@ test("Razorpay: a captured payment is normalised, with money in minor units and 
   assert.deepEqual(event, {
     gateway: "razorpay", gatewayEventId: "evt_rzp_1", paymentId: "pay_123", orderId: "order_9", status: "captured",
     amountMinor: 49900, currency: "INR", method: "upi", failureCodeRaw: "", bank: "oksbi", customerRef: "cust_1",
-    createdAt: new Date(1767000000 * 1000).toISOString(), sessionRef: "sess-abc", userRef: "user-7",
+    createdAt: new Date(1767000000 * 1000).toISOString(), sessionRef: "sess-abc", userRef: "user-7", reason: "", dueBy: "",
   });
   const serialized = JSON.stringify(event);
   for (const secret of ["ravi.kumar", "ravi@example.com", "9876543210"]) assert.ok(!serialized.includes(secret), `${secret} must not be kept`);
@@ -168,4 +168,34 @@ test("the gateway registry knows only the supported gateways", () => {
   assert.equal(getGateway("razorpay"), razorpay);
   assert.equal(getGateway("stripe"), stripe);
   for (const bad of ["paypal", "", "__proto__", "constructor"]) assert.equal(getGateway(bad), null, bad);
+});
+
+test("razorpay: a dispute keeps its reason code and the respond-by time; a plain payment keeps neither", () => {
+  const dispute = JSON.stringify({ event: "payment.dispute.created", created_at: 1700000000, payload: { dispute: { entity: { id: "disp_1", payment_id: "pay_9", amount: 5000, currency: "INR", reason_code: "GOODS_SERVICES_NOT_PROVIDED", respond_by: 1700600000, created_at: 1700000000 } } } });
+  const [d] = razorpay.normalize(dispute, "evt_d");
+  assert.equal(d!.status, "disputed");
+  assert.equal(d!.reason, "goods_services_not_provided".toUpperCase());
+  assert.equal(d!.dueBy, "2023-11-21T20:53:20.000Z");
+  const paid = JSON.stringify({ event: "payment.captured", payload: { payment: { entity: { id: "pay_1", amount: 100, currency: "INR", method: "card" } } } });
+  const [p] = razorpay.normalize(paid, "evt_p");
+  assert.equal(p!.reason, "");
+  assert.equal(p!.dueBy, "");
+});
+
+test("stripe: a dispute keeps its reason and evidence deadline, and a refund keeps its reason", () => {
+  const dispute = JSON.stringify({ id: "evt_1", type: "charge.dispute.created", created: 1700000000, data: { object: { payment_intent: "pi_1", amount: 2900, currency: "usd", reason: "product_not_received", evidence_details: { due_by: 1700600000 } } } });
+  const [d] = stripe.normalize(dispute, "evt_1");
+  assert.equal(d!.reason, "product_not_received");
+  assert.equal(d!.dueBy, "2023-11-21T20:53:20.000Z");
+  const refund = JSON.stringify({ id: "evt_2", type: "refund.created", created: 1700000000, data: { object: { payment_intent: "pi_1", amount: 900, currency: "usd", reason: "requested_by_customer" } } });
+  const [r] = stripe.normalize(refund, "evt_2");
+  assert.equal(r!.reason, "requested_by_customer");
+  assert.equal(r!.dueBy, "");
+});
+
+test("a missing or absurd deadline is empty, never a wrong date", () => {
+  const body = (due: unknown) => JSON.stringify({ id: "e", type: "charge.dispute.created", created: 1, data: { object: { payment_intent: "pi", amount: 1, currency: "usd", evidence_details: { due_by: due } } } });
+  assert.equal(stripe.normalize(body(0), "e")[0]!.dueBy, "");
+  assert.equal(stripe.normalize(body("soon"), "e")[0]!.dueBy, "");
+  assert.equal(stripe.normalize(body(undefined), "e")[0]!.dueBy, "");
 });

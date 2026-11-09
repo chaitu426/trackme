@@ -1,4 +1,4 @@
-import { at, failureText, hmacHex, isoFromSeconds, method, minorUnits, parseJson, signaturesMatch, text } from "./common.js";
+import { at, failureText, hmacHex, isoFromSeconds, isoOrEmpty, method, minorUnits, parseJson, signaturesMatch, text } from "./common.js";
 import type { PaymentGateway, PaymentStatus } from "./types.js";
 
 /**
@@ -89,6 +89,8 @@ export const stripe: PaymentGateway = {
           createdAt: isoFromSeconds(created, fallbackMs),
           sessionRef: text(at(object, "metadata", "trackme_session"), 64),
           userRef: text(at(object, "metadata", "trackme_user"), 64),
+          reason: "",
+          dueBy: "",
         },
       ];
     }
@@ -115,6 +117,8 @@ export const stripe: PaymentGateway = {
           createdAt: isoFromSeconds(created, fallbackMs),
           sessionRef: "",
           userRef: "",
+          reason: failureText(at(object, "reason")),
+          dueBy: type === "charge.dispute.created" ? isoOrEmpty(at(object, "evidence_details", "due_by")) : "",
         },
       ];
     }

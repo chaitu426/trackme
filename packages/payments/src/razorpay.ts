@@ -1,4 +1,4 @@
-import { at, failureText, hmacHex, isoFromSeconds, method, minorUnits, parseJson, sha256Hex, signaturesMatch, text } from "./common.js";
+import { at, failureText, hmacHex, isoFromSeconds, isoOrEmpty, method, minorUnits, parseJson, sha256Hex, signaturesMatch, text } from "./common.js";
 import type { PaymentEvent, PaymentGateway, PaymentStatus } from "./types.js";
 
 /**
@@ -70,6 +70,8 @@ export const razorpay: PaymentGateway = {
           createdAt: isoFromSeconds(at(entity, "created_at") ?? at(body, "created_at"), fallbackMs),
           sessionRef: text(at(entity, "notes", "trackme_session"), 64),
           userRef: text(at(entity, "notes", "trackme_user"), 64),
+          reason: "",
+          dueBy: "",
         },
       ];
     }
@@ -119,5 +121,7 @@ function refundOrDispute(
     createdAt: isoFromSeconds(at(entity, "created_at") ?? bodyCreated, fallbackMs),
     sessionRef: text(at(entity, "notes", "trackme_session"), 64),
     userRef: text(at(entity, "notes", "trackme_user"), 64),
+    reason: status === "disputed" ? failureText(at(entity, "reason_code")) : failureText(at(entity, "notes", "reason")),
+    dueBy: status === "disputed" ? isoOrEmpty(at(entity, "respond_by")) : "",
   };
 }

@@ -140,7 +140,18 @@ cron.schedule("* * * * *", async () => {
       "lock:scheduled:payment_failure_classifier",
       55,
       "Payment Failure Classifier",
-      instrumentJob("payment_failure_classifier", () => classifyPending(createClickHouseClassifierDeps()).then(() => undefined))
+      instrumentJob("payment_failure_classifier", () => {
+        const deps = createClickHouseClassifierDeps();
+        // Each classified failure is also published on a Redis stream for the customer's own follow-up tooling (about the last 10,000 kept).
+        deps.emit = async (rows) => {
+          const pipe = redis.pipeline();
+          for (const r of rows) {
+            pipe.xadd("payments:failed", "MAXLEN", "~", 10000, "*", "siteId", r.siteId, "workspaceId", r.workspaceId, "paymentId", r.paymentId, "orderId", r.orderId, "category", r.category, "amountMinor", String(r.amountMinor), "currency", r.currency, "method", r.method, "userRef", r.userRef, "failedAt", new Date(r.failedAtMs).toISOString());
+          }
+          await pipe.exec();
+        };
+        return classifyPending(deps).then(() => undefined);
+      })
     );
   } catch (err) {
     console.error("Failed classifying payment failures:", err);

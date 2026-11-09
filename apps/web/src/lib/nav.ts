@@ -1,6 +1,8 @@
 import {
   Activity,
+  RotateCcw,
   Stethoscope,
+  Undo2,
   Plug,
   BarChart2,
   CreditCard,
@@ -81,6 +83,8 @@ export const NAV_SUITES: NavSuite[] = [
       { path: "payments/checkout", label: "Checkout Funnel", icon: Filter },
       { path: "payments/health", label: "Gateway Health", icon: Activity },
       { path: "payments/failures", label: "Failure Doctor", icon: Stethoscope },
+      { path: "payments/recovery", label: "Recovery", icon: RotateCcw },
+      { path: "payments/refunds", label: "Refunds & Disputes", icon: Undo2 },
       { path: "payments/connect", label: "Integrations", icon: Plug },
     ],
   },

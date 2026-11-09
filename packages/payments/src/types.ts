@@ -39,6 +39,10 @@ export interface PaymentEvent {
   /** Merchant-supplied linkage copied from order metadata: which TrackMe session and user placed the order. */
   sessionRef: string;
   userRef: string;
+  /** Why a refund or dispute happened, as the gateway's own code, scrubbed and capped. Empty otherwise. */
+  reason: string;
+  /** For a dispute, when the merchant must respond by (ISO UTC). Empty otherwise. */
+  dueBy: string;
 }
 
 export type VerifyResult = { ok: true } | { ok: false; reason: "bad_signature" | "missing_signature" | "stale" | "malformed" };

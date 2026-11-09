@@ -58,3 +58,10 @@ export function parseJson(rawBody: string): unknown {
     return undefined;
   }
 }
+
+/** Unix seconds as an ISO time, or "" when the value is not a plausible time (missing, zero, not a number). */
+export function isoOrEmpty(value: unknown): string {
+  const seconds = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 4_102_444_800) return "";
+  return new Date(seconds * 1000).toISOString();
+}

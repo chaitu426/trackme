@@ -56,7 +56,8 @@ const PER_PAYMENT = `
          maxIf(amount_minor, status = 'captured') AS amount,
          sumIf(amount_minor, status = 'refunded') AS refunded,
          max(status = 'disputed') AS disputed,
-         argMax(method, created_at) AS method,
+         -- A refund or dispute event carries the method "other"; the payment's method is what it was when it was made.
+         argMaxIf(method, created_at, status IN ('created', 'authorized', 'captured', 'failed')) AS method,
          toDate(min(created_at)) AS day,
          any(if(user_ref != '', user_ref, customer_ref)) AS customer
   FROM growth_analytics.payment_events FINAL
