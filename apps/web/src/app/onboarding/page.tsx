@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo-mark";
 import { requireUser } from "@/lib/auth";
 import { listUserWorkspaces } from "@/lib/tenancy";
 import { OnboardingForm } from "./onboarding-form";
@@ -12,9 +12,7 @@ export default async function OnboardingPage() {
     <div className="flex min-h-screen flex-col bg-background text-zinc-100 antialiased">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 text-base font-medium leading-none text-zinc-50" aria-label="TrackMe home">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-[#ededed] text-[#141415]">
-            <Activity className="h-4 w-4" />
-          </span>
+          <LogoMark />
           TrackMe
         </Link>
         <span className="truncate font-mono text-xs text-zinc-500">{user.email}</span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { MatrixArt } from "@/components/ui/matrix-art";
 import { MatrixLoader } from "@/components/ui/matrix-loader";
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -98,12 +99,10 @@ export function GeoGlobe({
 
   if (!hub) {
     return (
-      <div
-        className="flex items-center justify-center rounded-xl border border-white/[0.08] bg-sidebar text-xs text-zinc-500"
-        style={{ height }}
-      >
-        Location data will appear after your first visitors arrive.
-      </div>
+      <MatrixArt variant="globe" className="min-h-[16rem] flex-1" strength={0.85}>
+        <p className="text-sm font-medium text-zinc-200">No visitors yet</p>
+        <p className="mt-1 text-xs leading-4 text-zinc-400">Countries appear here after your first visitors arrive.</p>
+      </MatrixArt>
     );
   }
 

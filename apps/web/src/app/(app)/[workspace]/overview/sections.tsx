@@ -231,7 +231,7 @@ export async function TrafficChart(props: SectionProps) {
 export async function TopSources(props: SectionProps) {
   const topReferrers = await cachedBreakdown(requests(props).current, "referrer");
   return (
-        <Card className="reveal">
+        <Card className="reveal flex min-h-[420px] flex-col">
           <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
             <div>
               <CardTitle>Top sources</CardTitle>
@@ -239,7 +239,7 @@ export async function TopSources(props: SectionProps) {
             </div>
             <span className="font-mono text-xs text-zinc-500">Visitors · share</span>
           </CardHeader>
-          <div className="pt-2">
+          <div className="flex flex-1 flex-col pt-2">
             <RankingList
               items={topReferrers.items.map((item) => ({
                 name: sourceLabel(item.name),
@@ -260,7 +260,7 @@ export async function TopPages(props: SectionProps) {
   // Rows are ranked by pageviews, so their share is a share of pageviews (the breakdown's own percentage is of visitors).
   const totalPageviews = Math.max(totals.pageviews, 1);
   return (
-        <Card className="reveal">
+        <Card className="reveal flex min-h-[420px] flex-col">
           <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
             <div>
               <CardTitle>Top pages</CardTitle>
@@ -268,7 +268,7 @@ export async function TopPages(props: SectionProps) {
             </div>
             <span className="font-mono text-xs text-zinc-500">Pageviews · share</span>
           </CardHeader>
-          <div className="pt-2">
+          <div className="flex flex-1 flex-col pt-2">
             <RankingList
               items={topPages.items.map((item) => ({
                 name: item.name,

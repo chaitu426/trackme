@@ -1,9 +1,10 @@
 import { Suspense } from "react";
+import { LogoMark } from "@/components/brand/logo-mark";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { Activity, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { GlyphField } from "@trackme/landing";
 import { getPublicSite } from "@/lib/tenancy";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -65,9 +66,7 @@ export default async function PublicShareDashboard({
       <div className="border-b border-white/[0.08] bg-background">
         <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2 text-base font-medium leading-none text-zinc-50" aria-label="TrackMe home">
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-[#ededed] text-[#141415]">
-              <Activity className="h-4 w-4" />
-            </span>
+            <LogoMark />
             TrackMe
           </Link>
           <div className="flex items-center gap-4">

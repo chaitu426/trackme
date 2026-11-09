@@ -1,8 +1,8 @@
 "use client";
 
+import { LogoMark } from "./logo-mark";
 import * as React from "react";
 import {
-  Activity,
   ArrowUpRight,
   BarChart2,
   Check,
@@ -773,9 +773,7 @@ export function DemoDashboard({ getStarted = "/signup", startLabel = "Create wor
           <div className="min-h-0">
             <div className={`flex h-14 items-center border-b border-white/[0.08] px-3 ${collapsed ? "justify-center" : "justify-between"}`}>
               <div className="flex items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-md bg-zinc-100 text-zinc-950">
-                  <Activity className="h-4 w-4" strokeWidth={1.5} />
-                </span>
+                <LogoMark size={28} />
                 {!collapsed && <span className="text-base font-medium leading-none text-zinc-100">TrackMe</span>}
               </div>
               {!collapsed && (

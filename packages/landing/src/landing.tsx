@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Activity, ArrowRight, ArrowUpRight, Database, Globe2, Server, ShieldCheck, Workflow, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Database, Globe2, Server, ShieldCheck, Workflow, type LucideIcon } from "lucide-react";
 import { SmartLink } from "./smart-link";
 import { HeroScene } from "./hero-scene";
 import { GlyphField } from "./glyph-field";
@@ -8,6 +8,7 @@ import { DEMO_ANCHOR } from "./demo-bus";
 import { Navbar } from "./navbar";
 import { FeatureStage } from "./feature-stage";
 import { PrivacyLedger } from "./privacy-ledger";
+import { LogoMark } from "./logo-mark";
 import { InstallConsole } from "./install-console";
 import { CopySnippet } from "./copy-snippet";
 import { TryChips } from "./try-chips";
@@ -111,11 +112,7 @@ function SectionHead({ index, label, title, lead }: { index: string; label: stri
 }
 
 function Mark() {
-  return (
-    <span className="grid h-6 w-6 place-items-center rounded-md bg-[#ededed] text-[#141415]">
-      <Activity className="h-4 w-4" strokeWidth={1.75} />
-    </span>
-  );
+  return <LogoMark size={24} />;
 }
 
 export function Landing({ product = "TrackMe", links, viewer, snippet }: LandingProps) {

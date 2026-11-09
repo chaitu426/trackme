@@ -1,6 +1,7 @@
 import * as React from "react";
+import { LogoMark } from "@/components/brand/logo-mark";
 import Link from "next/link";
-import { Activity, ArrowRight, type LucideIcon } from "lucide-react";
+import { ArrowRight, type LucideIcon } from "lucide-react";
 import { GlyphField } from "@trackme/landing";
 import { Notice } from "@/components/motion/primitives";
 import { inputClass } from "@/components/ui/field";
@@ -24,9 +25,7 @@ export function AuthShell({
       <div className="flex min-h-screen flex-col px-6 sm:px-10">
         <header className="flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-base font-medium leading-none text-zinc-50" aria-label="TrackMe home">
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-[#ededed] text-[#141415]">
-              <Activity className="h-4 w-4" />
-            </span>
+            <LogoMark />
             TrackMe
           </Link>
           <Link href={alt.href} className="press inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-100">

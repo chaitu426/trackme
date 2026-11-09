@@ -31,7 +31,7 @@ export function PageHeader({
           <h1 className="text-title font-medium text-zinc-50">{title}</h1>
           {children && <p className="mt-1 max-w-xl text-sm leading-5 text-zinc-400">{children}</p>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 rounded-xl bg-sidebar/90 p-1 backdrop-blur-[2px]">{actions}</div>}
       </div>
     </header>
   );

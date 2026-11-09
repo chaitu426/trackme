@@ -19,7 +19,11 @@ export function MatrixArt({
   return (
     <div className={`relative overflow-hidden rounded-xl border border-white/[0.06] bg-sidebar ${className}`}>
       <GlyphField variant={variant} cell={9} strength={strength} />
-      {children && <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">{children}</div>}
+      {children && (
+        <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">
+          <div className="max-w-xs rounded-lg bg-sidebar/90 px-4 py-3 backdrop-blur-[2px]">{children}</div>
+        </div>
+      )}
     </div>
   );
 }

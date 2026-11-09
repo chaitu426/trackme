@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
-  Activity,
   ChevronDown,
   LogOut,
   BookOpen,
@@ -19,6 +18,8 @@ import {
 } from "lucide-react";
 import { NAV_SUITES, SITE_SETTINGS_ITEM } from "@/lib/nav";
 import { Tooltip } from "@/components/ui/tooltip";
+import { PortalMenu } from "@/components/ui/menu-panel";
+import { LogoMark } from "@/components/brand/logo-mark";
 
 const SUITES_STORAGE_KEY = "trackme_sidebar_closed_suites";
 interface SidebarProps {
@@ -48,10 +49,15 @@ export function Sidebar({
   const router = useRouter();
   const [profileOpen, setProfileOpen] = React.useState(false);
   const profileMenuRef = React.useRef<HTMLDivElement>(null);
+  const profileButtons = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  // Only the sidebar that is on screen opens the menu; the other is mounted but hidden.
+  const visibleScope = mobileOpen ? "drawer" : "desktop";
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Element;
+      if (target.closest?.("[data-portal-menu]")) return;
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setProfileOpen(false);
       }
     }
@@ -147,29 +153,38 @@ export function Sidebar({
   const renderContent = (collapsed: boolean, scope: "desktop" | "drawer" = "desktop") => (
     <div className="flex h-full flex-col justify-between overflow-hidden border-r border-border bg-sidebar">
       <div>
-        <div className={`flex h-14 items-center justify-between border-b border-border px-3 ${collapsed ? "h-auto flex-col gap-2 py-3" : ""}`}>
-          <div className="flex min-w-0 items-center space-x-3 overflow-hidden">
-            <Link
-              href={`/${workspace.slug}/overview`}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white"
-            >
-              <Activity className="h-4 w-4" />
-            </Link>
-            {!collapsed && (
-              <div className="flex min-w-0 flex-col">
+        <div className={`flex h-14 items-center border-b border-border px-3 ${collapsed ? "justify-center" : "justify-between"}`}>
+          {collapsed ? (
+            // Collapsed, the logo is the only thing in the header. Hover or focus turns it into the expand control.
+            <Tooltip content="Expand sidebar" side="right">
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                aria-label="Expand sidebar"
+                className="group press relative grid size-9 place-items-center rounded-lg hover:bg-white/[0.06] focus-visible:bg-white/[0.06]"
+              >
+                <span className="transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0">
+                  <LogoMark />
+                </span>
+                <PanelLeftOpen className="absolute size-4 text-zinc-200 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
+              </button>
+            </Tooltip>
+          ) : (
+            <>
+              <Link href={`/${workspace.slug}/overview`} aria-label="TrackMe home" className="press flex min-w-0 items-center gap-3 rounded-md">
+                <LogoMark />
                 <span className="text-base font-medium leading-none text-zinc-100">TrackMe</span>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-200 lg:flex"
-          >
-            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </button>
+              </Link>
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                aria-label="Collapse sidebar"
+                className="press hidden size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200 lg:flex"
+              >
+                <PanelLeftClose className="size-4" aria-hidden="true" />
+              </button>
+            </>
+          )}
         </div>
 
         <LayoutGroup id={`sidebar-${scope}-${collapsed ? "rail" : "full"}`}>
@@ -177,7 +192,7 @@ export function Sidebar({
           {navGroups.map((group) => {
             const open = collapsed || !closedSuites.includes(group.id);
             return (
-            <div key={group.id} className="space-y-1">
+            <div key={group.id} className={collapsed ? "space-y-1 border-t border-white/[0.06] pt-4 first:border-0 first:pt-0" : "space-y-1"}>
               {!collapsed && (
                 <button
                   type="button"
@@ -239,15 +254,15 @@ export function Sidebar({
       </div>
 
       <div className="relative border-t border-border p-2" ref={profileMenuRef}>
-        <AnimatePresence>
-        {profileOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.14 }}
-            className={`absolute bottom-full z-50 mb-2 rounded-xl border border-border bg-card p-2 shadow-float ${collapsed ? "left-2 w-56" : "left-2 right-2"}`}
-          >
+        <PortalMenu
+          open={profileOpen && scope === visibleScope}
+          anchor={() => profileButtons.current[scope]}
+          placement={collapsed ? "right-end" : "above-start"}
+          role="menu"
+          aria-label="Account"
+          className="p-2"
+          onEscape={() => setProfileOpen(false)}
+        >
             <div className="border-b border-white/[0.06] px-3 py-2">
               <p className="truncate text-xs font-medium text-zinc-100">{user.email}</p>
               <div className="mt-1 flex items-center gap-2">
@@ -285,12 +300,15 @@ export function Sidebar({
                 <span>Sign Out</span>
               </button>
             </div>
-          </motion.div>
-        )}
-        </AnimatePresence>
+        </PortalMenu>
 
         <button
           type="button"
+          ref={(el) => {
+            profileButtons.current[scope] = el;
+          }}
+          aria-haspopup="menu"
+          aria-expanded={profileOpen && scope === visibleScope}
           onClick={() => setProfileOpen(!profileOpen)}
           className={`press flex w-full items-center rounded-md p-2 text-left hover:bg-white/[0.04] ${collapsed ? "justify-center" : "gap-3"} ${profileOpen ? "bg-white/[0.06]" : ""}`}
         >

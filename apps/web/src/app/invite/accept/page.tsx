@@ -1,11 +1,12 @@
 "use client";
 
+import { LogoMark } from "@/components/brand/logo-mark";
 import { MatrixLoader } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Activity, ArrowRight, Check, Crown, Eye, EyeOff, Lock, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, Check, Crown, Eye, EyeOff, Lock, Users, type LucideIcon } from "lucide-react";
 import { GlyphField } from "@trackme/landing";
 import { Field, TextInput } from "@/components/ui/field";
 import { StepPanel, DrawCheck, Notice } from "@/components/motion/primitives";
@@ -149,7 +150,7 @@ export default function InviteAcceptPage() {
       <aside className="relative hidden overflow-hidden border-r border-white/[0.08] bg-sidebar lg:flex lg:flex-col">
         <div className="relative z-10 flex flex-1 flex-col p-10">
           <Link href="/" className="flex items-center gap-2 text-base font-medium text-zinc-50" aria-label="TrackMe home">
-            <span className="grid size-7 place-items-center rounded-md bg-[#ededed] text-[#141415]"><Activity className="size-4" /></span>
+            <LogoMark />
             TrackMe
           </Link>
 
@@ -181,7 +182,7 @@ export default function InviteAcceptPage() {
       <main className="flex min-w-0 items-center justify-center px-4 py-12 sm:px-8">
         <div className="w-full max-w-[420px]">
           <Link href="/" className="mb-10 flex items-center gap-2 text-base font-medium text-zinc-50 lg:hidden" aria-label="TrackMe home">
-            <span className="grid size-7 place-items-center rounded-md bg-[#ededed] text-[#141415]"><Activity className="size-4" /></span>
+            <LogoMark />
             TrackMe
           </Link>
 

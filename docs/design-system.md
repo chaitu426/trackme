@@ -50,9 +50,18 @@ All in `apps/web/src/components`. Reach for these before writing markup.
 | An in-place "are you sure" on a row | `ui/confirm-action` |
 | Feedback after an action | `toast.success(...)`, `toast.error(...)` from `lib/toast` (never `alert`) |
 | Copying text | `ui/copy-button` |
+| Something is loading | `ui/matrix-loader`: `MatrixSpinner` inline (buttons use it through `Button loading`), `MatrixLoader` for a block. Never a spinning circle |
+| The logo | `brand/logo-mark` (one implementation, shared with the landing page, in `packages/landing`) |
+| A hint or menu inside the sidebar or a scroll area | `ui/tooltip` and `ui/menu-panel` `PortalMenu` draw in a portal so nothing clips them. Use `MenuPanel` only where no parent clips |
 | Go anywhere | the command palette, Ctrl or Cmd + K (`command-palette.tsx`); it reads `lib/nav.ts` |
 
 Navigation has one source: `lib/nav.ts` (`NAV_SUITES`, `navTargets`, `pageLabelFor`). The sidebar, the breadcrumb and the palette all read it, so a new page is added in one place.
+
+## The matrix theme
+
+The product's picture language is the glyph ramp `. : + #`. It appears as the page-header pictures, empty states (`MatrixArt`, `Empty`),
+the 404 and error pages, the loaders and the logo. A shape stands for what the page is about (ridge traffic, steps funnel, globe locations,
+gauge vitals and payments, pulse activity). Text laid over a picture always sits on a solid backing so it reads.
 
 ## Motion
 

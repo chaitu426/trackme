@@ -11,13 +11,13 @@ import { cn } from "@/lib/utils";
 const RAMP = [".", ":", "+", "#"] as const;
 const STEP_MS = 110;
 
-function useFrame(active: boolean): number {
+function useFrame(active: boolean, stepMs = STEP_MS): number {
   const [frame, setFrame] = React.useState(0);
   React.useEffect(() => {
     if (!active || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => setFrame((f) => f + 1), STEP_MS);
+    const timer = window.setInterval(() => setFrame((f) => f + 1), stepMs);
     return () => window.clearInterval(timer);
-  }, [active]);
+  }, [active, stepMs]);
   return frame;
 }
 
@@ -28,8 +28,8 @@ export function glyphLevel(row: number, col: number, frame: number, period = 6):
   return phase < 4 ? phase : -1;
 }
 
-function Grid({ cols, rows, cell, font, className, label }: { cols: number; rows: number; cell: number; font: number; className?: string | undefined; label: string }) {
-  const frame = useFrame(true);
+function Grid({ cols, rows, cell, font, className, label, stepMs }: { cols: number; rows: number; cell: number; font: number; className?: string | undefined; label: string; stepMs?: number | undefined }) {
+  const frame = useFrame(true, stepMs);
   return (
     <span
       role="status"

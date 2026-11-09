@@ -1,8 +1,8 @@
 "use client";
 
+import { LogoMark } from "./logo-mark";
 import * as React from "react";
 import {
-  Activity,
   ArrowUpRight,
   ChevronDown,
   Filter,
@@ -116,9 +116,7 @@ export function Navbar({ product, links, viewer }: { product: string; links: Nav
           }`}
         >
           <SmartLink href="#product" className="flex items-center gap-2 text-lg font-medium leading-none text-zinc-50" aria-label={`${product} home`}>
-            <span className="grid h-6 w-6 place-items-center rounded-md bg-[#ededed] text-[#141415]">
-              <Activity className="h-4 w-4" strokeWidth={1.75} />
-            </span>
+            <LogoMark size={24} />
             {product}
           </SmartLink>
 
