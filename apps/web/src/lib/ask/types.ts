@@ -74,6 +74,8 @@ export interface Step {
   /** What the agent is doing, in a plain phrase: "Reading the failure classifications". */
   label: string;
   detail?: string;
+  /** When the step reads a table: its name and how many rows it returned, so the interface can show the call and count up to the result. */
+  tool?: { table: string; rows: number };
   ms: number;
 }
 
@@ -100,6 +102,8 @@ export interface Turn {
   status: "thinking" | "done";
   /** How many steps have been revealed so far (the demo reveals them one by one, as a real run would stream them). */
   shownSteps: number;
+  /** The steps of the run in progress, known up front by the demo; a streaming backend would append them as they happen. */
+  pending?: Step[];
   answer?: Answer;
 }
 

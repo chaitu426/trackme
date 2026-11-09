@@ -31,10 +31,10 @@ const SCRIPTS: Script[] = [
     needs: ["payments"],
     build: (base) => ({
       steps: [
-        { id: "s1", label: "Reading gateway health for the last 7 days", detail: "payment_events, 5-minute buckets", ms: 620 },
+        { id: "s1", label: "Reading gateway health for the last 7 days", detail: "5-minute buckets", tool: { table: "payment_events", rows: 2016 }, ms: 640 },
         { id: "s2", label: "Looking for stretches far below the gateway's normal", detail: "Binomial test against its own failure rate", ms: 540 },
-        { id: "s3", label: "Reading what those failures were classified as", detail: "payment_failure_class", ms: 480 },
-        { id: "s4", label: "Checking whether the other gateway was affected", ms: 360 },
+        { id: "s3", label: "Reading what those failures were classified as", tool: { table: "payment_failure_class", rows: 98 }, ms: 520 },
+        { id: "s4", label: "Checking whether the other gateway was affected", tool: { table: "payment_events", rows: 8 }, ms: 420 },
       ],
       blocks: [
         { type: "text", text: "Razorpay had an incident yesterday from 14:00 to 14:40 UTC. In those forty minutes every one of 26 payments failed, all with the same gateway timeout code [1]. Over the rest of the week its success rate was about 95%." },
@@ -59,7 +59,7 @@ const SCRIPTS: Script[] = [
     needs: ["errors", "payments"],
     build: (base) => ({
       steps: [
-        { id: "s1", label: "Finding the sessions that opened your checkout page", detail: "leak_sessions, 30 days", ms: 520 },
+        { id: "s1", label: "Finding the sessions that opened your checkout page", tool: { table: "leak_sessions", rows: 624 }, ms: 560 },
         { id: "s2", label: "Matching them to the errors they saw", ms: 460 },
         { id: "s3", label: "Comparing conversion with and without each error", detail: "Two-proportion test", ms: 610 },
         { id: "s4", label: "Valuing the difference at your average order", ms: 300 },
@@ -84,8 +84,8 @@ const SCRIPTS: Script[] = [
     needs: ["traffic", "payments"],
     build: (base) => ({
       steps: [
-        { id: "s1", label: "Counting sessions that viewed checkout", detail: "events_v2, pageviews of /checkout", ms: 500 },
-        { id: "s2", label: "Following them to a started payment and a captured one", ms: 560 },
+        { id: "s1", label: "Counting sessions that viewed checkout", tool: { table: "events_v2", rows: 442 }, ms: 540 },
+        { id: "s2", label: "Following them to a started payment and a captured one", tool: { table: "payment_events", rows: 304 }, ms: 580 },
         { id: "s3", label: "Splitting by browser", ms: 320 },
       ],
       blocks: [
@@ -109,8 +109,8 @@ const SCRIPTS: Script[] = [
     needs: ["releases", "errors"],
     build: (base) => ({
       steps: [
-        { id: "s1", label: "Finding the release and the one before it", detail: "site_releases", ms: 300 },
-        { id: "s2", label: "Comparing errors, conversion and load time", detail: "bounded to the first 72 hours", ms: 720 },
+        { id: "s1", label: "Finding the release and the one before it", tool: { table: "site_releases", rows: 2 }, ms: 320 },
+        { id: "s2", label: "Comparing errors, conversion and load time", detail: "72 hours either side", tool: { table: "events_v2", rows: 4724 }, ms: 740 },
         { id: "s3", label: "Testing whether the differences could be chance", ms: 410 },
       ],
       blocks: [
@@ -132,7 +132,7 @@ const SCRIPTS: Script[] = [
     needs: ["traffic"],
     build: (base) => ({
       steps: [
-        { id: "s1", label: "Reading daily traffic rollups", detail: "daily_pageviews_agg, session aggregates", ms: 380 },
+        { id: "s1", label: "Reading daily traffic rollups", tool: { table: "daily_pageviews_agg", rows: 30 }, ms: 400 },
         { id: "s2", label: "Comparing with the previous 30 days", ms: 330 },
       ],
       blocks: [

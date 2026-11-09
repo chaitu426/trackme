@@ -1,6 +1,6 @@
 # Ask: the in-app agent
 
-Ask is a bar at the bottom of every signed-in page. Focus it (click, or press `/`) and it unfolds upward in place into a small floating panel; the page stays
+Ask is a floating pill at the bottom of every signed-in page. Focus it (click, or press `/`) and the conversation appears in the air above it: no solid panel, each turn a frosted sheet over the page, fading out at the top. The page stays
 usable behind it. Fold it (`Esc`, or the chevron) and it is a bar again. There is no separate chat window, no route to open and nothing to close.
 
 **Status: interface only.** The panel runs on a demo engine (`apps/web/src/lib/ask/demo-engine.ts`) that answers five kinds of question from the demo dataset and
@@ -61,3 +61,7 @@ These are the architecture questions the interface deliberately leaves open:
 5. **The query builder.** "Edit query" becomes a structured editor over the same evidence item, re-run through the same limits.
 6. **Cost and abuse.** Per-workspace budgets and rate limits, with the remaining allowance shown in the panel.
 7. **Audit.** Each run (question, scope, queries, answer) in the workspace audit log.
+
+## Working states
+
+While a run is in progress the turn shows one live line: the matrix mark, what the agent is doing, and for a table read the table name with a row count climbing to the result, plus small ticks for finished steps. The answer text is then written out word by word with a glyph caret (about 1.8 s however long it is; instant under reduced motion and for turns already read). Sources are quiet chips that expand to the exact query and sample rows; confidence, assumptions and the step summary are one line that expands.

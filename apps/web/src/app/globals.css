@@ -294,3 +294,17 @@
   .enter, .grow-x, .draw-line, .fade-late { animation: none; }
   .press:active { transform: none; }
 }
+
+/* A surface that floats over the page: the page shows through, softened, so text on it stays readable wherever it sits. Used by Ask. */
+@layer utilities {
+  .glass {
+    background: rgba(20, 20, 21, 0.72);
+    -webkit-backdrop-filter: blur(18px) saturate(1.1);
+    backdrop-filter: blur(18px) saturate(1.1);
+    border: 1px solid rgba(237, 237, 237, 0.08);
+    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.55);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass { background: rgba(20, 20, 21, 0.96); }
+  }
+}

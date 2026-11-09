@@ -66,3 +66,16 @@ export function MatrixLoader({ label, className }: { label?: string; className?:
     </div>
   );
 }
+
+/**
+ * A text caret made of the product's glyphs: one character that steps through . : + # while something is being written. It sits
+ * inline at the end of the text and takes its colour. Holds a still "#" with reduced motion.
+ */
+export function GlyphCaret({ className }: { className?: string | undefined }) {
+  const frame = useFrame(true, 130);
+  return (
+    <span aria-hidden="true" className={cn("ml-0.5 inline-block w-[0.6em] select-none font-mono font-semibold text-zinc-300", className)}>
+      {RAMP[frame % 4]}
+    </span>
+  );
+}

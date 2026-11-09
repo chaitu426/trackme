@@ -1,4 +1,4 @@
-import type { Answer, AskScope, PanelView, PastQuestion, Turn } from "./types";
+import type { Answer, AskScope, PanelView, PastQuestion, Step, Turn } from "./types";
 
 /**
  * The state of the Ask dock, as a pure reducer so its behaviour is tested without a browser. The component only drives it
@@ -20,7 +20,7 @@ export type AskAction =
   | { type: "fold" }
   | { type: "view"; view: PanelView }
   | { type: "draft"; text: string }
-  | { type: "ask"; id: string; question: string; page: string; at: string }
+  | { type: "ask"; id: string; question: string; page: string; at: string; steps?: Step[] }
   | { type: "step"; id: string }
   | { type: "answer"; id: string; answer: Answer }
   | { type: "clear" }
@@ -45,7 +45,7 @@ export function reduce(state: AskState, action: AskAction): AskState {
     case "ask": {
       const question = action.question.trim().slice(0, MAX_QUESTION);
       if (!question) return state;
-      const turn: Turn = { id: action.id, question, status: "thinking", shownSteps: 0 };
+      const turn: Turn = { id: action.id, question, status: "thinking", shownSteps: 0, ...(action.steps ? { pending: action.steps } : {}) };
       const past: PastQuestion = { id: action.id, question, at: action.at, page: action.page };
       // The same question asked again moves to the top of the history rather than appearing twice.
       const history = [past, ...state.history.filter((h) => h.question !== question)].slice(0, MAX_HISTORY);
