@@ -8,6 +8,7 @@ import { encryptSecret } from "@/lib/secret-box";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
 import { getClientIp } from "@/lib/client-ip";
+import { forgetGatewaySecrets } from "@/lib/payment-secret-cache";
 
 const PutSchema = z.object({
   gateway: z.enum(GATEWAY_IDS),
@@ -55,6 +56,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         .where(eq(sitePaymentGateways.id, existing.id));
     }
 
+    forgetGatewaySecrets(siteId);
     // The secret itself is never written to the audit log.
     await recordAuditLog({
       workspaceId: site.workspaceId,
@@ -78,6 +80,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const gateway = z.enum(GATEWAY_IDS).safeParse(request.nextUrl.searchParams.get("gateway"));
     if (!gateway.success) throw new AppError(400, "INVALID_INPUT", "gateway must be razorpay or stripe");
     await db.delete(sitePaymentGateways).where(and(eq(sitePaymentGateways.siteId, siteId), eq(sitePaymentGateways.gateway, gateway.data)));
+    forgetGatewaySecrets(siteId);
     await recordAuditLog({
       workspaceId: site.workspaceId,
       actorId: ctx.userId,

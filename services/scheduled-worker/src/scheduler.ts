@@ -9,6 +9,7 @@ import { runRetentionCleanup } from "./jobs/retention.js";
 import { runReconciliation } from "./jobs/reconciliation.js";
 import { runErrorRegressions } from "./jobs/error-regressions.js";
 import { runSourceMapRetention } from "./jobs/sourcemap-retention.js";
+import { runPaymentPayloadRetention } from "./jobs/payment-payload-retention.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
 import { withDistributedLock } from "./lock.js";
 
@@ -125,6 +126,21 @@ cron.schedule("50 3 * * *", async () => {
     );
   } catch (err) {
     console.error("Failed running source map retention:", err);
+  }
+});
+
+// 4c. Raw payment payload retention: 04:00 UTC daily. Deletes webhook bodies older than 90 days from the object store.
+cron.schedule("0 4 * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:payment_payload_retention",
+      600,
+      "Payment Payload Retention",
+      instrumentJob("payment_payload_retention", () => runPaymentPayloadRetention().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed running payment payload retention:", err);
   }
 });
 

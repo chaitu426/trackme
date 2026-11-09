@@ -7,13 +7,22 @@ import { getRedis } from "@/lib/redis";
 import { getObjectStore } from "@/lib/sourcemaps";
 import { timedRoute } from "@/lib/metrics-registry";
 import { handlePaymentWebhook, type WebhookDeps } from "@/lib/payment-webhook";
+import { createFailureLimiter, createThrottle } from "@/lib/webhook-guard";
+import { secretCache } from "@/lib/payment-secret-cache";
+import { getClientIp } from "@/lib/client-ip";
 
 const CLAIM_TTL_SECONDS = 25 * 60 * 60;
+/** A caller that sends many rejected requests is turned away before any lookup. */
+const failures = createFailureLimiter(30, 60_000);
+const touchOncePerMinute = createThrottle(60_000);
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const claimKey = (siteId: string, gateway: string, id: string) => `pay_evt:${siteId}:${gateway}:${sha(id).slice(0, 32)}`;
 
 const deps: WebhookDeps = {
   async loadSecret(siteKey, gateway) {
+    const cacheKey = `${siteKey}:${gateway}`;
+    const cached = secretCache.get(cacheKey);
+    if (cached !== undefined) return cached;
     const [row] = await db
       .select({ siteId: sites.id, workspaceId: sites.workspaceId, secretEnc: sitePaymentGateways.secretEnc })
       .from(sites)
@@ -21,7 +30,10 @@ const deps: WebhookDeps = {
       .where(and(eq(sites.publicKey, siteKey), eq(sitePaymentGateways.gateway, gateway), eq(sitePaymentGateways.enabled, true)))
       .limit(1);
     const secret = decryptSecret(row?.secretEnc);
-    return row && secret ? { siteId: row.siteId, workspaceId: row.workspaceId, secret } : null;
+    const found = row && secret ? { siteId: row.siteId, workspaceId: row.workspaceId, secret } : null;
+    // A "not connected" answer is cached too, so probing random keys cannot be used to hammer the database.
+    secretCache.set(cacheKey, found);
+    return found;
   },
   async claim(siteId, gateway, id) {
     return (await getRedis("ratelimit").set(claimKey(siteId, gateway, id), "1", "EX", CLAIM_TTL_SECONDS, "NX")) === "OK";
@@ -60,6 +72,7 @@ const deps: WebhookDeps = {
     });
   },
   async touch(siteId, gateway) {
+    if (!touchOncePerMinute(`${siteId}:${gateway}`)) return;
     await db
       .update(sitePaymentGateways)
       .set({ lastEventAt: new Date() })
@@ -73,8 +86,14 @@ const deps: WebhookDeps = {
  */
 async function handlePost(request: NextRequest, ctx: { params: Promise<{ gateway: string; siteKey: string }> }) {
   const { gateway, siteKey } = await ctx.params;
+  const caller = getClientIp(request);
+  // An address that could not be worked out is one shared bucket, so it is never counted: one sender must not lock out the rest.
+  const attributable = caller !== "unknown";
+  if (attributable && failures.isBlocked(caller)) return NextResponse.json({ ok: false, reason: "rate_limited" }, { status: 429, headers: { "Retry-After": "60" } });
   const rawBody = await request.text();
   const out = await handlePaymentWebhook({ gateway, siteKey, rawBody, headers: request.headers }, deps);
+  // A refused request counts against its sender; a good one never does.
+  if (attributable && (out.status === 400 || out.status === 401 || out.status === 404)) failures.recordFailure(caller);
   return NextResponse.json(out.body, { status: out.status });
 }
 

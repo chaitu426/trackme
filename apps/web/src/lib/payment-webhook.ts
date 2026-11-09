@@ -52,9 +52,13 @@ export async function handlePaymentWebhook(
 
   try {
     const events = adapter.normalize(input.rawBody, eventId);
-    await deps.storeRaw(conn.siteId, adapter.id, eventId, input.rawBody);
-    if (events.length > 0) await deps.insert(conn.siteId, conn.workspaceId, events);
-    await deps.touch(conn.siteId, adapter.id);
+    // Independent writes, so they run together: the answer takes as long as the slower one, not the sum.
+    await Promise.all([
+      deps.storeRaw(conn.siteId, adapter.id, eventId, input.rawBody),
+      events.length > 0 ? deps.insert(conn.siteId, conn.workspaceId, events) : Promise.resolve(),
+    ]);
+    // The "last event" stamp is bookkeeping; it must not delay the answer or fail the request.
+    void deps.touch(conn.siteId, adapter.id).catch(() => undefined);
     return { status: 200, body: { ok: true, events: events.length } };
   } catch {
     await deps.release(conn.siteId, adapter.id, eventId).catch(() => undefined);
