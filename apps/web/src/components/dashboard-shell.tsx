@@ -75,6 +75,7 @@ export function DashboardShell({
     vitals: "Web Vitals",
     pages: "Page Performance",
     errors: "Error Tracking",
+    retention: "Retention & Cohorts",
   };
   const segments = pathname.split("/").filter(Boolean);
   const pageLabel = (() => {

@@ -29,13 +29,16 @@ test("deletes web_vitals, then events_v2, then events_raw, and reports what it r
   assert.deepEqual(deletes, [
     ERASURE_SQL.delete.site_profiles_agg,
     ERASURE_SQL.delete.identity_map,
+    ERASURE_SQL.delete.user_active_day,
+    ERASURE_SQL.delete.user_first_day,
+    ERASURE_SQL.delete.user_event_day,
     ERASURE_SQL.delete.error_occurrences,
     ERASURE_SQL.delete.error_events,
     ERASURE_SQL.delete.web_vitals,
     ERASURE_SQL.delete.events_v2,
     ERASURE_SQL.delete.events_raw,
   ]);
-  assert.deepEqual(result, { visitors: 2, rows: { site_profiles_agg: 7, identity_map: 7, error_occurrences: 7, error_events: 7, web_vitals: 7, events_v2: 7, events_raw: 7 }, dryRun: false });
+  assert.deepEqual(result, { visitors: 2, rows: { site_profiles_agg: 7, identity_map: 7, user_active_day: 7, user_first_day: 7, user_event_day: 7, error_occurrences: 7, error_events: 7, web_vitals: 7, events_v2: 7, events_raw: 7 }, dryRun: false });
 });
 
 test("without confirmation (dry run) nothing is deleted", async () => {
@@ -55,6 +58,9 @@ test("a person with no events still has their profile and identity link removed,
     [
       ERASURE_SQL.delete.site_profiles_agg,
       ERASURE_SQL.delete.identity_map,
+      ERASURE_SQL.delete.user_active_day,
+      ERASURE_SQL.delete.user_first_day,
+      ERASURE_SQL.delete.user_event_day,
       ERASURE_SQL.delete.error_occurrences,
       ERASURE_SQL.delete.error_events,
     ]

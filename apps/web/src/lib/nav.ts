@@ -6,6 +6,7 @@ import {
   MapPinned,
   Radio,
   Bug,
+  Repeat2,
   Settings2,
   Target,
   TrendingUp,
@@ -51,6 +52,7 @@ export const NAV_SUITES: NavSuite[] = [
       { path: "acquisition", label: "Acquisition", icon: TrendingUp },
       { path: "geography", label: "Audience Geography", icon: MapPinned },
       { path: "events", label: "Goals & Events", icon: Target },
+      { path: "retention", label: "Retention & Cohorts", icon: Repeat2, flag: "retention" },
     ],
   },
   {

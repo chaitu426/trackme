@@ -11,7 +11,7 @@ import { getClickHouseClient } from "./client.js";
  * browser, both lose the events recorded under it; that errs on the side of deleting.
  *
  * Every statement is scoped to {workspaceId, siteId} and every value is a bound parameter. The deletes
- * run site_profiles_agg -> identity_map -> error_occurrences -> error_events -> web_vitals -> events_v2 -> events_raw. The profile row (email, traits) goes first
+ * run site_profiles_agg -> identity_map -> user_active_day -> user_first_day -> user_event_day -> error_occurrences -> error_events -> web_vitals -> events_v2 -> events_raw. The profile row (email, traits) goes first
  * and is deleted even when no events are found, so it can never be stranded. web_vitals rows carry no
  * visitor, so they are found through events_raw and must go before it; events_raw goes last so that a failure
  * part-way can simply be re-run (the visitors are still discoverable from whatever has not been deleted yet).
@@ -30,6 +30,8 @@ const V2_OF_VISITORS = `visitor_hash IN (SELECT arrayJoin(arrayConcat(
 const PROFILE = `FROM site_profiles_agg WHERE ${TENANT} AND distinct_id = {id:String}`;
 /** The visitor-to-user links (migration 015) for the person, by user id or by any of their visitor hashes. */
 const IDENTITY = `FROM identity_map WHERE ${TENANT} AND (user_id = {id:String} OR ${V2_OF_VISITORS})`;
+/** Per-user activity (migration 017): keyed by the raw user id. */
+const activity = (table: string) => `FROM ${table} WHERE ${TENANT} AND user_id = {id:String}`;
 /** Error tracking (migration 016): events hold hashes of the user and visitor; occurrences hold the raw user id and the event id. */
 const ERROR_EVENTS = `FROM error_events WHERE ${TENANT} AND (user_hash = cityHash64({id:String}) OR ${V2_OF_VISITORS})`;
 const ERROR_OCCURRENCES = `FROM error_occurrences WHERE ${TENANT} AND (user_id = {id:String}
@@ -43,6 +45,9 @@ export const ERASURE_SQL = {
   count: {
     site_profiles_agg: `SELECT count() AS n ${PROFILE}`,
     identity_map: `SELECT count() AS n ${IDENTITY}`,
+    user_active_day: `SELECT count() AS n ${activity("user_active_day")}`,
+    user_first_day: `SELECT count() AS n ${activity("user_first_day")}`,
+    user_event_day: `SELECT count() AS n ${activity("user_event_day")}`,
     error_occurrences: `SELECT count() AS n ${ERROR_OCCURRENCES}`,
     error_events: `SELECT count() AS n ${ERROR_EVENTS}`,
     web_vitals: `SELECT count() AS n FROM web_vitals WHERE ${TENANT} AND event_id IN (SELECT event_id ${RAW_OF_VISITORS})`,
@@ -52,6 +57,9 @@ export const ERASURE_SQL = {
   delete: {
     site_profiles_agg: `DELETE ${PROFILE}`,
     identity_map: `DELETE ${IDENTITY}`,
+    user_active_day: `DELETE ${activity("user_active_day")}`,
+    user_first_day: `DELETE ${activity("user_first_day")}`,
+    user_event_day: `DELETE ${activity("user_event_day")}`,
     error_occurrences: `DELETE ${ERROR_OCCURRENCES}`,
     error_events: `DELETE ${ERROR_EVENTS}`,
     web_vitals: `DELETE FROM web_vitals WHERE ${TENANT} AND event_id IN (SELECT event_id ${RAW_OF_VISITORS})`,
@@ -61,7 +69,7 @@ export const ERASURE_SQL = {
 } as const;
 
 /** Deletion order; see the note above. */
-const ORDER = ["site_profiles_agg", "identity_map", "error_occurrences", "error_events", "web_vitals", "events_v2", "events_raw"] as const;
+const ORDER = ["site_profiles_agg", "identity_map", "user_active_day", "user_first_day", "user_event_day", "error_occurrences", "error_events", "web_vitals", "events_v2", "events_raw"] as const;
 
 export interface ErasureTarget {
   workspaceId: string;
@@ -98,9 +106,9 @@ export async function eraseVisitor(
 
   // With no events found only the profile and identity steps apply; the event tables would match nothing anyway.
   const found = visitors.length > 0 || hashes.length > 0;
-  const steps = ORDER.filter((table) => found || table === "site_profiles_agg" || table === "identity_map" || table === "error_occurrences" || table === "error_events");
+  const steps = ORDER.filter((table) => found || table !== "web_vitals" && table !== "events_v2" && table !== "events_raw");
 
-  const rows = { site_profiles_agg: 0, identity_map: 0, error_occurrences: 0, error_events: 0, web_vitals: 0, events_v2: 0, events_raw: 0 };
+  const rows = { site_profiles_agg: 0, identity_map: 0, user_active_day: 0, user_first_day: 0, user_event_day: 0, error_occurrences: 0, error_events: 0, web_vitals: 0, events_v2: 0, events_raw: 0 };
   for (const table of steps) {
     const rs = await client.query({ query: ERASURE_SQL.count[table], query_params: params, format: "JSONEachRow" });
     rows[table] = Number((await rs.json<{ n: string }>())[0]?.n ?? 0);
