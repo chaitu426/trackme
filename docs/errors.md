@@ -95,3 +95,9 @@ behaviour with a large number of issues.
 
 ## Still to build in 1A
 Source maps (`POST /api/v1/sourcemaps`, an object store, de-minifying in the worker).
+
+## Alert events
+
+New error groups and regressions are published on the Redis stream `alerts:events` (about the last 10,000 kept) with fields `type` (`new_error_group` or
+`error_regression`), `siteId`, `groupId`, `title`, `release`, `level`, `at`. A new group is published once, within a minute of first being seen; a regression when a
+resolved issue is reopened. Nothing reads the stream yet; the Phase 4 alert engine will. The events carry identifiers and titles only.
