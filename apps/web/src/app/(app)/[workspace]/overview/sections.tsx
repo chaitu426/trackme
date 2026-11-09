@@ -103,7 +103,7 @@ export async function KpiGrid(props: SectionProps) {
   return (
     <div className="reveal grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatsCard
-        title="Visitors"
+        title={props.range === "24h" ? "Visitors" : "Visitors (daily unique)"}
         value={formatNumber(currentMetrics.visitors)}
         change={formatChange(percentChange(currentMetrics.visitors, previousMetrics.visitors))}
         isPositive={currentMetrics.visitors >= previousMetrics.visitors}

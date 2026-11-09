@@ -54,7 +54,7 @@ export async function ShareKpis(props: ShareProps) {
   return (
     <div className="reveal grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatsCard
-        title="Visitors"
+        title={props.range === "24h" ? "Visitors" : "Visitors (daily unique)"}
         value={formatNumber(now.visitors)}
         change={formatChange(percentChange(now.visitors, before.visitors))}
         isPositive={now.visitors >= before.visitors}

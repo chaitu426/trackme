@@ -198,7 +198,7 @@ async function GeographyBody({
         <StatsCard
           title={audienceLabel}
           value={formatNumber(focusMetrics.visitors)}
-          subtitle="Unique visitors in selected timeframe"
+          subtitle={range === "24h" ? "Unique visitors in the last 24 hours" : "Daily-unique visitors in selected timeframe"}
         />
         <StatsCard
           title="Pageviews"

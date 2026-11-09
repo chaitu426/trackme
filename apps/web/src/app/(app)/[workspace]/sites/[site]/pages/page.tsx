@@ -79,7 +79,7 @@ async function PagesBody({ workspaceId, siteId, range }: { workspaceId: string; 
             name: row.name,
             value: row.pageviews,
             percentage: Math.min(100, (row.pageviews / totalPageviews) * 100),
-            meta: `${formatNumber(row.visitors)} unique visitors`,
+            meta: `${formatNumber(row.visitors)} visitors`,
           }))}
           empty="No pageviews recorded in this date range yet."
           valueFormatter={formatNumber}
