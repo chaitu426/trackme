@@ -265,6 +265,21 @@ export interface GatewayHealth {
   baseline: number | null;
   /** Newest first. An incident still running has `ongoing: true`. */
   incidents: Incident[];
+  /** The last 6 hours in 5-minute buckets, oldest first, empty buckets included, for the health strip. */
+  recent: Array<{ startMs: number; paid: number; failed: number }>;
+}
+
+const STRIP_BUCKETS = 72;
+
+function recentBuckets(buckets: HealthBucket[], nowMs: number): GatewayHealth["recent"] {
+  const size = BUCKET_MINUTES * 60_000;
+  const last = Math.floor(nowMs / size) * size;
+  const byStart = new Map(buckets.map((b) => [b.startMs, b]));
+  return Array.from({ length: STRIP_BUCKETS }, (_, i) => {
+    const startMs = last - (STRIP_BUCKETS - 1 - i) * size;
+    const b = byStart.get(startMs);
+    return { startMs, paid: b?.paid ?? 0, failed: b?.failed ?? 0 };
+  });
 }
 
 const window = (buckets: HealthBucket[], sinceMs: number): GatewayWindow => {
@@ -336,6 +351,7 @@ export async function getGatewayHealth(
       last24h: window(buckets, nowMs - DAY_MS),
       baseline: all >= 20 ? paid / all : null,
       incidents: [...incidents].reverse(),
+      recent: recentBuckets(buckets, nowMs),
     };
   });
 }

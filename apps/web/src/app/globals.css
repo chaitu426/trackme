@@ -37,6 +37,10 @@
     --font-mono: var(--font-geist-mono), "Geist Mono", "SF Mono", Consolas, monospace;
 
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    /* Three durations: feedback, change, entrance. */
+    --dur-fast: 120ms;
+    --dur: 200ms;
+    --dur-enter: 320ms;
 
     --radius: 8px;
     --radius-sm: 6px;
@@ -247,4 +251,36 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal { animation: none; }
+}
+
+/* Motion that explains something. One entrance per page (a short rise with a small stagger), bars and lines that
+   draw once when they appear, a tiny press. Nothing loops. Only opacity and transform move. */
+@keyframes enterRise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes growX {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes drawLine {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fadeOnly {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@layer utilities {
+  .enter { animation: enterRise var(--dur-enter) var(--ease) both; animation-delay: calc(var(--i, 0) * 40ms); }
+  .grow-x { transform-origin: left center; animation: growX 520ms var(--ease) both; animation-delay: calc(var(--i, 0) * 50ms); }
+  /* Lines use pathLength="1" so the dash maths does not depend on the drawn length. */
+  .draw-line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: drawLine 800ms var(--ease) both; }
+  .fade-late { animation: fadeOnly 400ms var(--ease) 350ms both; }
+  .press { transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  .press:active { transform: scale(0.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enter, .grow-x, .draw-line, .fade-late { animation: none; }
+  .press:active { transform: none; }
 }

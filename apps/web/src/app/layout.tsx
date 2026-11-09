@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ChunkErrorReload } from "@/components/chunk-error-reload";
+import { MotionProvider } from "@/components/motion/provider";
 
 // Self-hosted at build time: no render-blocking request to Google Fonts, no layout shift
 // (the fallback is size-adjusted), and the files cache with the app's own assets.
@@ -21,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${geist.variable} ${geistMono.variable}`}>
       <body className="min-h-screen antialiased bg-background text-foreground font-sans">
-        {children}
+        <MotionProvider>{children}</MotionProvider>
         <ChunkErrorReload />
       </body>
     </html>

@@ -1,20 +1,15 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Shield,
-  Users,
-  Eye,
-  Crown,
-  ArrowRight,
-  Lock,
-} from "lucide-react";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { motion } from "motion/react";
+import { Activity, ArrowRight, Check, Crown, Eye, EyeOff, Loader2, Lock, Users, type LucideIcon } from "lucide-react";
+import { GlyphField } from "@trackme/landing";
+import { Field, TextInput } from "@/components/ui/field";
+import { StepPanel, DrawCheck, Notice } from "@/components/motion/primitives";
+import { checkPassword, strengthLabel } from "@/lib/password-meter";
+import { cn } from "@/lib/utils";
 
 interface InviteInfo {
   email: string;
@@ -26,396 +21,320 @@ interface InviteInfo {
   requiresSignup: boolean;
 }
 
-// ─── Role display helpers ─────────────────────────────────────────────────────
+type Phase = "loading" | "preview" | "signup" | "accepting" | "success" | "error";
 
-const ROLE_META: Record<string, { label: string; icon: React.ReactNode; color: string; description: string }> = {
-  admin: {
-    label: "Admin",
-    icon: <Crown className="w-4 h-4" />,
-    color: "text-amber-400 bg-amber-500/10 border-amber-500/30",
-    description: "Full control — manage members, sites, and settings.",
-  },
-  member: {
-    label: "Member",
-    icon: <Users className="w-4 h-4" />,
-    color: "text-zinc-200 bg-white/[0.07] border-white/[0.25]",
-    description: "Read and edit analytics, funnels, and goals.",
-  },
-  viewer: {
-    label: "Viewer",
-    icon: <Eye className="w-4 h-4" />,
-    color: "text-zinc-200 bg-white/[0.07] border-white/[0.25]",
-    description: "Read-only access to analytics dashboards.",
-  },
+/** What each role can do, in the words the rest of the app uses. The server decides the real permissions. */
+const ROLES: Record<string, { label: string; icon: LucideIcon; can: string[] }> = {
+  admin: { label: "Admin", icon: Crown, can: ["See every report", "Edit goals, funnels and segments", "Manage sites and settings", "Invite and remove members"] },
+  member: { label: "Member", icon: Users, can: ["See every report", "Edit goals, funnels and segments"] },
+  viewer: { label: "Viewer", icon: Eye, can: ["See every report"] },
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+function daysLeft(iso: string): string {
+  const days = Math.ceil((Date.parse(iso) - Date.now()) / 86_400_000);
+  if (!Number.isFinite(days)) return "";
+  if (days <= 0) return "Expires today";
+  return days === 1 ? "Expires tomorrow" : `Expires in ${days} days`;
+}
+
+const primaryButton =
+  "press inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#ededed] px-5 text-sm font-medium text-[#141415] " +
+  "shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:bg-white disabled:pointer-events-none disabled:opacity-60";
 
 export default function InviteAcceptPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  const token = useSearchParams().get("token") ?? "";
 
-  const [state, setState] = React.useState<
-    "loading" | "preview" | "signup-form" | "accepting" | "success" | "error"
-  >("loading");
-
+  const [phase, setPhase] = React.useState<Phase>("loading");
+  const [direction, setDirection] = React.useState<1 | -1>(1);
   const [invite, setInvite] = React.useState<InviteInfo | null>(null);
   const [errorMsg, setErrorMsg] = React.useState("");
 
-  // Signup form state (for new users)
   const [name, setName] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [formError, setFormError] = React.useState("");
+  const [confirm, setConfirm] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
+  const [formError, setFormError] = React.useState("");
+  const [errorNonce, setErrorNonce] = React.useState(0);
+  const [touched, setTouched] = React.useState(false);
 
-  // ── Fetch invite preview on mount ─────────────────────────────────────────
+  const go = (next: Phase, dir: 1 | -1 = 1) => {
+    setDirection(dir);
+    setPhase(next);
+  };
+
   React.useEffect(() => {
     if (!token) {
-      setState("error");
-      setErrorMsg("No invite token provided. Please check the link in your email.");
+      setErrorMsg("No invite token was provided. Check the link in your email.");
+      go("error");
       return;
     }
-
     fetch(`/api/v1/invites/accept?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error || data.status === 410) {
-          setState("error");
           setErrorMsg(data.detail || data.message || "This invitation is invalid or has expired.");
+          go("error");
           return;
         }
         setInvite(data);
-        // Existing users go straight to accept preview; new users get signup form
-        setState("preview");
+        go("preview");
       })
       .catch(() => {
-        setState("error");
-        setErrorMsg("Failed to load invitation. Please try again.");
+        setErrorMsg("The invitation could not be loaded. Try again.");
+        go("error");
       });
   }, [token]);
 
-  // ── Accept invite (existing user) ─────────────────────────────────────────
-  async function handleAccept() {
-    setState("accepting");
-    try {
-      const res = await fetch("/api/v1/invites/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      const data = await res.json();
+  function succeed(slug: string) {
+    go("success");
+    // A full page load, not a client navigation, so the browser sends the session cookie that was just set.
+    window.setTimeout(() => {
+      window.location.href = `/${slug}/overview`;
+    }, 1600);
+  }
 
-      // 401 + requiresLogin = the invited address already has an account: sign in as it, then come back.
+  async function handleAccept() {
+    go("accepting");
+    try {
+      const res = await fetch("/api/v1/invites/accept", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+      const data = await res.json();
+      // The invited address already has an account: sign in as it, then come back.
       if (res.status === 401 && data.requiresLogin) {
         window.location.href = `/login?next=${encodeURIComponent(`/invite/accept?token=${token}`)}`;
         return;
       }
-
-      // 202 = new user who needs to fill signup form first
-      if (res.status === 202 && data.requiresSignup) {
-        setState("signup-form");
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error(data.detail || data.error || data.message || "Failed to accept invitation.");
-      }
-
-      setState("success");
-      // Use full page reload (not router.push) so the browser sends the
-      // freshly-set session cookie on the next server-component request.
-      setTimeout(() => {
-        window.location.href = `/${data.workspaceSlug}/overview`;
-      }, 1500);
-    } catch (err: unknown) {
-      setState("error");
+      if (res.status === 202 && data.requiresSignup) return go("signup");
+      if (!res.ok) throw new Error(data.detail || data.error || data.message || "The invitation could not be accepted.");
+      succeed(data.workspaceSlug);
+    } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
+      go("error");
     }
   }
 
-  // ── Accept invite (new user signup) ───────────────────────────────────────
-  async function handleSignupAndAccept(e: React.FormEvent) {
+  const report = checkPassword(password, { email: invite?.email ?? "", name });
+  const mismatch = confirm.length > 0 && confirm !== password;
+
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
+    setTouched(true);
+    const problem = !name.trim() ? "Enter your name." : !report.acceptable ? "Choose a password that meets the checks below." : password !== confirm ? "The passwords do not match." : "";
+    if (problem) {
+      setFormError(problem);
+      setErrorNonce((n) => n + 1);
+      return;
+    }
     setFormError("");
-
-    if (!name.trim()) {
-      setFormError("Please enter your name.");
-      return;
-    }
-    if (password.length < 12) {
-      setFormError("Password must be at least 12 characters.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setFormError("Passwords do not match.");
-      return;
-    }
-
-    setState("accepting");
+    go("accepting");
     try {
-      const res = await fetch("/api/v1/invites/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name: name.trim(), password }),
-      });
+      const res = await fetch("/api/v1/invites/accept", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, name: name.trim(), password }) });
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.detail || data.error || data.message || "Failed to create account.");
-      }
-
-      setState("success");
-      // Full page reload so the browser commits the session cookie before
-      // hitting the server component that calls requireUser().
-      setTimeout(() => {
-        window.location.href = `/${data.workspaceSlug}/overview`;
-      }, 1500);
-    } catch (err: unknown) {
-      setState("error");
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
+      if (!res.ok) throw new Error(data.detail || data.error || data.message || "The account could not be created.");
+      succeed(data.workspaceSlug);
+    } catch (err) {
+      // Stay on the form so nothing typed is lost; the message says what to fix.
+      setFormError(err instanceof Error ? err.message : "Something went wrong.");
+      setErrorNonce((n) => n + 1);
+      go("signup", -1);
     }
   }
 
-  const roleMeta = invite ? (ROLE_META[invite.role] ?? ROLE_META.member) : null;
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
+  const role = invite ? (ROLES[invite.role] ?? ROLES.member!) : null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-16">
-      {/* Background glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-white/[0.07] rounded-full blur-[120px]" />
-      </div>
+    <div className="grid min-h-screen bg-background text-zinc-100 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      {/* The invitation, always in view: who, where, and what the role allows */}
+      <aside className="relative hidden overflow-hidden border-r border-white/[0.08] bg-sidebar lg:flex lg:flex-col">
+        <div className="relative z-10 flex flex-1 flex-col p-10">
+          <Link href="/" className="flex items-center gap-2 text-base font-medium text-zinc-50" aria-label="TrackMe home">
+            <span className="grid size-7 place-items-center rounded-md bg-[#ededed] text-[#141415]"><Activity className="size-4" /></span>
+            TrackMe
+          </Link>
 
-      <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-        {/* ── Loading ────────────────────────────────────────────────────── */}
-        {state === "loading" && (
-          <div className="flex flex-col items-center gap-4 text-zinc-400">
-            <Loader2 className="w-8 h-8 animate-spin text-zinc-200" />
-            <p className="text-sm">Loading your invitation…</p>
-          </div>
-        )}
-
-        {/* ── Error ─────────────────────────────────────────────────────── */}
-        {state === "error" && (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-8 text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="w-14 h-14 rounded-full bg-rose-500/10 flex items-center justify-center">
-                <XCircle className="w-7 h-7 text-rose-400" />
-              </div>
-            </div>
-            <h1 className="text-xl font-bold text-zinc-100">Invitation not valid</h1>
-            <p className="text-sm text-zinc-400 leading-relaxed">{errorMsg}</p>
-            <button
-              onClick={() => router.push("/login")}
-              className="text-sm text-zinc-200 hover:text-zinc-100 transition underline underline-offset-2"
-            >
-              Go to login
-            </button>
-          </div>
-        )}
-
-        {/* ── Success ───────────────────────────────────────────────────── */}
-        {state === "success" && invite && (
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-8 text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
-              </div>
-            </div>
-            <h1 className="text-xl font-bold text-zinc-100">You're in!</h1>
-            <p className="text-sm text-zinc-400">
-              Welcome to <span className="text-zinc-200 font-semibold">{invite.workspaceName}</span>.
-              Taking you to the dashboard…
-            </p>
-            <Loader2 className="w-5 h-5 animate-spin text-zinc-500 mx-auto" />
-          </div>
-        )}
-
-        {/* ── Accepting (loading) ───────────────────────────────────────── */}
-        {state === "accepting" && (
-          <div className="flex flex-col items-center gap-4 text-zinc-400">
-            <Loader2 className="w-8 h-8 animate-spin text-zinc-200" />
-            <p className="text-sm">Setting up your access…</p>
-          </div>
-        )}
-
-        {/* ── Preview (existing user or new user before form) ───────────── */}
-        {(state === "preview") && invite && roleMeta && (
-          <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-br to-zinc-950 px-6 pt-8 pb-6 text-center border-b border-white/[0.06]">
-              {/* Inviter avatar */}
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br to-violet-600 flex items-center justify-center text-xl font-bold text-white mx-auto mb-4 shadow-lg">
-                {(invite.inviterName ?? "T").slice(0, 1).toUpperCase()}
-              </div>
-              <div className="text-xs text-zinc-500 mb-1">Invitation from</div>
-              <div className="text-sm font-semibold text-zinc-200">
-                {invite.inviterName ?? "A teammate"}
-              </div>
-            </div>
-
-            <div className="px-6 py-6 space-y-5">
-              {/* Workspace card */}
-              <div className="rounded-xl border border-white/[0.06] bg-zinc-900/60 p-4 flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-zinc-500 mb-0.5">Joining workspace</div>
-                  <div className="text-base font-bold text-zinc-100">{invite.workspaceName}</div>
-                </div>
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${roleMeta.color}`}>
-                  {roleMeta.icon}
-                  {roleMeta.label}
-                </span>
-              </div>
-
-              {/* Role description */}
-              <div className="flex items-start gap-2.5 bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3">
-                <Shield className="w-4 h-4 text-zinc-500 mt-0.5 shrink-0" />
-                <p className="text-xs text-zinc-400 leading-relaxed">{roleMeta.description}</p>
-              </div>
-
-              {/* Email notice */}
-              <p className="text-xs text-zinc-500 text-center">
-                Accepting as <span className="text-zinc-300 font-medium">{invite.email}</span>
+          {invite && role && (
+            <motion.div className="my-auto max-w-sm" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}>
+              <p className="font-mono text-xs text-zinc-500">{invite.inviterName ?? "A teammate"} invited you to</p>
+              <h1 className="mt-3 text-[32px] font-medium leading-10 text-zinc-50">{invite.workspaceName}</h1>
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-zinc-400">
+                <role.icon className="size-4" aria-hidden="true" />
+                as {role.label.toLowerCase() === "admin" ? "an" : "a"} {role.label.toLowerCase()}
               </p>
+              <ul className="mt-8 flex flex-col gap-3">
+                {role.can.map((item, i) => (
+                  <motion.li key={item} className="flex items-center gap-3 text-sm text-zinc-300" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + i * 0.06, duration: 0.3 }}>
+                    <span className="grid size-5 place-items-center rounded-full border border-white/[0.14] text-zinc-300"><Check className="size-3" aria-hidden="true" /></span>
+                    {item}
+                  </motion.li>
+                ))}
+              </ul>
+            </motion.div>
+          )}
+        </div>
+        <div className="absolute inset-x-0 bottom-0 h-72" aria-hidden="true">
+          <GlyphField variant="stream" cell={9} strength={0.6} />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#0f0f10] to-transparent" />
+        </div>
+      </aside>
 
-              {/* CTA */}
-              <button
-                onClick={handleAccept}
-                className="w-full flex items-center justify-center gap-2 bg-zinc-300 hover:bg-zinc-300 active:bg-zinc-300 text-white font-semibold py-3 rounded-xl transition text-sm"
-              >
-                Accept Invitation
-                <ArrowRight className="w-4 h-4" />
-              </button>
+      <main className="flex min-w-0 items-center justify-center px-4 py-12 sm:px-8">
+        <div className="w-full max-w-[420px]">
+          <Link href="/" className="mb-10 flex items-center gap-2 text-base font-medium text-zinc-50 lg:hidden" aria-label="TrackMe home">
+            <span className="grid size-7 place-items-center rounded-md bg-[#ededed] text-[#141415]"><Activity className="size-4" /></span>
+            TrackMe
+          </Link>
 
-              <button
-                onClick={() => router.push("/login")}
-                className="w-full text-xs text-zinc-500 hover:text-zinc-300 transition"
-              >
-                Not you? Sign in with a different account
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Signup Form (new users) ───────────────────────────────────── */}
-        {state === "signup-form" && invite && roleMeta && (
-          <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-br to-zinc-950 px-6 pt-8 pb-6 border-b border-white/[0.06]">
-              <div className="flex items-center justify-between mb-1">
-                <h1 className="text-lg font-bold text-zinc-100">Create your account</h1>
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${roleMeta.color}`}>
-                  {roleMeta.icon}
-                  {roleMeta.label}
-                </span>
+          <StepPanel stepKey={phase} direction={direction}>
+            {phase === "loading" && (
+              <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading your invitation">
+                <div className="skeleton h-4 w-24" />
+                <div className="skeleton h-8 w-64" />
+                <div className="skeleton h-4 w-full" />
+                <div className="skeleton mt-4 h-11 w-full" />
               </div>
-              <p className="text-xs text-zinc-400">
-                Joining <span className="text-zinc-200 font-medium">{invite.workspaceName}</span> — invited by{" "}
-                <span className="text-zinc-200">{invite.inviterName ?? "a teammate"}</span>.
-              </p>
-            </div>
+            )}
 
-            <form onSubmit={handleSignupAndAccept} className="px-6 py-6 space-y-4">
-              {/* Email (pre-filled, locked) */}
+            {phase === "preview" && invite && role && (
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email</label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={invite.email}
-                    readOnly
-                    className="w-full rounded-xl border border-white/[0.06] bg-zinc-900/40 px-3.5 py-2.5 text-sm text-zinc-400 pr-10 cursor-not-allowed"
-                  />
-                  <Lock className="w-3.5 h-3.5 text-zinc-600 absolute right-3 top-1/2 -translate-y-1/2" />
-                </div>
-              </div>
-
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Full name</label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="Ada Lovelace"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-white/[0.25] focus:outline-none transition"
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    placeholder="Min. 12 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-white/[0.25] focus:outline-none transition pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-                    tabIndex={-1}
-                  >
-                    <Eye className="w-4 h-4" />
+                <p className="font-mono text-xs text-zinc-500">{daysLeft(invite.expiresAt)}</p>
+                <h2 className="mt-3 text-[28px] font-medium leading-9 text-zinc-50">Join {invite.workspaceName}</h2>
+                <p className="mt-2 text-sm leading-5 text-zinc-400">
+                  {invite.inviterName ?? "A teammate"} invited <span className="text-zinc-200">{invite.email}</span> as {role.label.toLowerCase() === "admin" ? "an" : "a"} {role.label.toLowerCase()}.
+                </p>
+                <div className="mt-8 flex flex-col gap-3">
+                  <button type="button" onClick={handleAccept} className={primaryButton}>
+                    Accept invitation <ArrowRight className="size-4" />
+                  </button>
+                  <button type="button" onClick={() => router.push("/login")} className="press h-9 rounded-lg text-sm text-zinc-500 hover:text-zinc-200">
+                    Not you? Use a different account
                   </button>
                 </div>
               </div>
+            )}
 
-              {/* Confirm password */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Confirm password</label>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  placeholder="Repeat password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-white/[0.25] focus:outline-none transition"
-                />
+            {phase === "signup" && invite && role && (
+              <form onSubmit={handleSignup} noValidate>
+                <p className="font-mono text-xs text-zinc-500">One more step</p>
+                <h2 className="mt-3 text-[28px] font-medium leading-9 text-zinc-50">Create your account</h2>
+                <p className="mt-2 text-sm leading-5 text-zinc-400">You will join {invite.workspaceName} as {role.label.toLowerCase() === "admin" ? "an" : "a"} {role.label.toLowerCase()}.</p>
+
+                <div className="mt-7 flex flex-col gap-5">
+                  <Field label="Email" htmlFor="invite-email">
+                    <div className="relative">
+                      <TextInput id="invite-email" type="email" value={invite.email} readOnly className="cursor-not-allowed pr-10 text-zinc-400" />
+                      <Lock className="absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-600" aria-hidden="true" />
+                    </div>
+                  </Field>
+
+                  <Field label="Full name" htmlFor="invite-name" error={touched && !name.trim() ? "Enter your name." : null}>
+                    <TextInput id="invite-name" autoFocus autoComplete="name" placeholder="Ada Lovelace" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={touched && !name.trim()} />
+                  </Field>
+
+                  <Field label="Password" htmlFor="invite-password">
+                    <div className="relative">
+                      <TextInput
+                        id="invite-password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        placeholder="At least 12 characters"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pr-10"
+                        aria-describedby="password-meter"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="press absolute right-1 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-zinc-500 hover:text-zinc-200"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                    <div id="password-meter" className="mt-1">
+                      <div className="flex items-center gap-3">
+                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.08]" aria-hidden="true">
+                          <motion.div
+                            className={cn("h-full origin-left rounded-full", report.strength < 0.4 ? "bg-[#e5484d]" : report.strength < 0.75 ? "bg-amber-400" : "bg-[#4cc38a]")}
+                            animate={{ scaleX: report.strength }}
+                            initial={false}
+                            transition={{ type: "spring", bounce: 0, visualDuration: 0.3 }}
+                            style={{ width: "100%" }}
+                          />
+                        </div>
+                        <span className="w-12 text-right text-xs text-zinc-500">{strengthLabel(report.strength)}</span>
+                      </div>
+                      <ul className="mt-2 flex flex-col gap-1">
+                        {report.checks.map((c) => (
+                          <li key={c.id} className={cn("flex items-center gap-2 text-xs transition-colors duration-150", c.ok ? "text-zinc-300" : "text-zinc-500")}>
+                            <span className={cn("grid size-3.5 place-items-center rounded-full border", c.ok ? "border-[#4cc38a]/60 text-[#4cc38a]" : "border-white/[0.14]")}>
+                              {c.ok && <Check className="size-2.5" aria-hidden="true" />}
+                            </span>
+                            {c.label}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </Field>
+
+                  <Field label="Confirm password" htmlFor="invite-confirm" error={mismatch ? "The passwords do not match." : null}>
+                    <TextInput
+                      id="invite-confirm"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="Repeat the password"
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      aria-invalid={mismatch}
+                    />
+                  </Field>
+
+                  {formError && (
+                    <Notice nonce={errorNonce} className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+                      {formError}
+                    </Notice>
+                  )}
+
+                  <button type="submit" className={primaryButton}>
+                    Create account and join <ArrowRight className="size-4" />
+                  </button>
+                  <p className="text-center text-xs leading-5 text-zinc-600">No tracking cookies. Your analytics stay private to your workspace.</p>
+                </div>
+              </form>
+            )}
+
+            {phase === "accepting" && (
+              <div className="flex flex-col items-center gap-4 py-10 text-center" role="status">
+                <Loader2 className="size-6 animate-spin text-zinc-300" aria-hidden="true" />
+                <p className="text-sm text-zinc-400">Setting up your access</p>
               </div>
+            )}
 
-              {formError && (
-                <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">
-                  {formError}
-                </p>
-              )}
+            {phase === "success" && (
+              <div className="flex flex-col items-center py-6 text-center" role="status">
+                <DrawCheck />
+                <h2 className="mt-6 text-[28px] font-medium leading-9 text-zinc-50">You are in</h2>
+                <p className="mt-2 text-sm text-zinc-400">Opening {invite?.workspaceName ?? "your workspace"}</p>
+                <div className="mt-6 h-0.5 w-40 overflow-hidden rounded-full bg-white/[0.08]" aria-hidden="true">
+                  <motion.div className="h-full origin-left bg-zinc-200" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 1.6, ease: "linear" }} style={{ width: "100%" }} />
+                </div>
+              </div>
+            )}
 
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-zinc-300 hover:bg-zinc-300 active:bg-zinc-300 text-white font-semibold py-3 rounded-xl transition text-sm mt-1"
-              >
-                Create account & join workspace
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <p className="text-[11px] text-zinc-600 text-center leading-relaxed">
-                By accepting, you agree to our Terms of Service and Privacy Policy.
-                Your analytics are protected under zero-cookie, privacy-first principles.
-              </p>
-            </form>
-          </div>
-        )}
-
-        {/* Logo footer */}
-        {state !== "success" && state !== "accepting" && (
-          <div className="flex items-center justify-center gap-2 mt-8 text-zinc-600 text-xs">
-            <div className="w-1.5 h-1.5 rounded-full bg-white/[0.07]" />
-            <span>TrackMe · Privacy-first analytics</span>
-          </div>
-        )}
-      </div>
+            {phase === "error" && (
+              <div className="flex flex-col items-center py-6 text-center">
+                <DrawCheck tone="bad" />
+                <h2 className="mt-6 text-[28px] font-medium leading-9 text-zinc-50">This invitation cannot be used</h2>
+                <p className="mt-2 max-w-sm text-sm leading-5 text-zinc-400" role="alert">{errorMsg}</p>
+                <div className="mt-8 flex w-full flex-col gap-3">
+                  <button type="button" onClick={() => router.push("/login")} className={primaryButton}>Go to sign in</button>
+                  <p className="text-xs text-zinc-500">Ask the person who invited you to send a new link.</p>
+                </div>
+              </div>
+            )}
+          </StepPanel>
+        </div>
+      </main>
     </div>
   );
 }
