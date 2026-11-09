@@ -364,6 +364,101 @@
           "source": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         }
       }
+    },
+    {
+      "name": "valid release and environment",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "release": "web@1.4.2+build.7",
+        "environment": "staging"
+      }
+    },
+    {
+      "name": "valid error kind",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "release with spaces",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "release": "v 1"
+      }
+    },
+    {
+      "name": "release longer than 64",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "release": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      }
+    },
+    {
+      "name": "unknown environment",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "environment": "prod"
+      }
+    },
+    {
+      "name": "unknown event kind",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "purchase",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
     }
   ]
 }

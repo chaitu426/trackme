@@ -107,6 +107,8 @@ export function toIngestRow(e: EnrichedEvent) {
     vital_rating: e.webVital?.rating ?? "",
     vital_nav_type: e.webVital?.navigationType ?? "",
     properties_json: e.properties ? JSON.stringify(e.properties) : "{}",
+    release: e.release ?? "",
+    environment: e.environment ?? "production",
   };
 }
 

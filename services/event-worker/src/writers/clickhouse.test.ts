@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createClickHouseWriter, insertSettings, v2InsertSettings, type InsertClient } from "./clickhouse.js";
+import { createClickHouseWriter, insertSettings, toIngestRow, v2InsertSettings, type InsertClient } from "./clickhouse.js";
 import { DataError } from "../errors.js";
 
 type Insert = Parameters<InsertClient["insert"]>[0];
@@ -145,4 +145,13 @@ test("only mode writes events_ingest alone and fails the batch when it fails", a
 
   const bad = fakeClient("events_ingest");
   await assert.rejects(createClickHouseWriter({ ...options(bad.client), writeMode: "only" })([event()]), /unavailable/);
+});
+
+test("the v2 row carries release and environment, defaulting to production with no release", () => {
+  const tagged = toIngestRow(event({ release: "web@1.4.2", environment: "staging" }));
+  assert.equal(tagged.release, "web@1.4.2");
+  assert.equal(tagged.environment, "staging");
+  const plain = toIngestRow(event());
+  assert.equal(plain.release, "");
+  assert.equal(plain.environment, "production");
 });

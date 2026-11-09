@@ -29,6 +29,7 @@ const (
 	ReasonCampaign   = "campaign"
 	ReasonWebVital   = "web_vital"
 	ReasonUser       = "user"
+	ReasonRelease    = "release"
 )
 
 const (
@@ -40,6 +41,7 @@ const (
 	maxPath        = 512
 	maxTitle       = 512
 	maxUserID      = 256
+	maxRelease     = 64
 	minKey         = 8
 	maxKey         = 64
 )
@@ -58,7 +60,14 @@ var (
 	propKeyRe  = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 	vitalNames = map[string]bool{"CLS": true, "FCP": true, "FID": true, "INP": true, "LCP": true, "TTFB": true}
 	vitalRates = map[string]bool{"good": true, "needs-improvement": true, "poor": true}
-	eventTypes = map[string]bool{"pageview": true, "custom": true, "web_vital": true, "identify": true, "engagement": true}
+	releaseRe  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+@/-]*$`)
+	// Mirrors EVENT_TYPES and ENVIRONMENTS in packages/contracts/src/events.ts.
+	eventTypes = map[string]bool{
+		"pageview": true, "custom": true, "web_vital": true, "identify": true, "engagement": true,
+		"error": true, "api_call": true, "payment": true, "flag_exposure": true, "feedback": true,
+		"heartbeat": true, "deploy": true,
+	}
+	environments = map[string]bool{"production": true, "staging": true, "development": true}
 )
 
 // Event checks one event. On success it returns the event (with its timestamp
@@ -111,6 +120,13 @@ func Event(ev enrich.TrackerEvent, now time.Time, w Window) (out enrich.TrackerE
 	}
 	if ev.Type == "identify" && ev.UserID == "" {
 		return ev, false, ReasonUser
+	}
+
+	if ev.Release != "" && (len(ev.Release) > maxRelease || !releaseRe.MatchString(ev.Release)) {
+		return ev, false, ReasonRelease
+	}
+	if ev.Environment != "" && !environments[ev.Environment] {
+		return ev, false, ReasonRelease
 	}
 
 	for _, v := range ev.Campaign {

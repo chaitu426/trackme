@@ -45,13 +45,39 @@ export const WebVitalMetricSchema = z.object({
 
 export type WebVitalMetric = z.infer<typeof WebVitalMetricSchema>;
 
+/** Every event kind the pipeline accepts. Kinds after `engagement` belong to the observability suites. */
+export const EVENT_TYPES = [
+  "pageview",
+  "custom",
+  "web_vital",
+  "identify",
+  "engagement",
+  "error",
+  "api_call",
+  "payment",
+  "flag_exposure",
+  "feedback",
+  "heartbeat",
+  "deploy",
+] as const;
+
+export const ENVIRONMENTS = ["production", "staging", "development"] as const;
+export type Environment = (typeof ENVIRONMENTS)[number];
+
+/** Release label from the tracker config: a version, tag or short commit. */
+export const ReleaseSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._+@/-]*$/, "release may use letters, digits and . _ + @ / -");
+
 /**
  * Base versioned tracker event envelope (Schema Version 1)
  */
 export const TrackerEventSchema = z.object({
   schemaVersion: z.literal(1),
   eventId: z.string().uuid("eventId must be a valid UUIDv4"),
-  type: z.enum(["pageview", "custom", "web_vital", "identify", "engagement"]),
+  type: z.enum(EVENT_TYPES),
   occurredAt: z.string().datetime({ message: "occurredAt must be an ISO 8601 UTC timestamp" }),
   siteKey: z.string().min(8).max(64),
   sessionId: z.string().min(8).max(64),
@@ -62,6 +88,8 @@ export const TrackerEventSchema = z.object({
   title: z.string().max(512).optional(),
   referrer: z.string().max(2048).optional(),
   userId: z.string().max(256).optional(),
+  release: ReleaseSchema.optional(),
+  environment: z.enum(ENVIRONMENTS).optional(),
   userTraits: EventPropertiesSchema.optional(),
   campaign: CampaignSchema.optional(),
   properties: EventPropertiesSchema.optional(),
