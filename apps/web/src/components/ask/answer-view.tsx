@@ -8,6 +8,7 @@ import { GlyphCaret, MatrixSpinner } from "@/components/ui/matrix-loader";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Actions, MoneyTrail } from "./money-trail";
 import type { Answer, Block, EvidenceItem, Step, Turn } from "@/lib/ask/types";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -318,7 +319,7 @@ function Working({ steps, shown }: { steps: Step[]; shown: number }) {
 
 /* ───────────────────────────── a turn ───────────────────────────── */
 
-export function TurnView({ turn, onFollow }: { turn: Turn; onFollow: (question: string) => void }) {
+export function TurnView({ turn, onFollow, site = "", range = "" }: { turn: Turn; onFollow: (question: string) => void; site?: string; range?: string }) {
   const a: Answer | undefined = turn.answer;
   // An answer is written out only if this turn was watched from the moment it was asked. A turn mounted already finished is shown whole.
   const [fresh] = React.useState(turn.status === "thinking");
@@ -367,6 +368,12 @@ export function TurnView({ turn, onFollow }: { turn: Turn; onFollow: (question: 
                     <BlockView block={b} onOpen={openOne} />
                   </motion.div>
                 ))}
+
+                {a.trail && (
+                  <motion.div {...rise(a.blocks.length)}>
+                    <MoneyTrail trail={a.trail} onOpen={openOne} fresh={fresh} />
+                  </motion.div>
+                )}
 
                 {a.limit && <motion.p {...rise(a.blocks.length)} className="border-l-2 border-white/[0.14] pl-3 text-xs leading-5 text-zinc-400">{a.limit}</motion.p>}
 
@@ -433,6 +440,12 @@ export function TurnView({ turn, onFollow }: { turn: Turn; onFollow: (question: 
                     )}
                   </AnimatePresence>
                 </motion.div>
+
+                {(a.trail || a.watch) && (
+                  <motion.div {...rise(a.blocks.length + 3)}>
+                    <Actions question={turn.question} answer={a} site={site} range={range} />
+                  </motion.div>
+                )}
 
                 {a.ideas.length > 0 && (
                   <motion.div {...rise(a.blocks.length + 3)}>

@@ -171,7 +171,7 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
                     <div className="flex flex-col gap-7">
                       {state.turns.map((t) => (
                         <div key={t.id} id={`turn-${t.id}`} className="scroll-mt-1">
-                          <TurnView turn={t} onFollow={ask} />
+                          <TurnView turn={t} onFollow={ask} site={site} range={rangeLabel} />
                         </div>
                       ))}
                     </div>

@@ -65,3 +65,28 @@ These are the architecture questions the interface deliberately leaves open:
 ## Working states
 
 While a run is in progress the turn shows one live line: the matrix mark, what the agent is doing, and for a table read the table name with a row count climbing to the result, plus small ticks for finished steps. The answer text is then written out word by word with a glyph caret (about 1.8 s however long it is; instant under reduced motion and for turns already read). Sources are quiet chips that expand to the exact query and sample rows; confidence, assumptions and the step summary are one line that expands.
+
+## The money trail (our edge)
+
+Other analytics tools answer "what happened". Sentry knows the error, a payments dashboard knows the failure, web analytics knows the drop-off, and none of them can say **"this error cost you ₹195,970"**. TrackMe holds errors, releases, gateway events, checkout sessions and payments in one place, so Ask can follow a problem from its **cause to the rupees it cost**, link by link, each link citing its evidence. That is the product's USP, and Ask is where it is easiest to use: ask a plain question, get the chain and the number.
+
+An answer about something that cost money carries three extra things (all in `types.ts`, all optional):
+
+1. **`trail`**: ordered links (release, error, gateway, funnel, money), each with a title, a plain detail, when it happened and a citation, plus a `total` (the figure, what it is, and how it was estimated). Drawn as a vertical line that grows as the links appear.
+2. **`watch`**: a standing check the answer suggests ("a gateway's success rate falls below 70% over 15 minutes"). One click opens channels (Email, Slack, Webhook) and arms it. A question asked once keeps being asked.
+3. **Case file and ticket** (built in the browser from the answer, so they never say more than the answer did): *Copy case file* gives markdown with the question, answer, trail, every query as SQL and the assumptions; *Copy ticket* gives a title that leads with the cause and the money, the impact, and where to start. The finding leaves the panel and goes where work happens.
+
+Demo status: trail, watch and the two copies work in the preview. A watch is saved in the browser only (`trackme_ask_watches`).
+
+### Backend, for the next phase
+
+- **Trail builder.** Not free text from a model. A deterministic joiner over existing data, which a model only narrates:
+  - *cause candidates*: new error groups and regressions (`new-error-groups` job, `alerts:events`), releases (`site_releases`), gateway incidents (`payments/health` stretches), classified failure causes (`payment_failure_class`);
+  - *exposure*: `leak_sessions` (session → error groups → paid), `order_session` (order ↔ session), `payment_events` for values;
+  - *cost*: the revenue-leak estimator in `packages/analytics/src/revenue-leak.ts` (two-proportion test; value = gap × affected sessions × average order; a range from "beyond normal drop-off" to "every session would have paid"). Reuse it as is so Ask and the Revenue Leaks page can never disagree.
+  - Output is `Trail` directly. A link is only emitted if its evidence query ran and returned rows; if the join cannot be made (no checkout sessions, no payments source) the trail is omitted and the answer says why, never a guessed rupee figure.
+- **Ranking.** "What should I fix first" is the trail totals sorted descending with their confidence; expose it as a planner tool `rank_causes(range, limit)`.
+- **Watches.** Store in Postgres (`ask_watches`: workspace, site, `metric` id from a fixed catalog, comparator, threshold, window, channels, created_by, armed_at). The metric catalog is a fixed list of vetted queries (gateway success rate, error-affected checkout sessions, error cost per week), not model-written SQL. Evaluation runs in the scheduled worker and publishes to `alerts:events`, reusing the alert engine's channels, throttling and delivery log. A watch shows its last value and last fired time in History. Limit per workspace, and the creator is audited.
+- **Case files.** Server side only adds a stable link: persist the `Answer` JSON (question, scope, trail, evidence samples) under an id so a teammate opens the same finding read-only; evidence queries are re-runnable by people with access, never embedded with raw personal data (masking applies before storage).
+- **Tickets.** Later: push the ticket text to Linear/Jira/GitHub through the workspace's integration, with the case-file link in the body.
+- **Grounding.** Every trail node and the total must resolve to an evidence item, enforced by the same check as the answer text (`citationsOf` already covers trail nodes).

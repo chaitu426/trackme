@@ -49,6 +49,15 @@ const SCRIPTS: Script[] = [
       ],
       assumptions: ["A payment is judged by its final outcome, so a failed payment that later succeeded under the same payment id counts as a success.", "Times are UTC."],
       confidence: "high",
+      trail: {
+        nodes: [
+          { kind: "gateway", title: "Razorpay timed out", detail: "Every payment through it failed with the same gateway timeout code.", at: "Nov 8, 14:00–14:40 UTC", cite: 1 },
+          { kind: "funnel", title: "26 customers hit the failure", detail: "Stripe, in the same window, was unaffected.", cite: 3 },
+          { kind: "money", title: "₹176,940 of orders failed", detail: "Failures classified as the gateway's own, over the week.", cite: 2 },
+        ],
+        total: { value: "₹176,940", label: "lost to the gateway", basis: "Sum of failed order values classified as a gateway problem. Some customers may have paid later." },
+      },
+      watch: { id: "gateway-success", title: "Gateway success rate", metric: "Any gateway's success rate", condition: "falls below 70% over 15 minutes", now: "95% over the week" },
       followups: ["How much revenue did that incident cost?", "Did those customers come back and pay?", "Which payment method failed most that day?"],
       ideas: [{ title: "Get told next time", detail: "Alert when a gateway's success rate falls below 70% over 15 minutes (alerts arrive in the next release)." }, { title: "Add a fallback gateway", detail: "60 failures here were the gateway's own. A second gateway would have taken some of that." }],
     }),
@@ -74,6 +83,15 @@ const SCRIPTS: Script[] = [
       ],
       assumptions: ["A session counts as affected if the error happened from ten minutes before the checkout page opened.", "Average order value is used to value a lost sale, so the money is an estimate."],
       confidence: "high",
+      trail: {
+        nodes: [
+          { kind: "error", title: "TypeError on the checkout page", detail: "cannot read properties of undefined", at: "Last 30 days", cite: 1 },
+          { kind: "funnel", title: "113 checkout sessions hit it", detail: "23% of them paid, against 69% of sessions without it.", cite: 1 },
+          { kind: "money", title: "About ₹195,970 beyond normal drop-off", detail: "Up to ₹330,296 if every one of those sessions would have paid.", cite: 1 },
+        ],
+        total: { value: "₹195,970", label: "recoverable by fixing one error", basis: "Conversion gap × affected sessions × your average order. An estimate, not a ledger." },
+      },
+      watch: { id: "checkout-error-cost", title: "Checkout error cost", metric: "Error-affected checkout sessions", condition: "a new error costs more than ₹10,000 in a week", now: "1 error over the limit" },
       followups: ["Which browsers see the TypeError?", "Which release introduced it?", "Show me an example stack trace"],
       ideas: [{ title: "Open the issue", detail: "See the source-mapped stack, the release it started in, and the affected users." }, { title: "Track the fix", detail: "After you deploy, Release Impact will compare conversion before and after." }],
     }),
@@ -201,5 +219,6 @@ export function citationsOf(answer: Answer): number[] {
     if (b.type === "bars") for (const r of b.rows) if (r.cite) found.push(r.cite);
     if ((b.type === "table" || b.type === "spark") && b.cite) found.push(b.cite);
   }
+  for (const n of answer.trail?.nodes ?? []) if (n.cite) found.push(n.cite);
   return found;
 }

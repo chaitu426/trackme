@@ -81,6 +81,36 @@ export interface Step {
 
 export type Confidence = "high" | "medium" | "low";
 
+/**
+ * The money trail: TrackMe's own idea. Because errors, releases, gateways, checkout sessions and payments live in one place, an
+ * answer can follow a problem from its cause to the rupees it cost, link by link, each link citing its evidence.
+ */
+export interface TrailNode {
+  kind: "release" | "error" | "gateway" | "funnel" | "money";
+  title: string;
+  detail: string;
+  /** When it happened, in plain words. */
+  at?: string;
+  cite?: number;
+}
+export interface Trail {
+  nodes: TrailNode[];
+  /** The bottom line: what it cost, and how sure that figure is. */
+  total: { value: string; label: string; basis: string };
+}
+
+/** A standing check the person can arm from an answer, so a question asked once keeps being asked. */
+export interface WatchSpec {
+  id: string;
+  title: string;
+  /** What is measured, in words: "Razorpay success rate". */
+  metric: string;
+  /** When it fires, in words: "falls below 70% over 15 minutes". */
+  condition: string;
+  /** The value now, for context. */
+  now: string;
+}
+
 export interface Answer {
   steps: Step[];
   blocks: Block[];
@@ -92,6 +122,10 @@ export interface Answer {
   followups: string[];
   /** Things the person could do next with TrackMe, beyond answering. */
   ideas: Array<{ title: string; detail: string }>;
+  /** Cause-to-rupees chain, when the answer is about something that cost money. */
+  trail?: Trail;
+  /** A monitor this answer suggests; arming it is one click. */
+  watch?: WatchSpec;
   /** Set when the question could not be answered from the connected sources; says what could be. */
   limit?: string;
 }
