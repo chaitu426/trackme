@@ -7,11 +7,16 @@ import { PeopleClient, type UserProfileItem } from "./people-client";
 
 export default async function SitePeoplePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspace: string; site: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const user = await requireUser();
   const { workspace: workspaceSlug, site: siteDomain } = await params;
+  // Links from other pages (an error's affected users) open the list already searched for one person.
+  const { q } = await searchParams;
+  const initialSearch = (q ?? "").trim().slice(0, 256);
 
   let context: Awaited<ReturnType<typeof requireDashboardSite>>;
   try {
@@ -23,7 +28,7 @@ export default async function SitePeoplePage({
 
   // Identified people come from the event stream (ClickHouse); a backend's POST /people adds name/email on top.
   const [page, stats] = await Promise.all([
-    listProfiles({ workspaceId: site.workspaceId, siteId: site.id, limit: 50, offset: 0 }),
+    listProfiles({ workspaceId: site.workspaceId, siteId: site.id, limit: 50, offset: 0, ...(initialSearch ? { search: initialSearch } : {}) }),
     profileStats(site.workspaceId, site.id),
   ]);
   const initialProfiles: UserProfileItem[] = (await overlayServerProfiles(site.id, page.profiles)).map((p) => ({
@@ -35,6 +40,7 @@ export default async function SitePeoplePage({
     <PeopleClient
       site={{ id: site.id, domain: site.domain }}
       initialProfiles={initialProfiles}
+      initialSearch={initialSearch}
       stats={{
         total: stats.total,
         active7d: stats.active7d,

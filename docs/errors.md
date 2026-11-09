@@ -2,7 +2,7 @@
 
 Plan: [`phase1-plan.md`](phase1-plan.md). Foundation: [`suite-foundation.md`](suite-foundation.md).
 **Status:** the SDK, the pipeline from the edge to storage and the storage are built and verified. Issue status,
-the regression job, source maps and the dashboard pages are **not** built yet.
+source maps are **not** built yet.
 
 ## Event shape
 An event with `type: "error"` carries an `error` object (and no other kind may):
@@ -58,6 +58,40 @@ in storage; test rows removed. **Not verified:** the full Kafka path, load, and 
 ## SDK
 Built and verified in a real browser: see [`sdk.md`](sdk.md) (options, API, what is collected, sizes).
 
+## Dashboard (Errors & Reliability > Error Tracking)
+Hidden until `FEATURE_FLAGS` contains `errors`.
+
+- **Issue list** (`/<workspace>/sites/<site>/errors`): title, level, status, first seen, release, a daily trend, events,
+  users and last seen. Filters for status (open by default), release, environment, level, sort (last seen, events,
+  users) and range, all in the URL. Keyset pagination ("Next 25"), no OFFSET. Loading, empty (with the snippet to
+  turn capture on), filtered-empty and error states.
+- **Issue page** (`.../errors/<id>`): stack with your own code highlighted, breadcrumbs timed against the error,
+  events per day, release split, tag counts, affected users (each opens the People page searched for that user),
+  an occurrence picker, and the actions below.
+- **Actions:** Resolve, Resolve in next release, Ignore, Reopen. Members and above can change status (`sites:update`);
+  viewers see none. Each change is audit-logged.
+- **Status** lives in Postgres `site_error_status` (migration 0008); the rules are in `packages/contracts/src/error-status.ts`.
+- **Regressions:** a job runs every minute (`error_regressions`). A plainly resolved issue reopens on any new
+  occurrence. One resolved "in next release" reopens only for a release it had not been seen in, so old builds still in
+  the wild do not reopen it. The issue is marked "Regressed in <release>". The job is idempotent and never overrides a
+  change a person made while it ran.
+- **Caching:** results are cached for 30 seconds with single-flight, stale-while-revalidate and early refresh
+  (`cached()` in `query-cache.ts`), so many dashboards loading together cost one query.
+
+### Reading the numbers
+- Events and the trend are exact. "Users affected" counts the identified user when the SDK knew one and otherwise the
+  visitor pseudonym, which rotates every 24 hours, so an anonymous person seen on several days counts once per day.
+- Stack, breadcrumbs, tags and the affected-users list come from the sampled occurrences (5 per issue per day), not
+  from every event.
+
+## Verified
+Queries ran against the real ClickHouse with three seeded issues over three days: all three sorts, keyset paging,
+release/environment/level filters, include/exclude id lists, trends, release split, occurrences, tags, a wrong
+site or workspace returning nothing, and a hostile cursor ignored. The regression job ran against the real Postgres
+and ClickHouse for four scenarios (resolved and returned; old build under "next release"; newer build; quiet) and
+was idempotent on a second run. `next build` compiles both pages and the status route.
+**Not verified:** the pages rendered in a browser (they sit behind login), the status buttons end to end, and
+behaviour with a large number of issues.
+
 ## Still to build in 1A
-Issue status (Postgres) and the once-a-minute regression job; source maps (`POST /api/v1/sourcemaps`, object store,
-de-minify); the Error Tracking list and issue pages behind the `errors` flag.
+Source maps (`POST /api/v1/sourcemaps`, an object store, de-minifying in the worker).

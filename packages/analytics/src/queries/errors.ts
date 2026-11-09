@@ -366,3 +366,27 @@ export async function getRecentReleasesForGroups(
   );
   return rows.map((r) => ({ siteId: r.sid, groupId: r.gid, release: r.rel, lastSeen: r.last_seen }));
 }
+
+export interface ErrorFilterOptions {
+  releases: string[];
+  environments: string[];
+}
+
+/** The releases and environments that have errors in a range, for the filter dropdowns. Newest activity first. */
+export async function getErrorFilterOptions(
+  siteId: string,
+  from: string,
+  to: string,
+  client: Client = getDashboardClickHouseClient()
+): Promise<ErrorFilterOptions> {
+  const rows = await run<{ release: string; environment: string }>(
+    client,
+    `SELECT release, environment, max(last_ts) AS latest
+     FROM error_group_daily
+     WHERE site_id = {siteId:UUID} AND date >= {from:Date} AND date <= {to:Date}
+     GROUP BY release, environment ORDER BY latest DESC LIMIT 200`,
+    { siteId, from, to }
+  );
+  const unique = (values: string[]) => [...new Set(values.filter((value) => value !== ""))];
+  return { releases: unique(rows.map((r) => r.release)).slice(0, 50), environments: unique(rows.map((r) => r.environment)) };
+}

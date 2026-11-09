@@ -43,6 +43,8 @@ export interface UserProfileItem {
 interface PeopleClientProps {
   site: { id: string; domain: string };
   initialProfiles: UserProfileItem[];
+  /** A search the page was opened with; the list is already filtered to it. */
+  initialSearch?: string;
   stats: { total: number; active7d: number; avgEvents: number };
 }
 
@@ -83,9 +85,9 @@ function Avatar({ label, size = "md" }: { label: string; size?: "md" | "lg" }) {
   );
 }
 
-export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps) {
+export function PeopleClient({ site, initialProfiles, initialSearch = "", stats }: PeopleClientProps) {
   const [profiles, setProfiles] = React.useState<UserProfileItem[]>(initialProfiles);
-  const [search, setSearch] = React.useState("");
+  const [search, setSearch] = React.useState(initialSearch);
   const [isSearching, setIsSearching] = React.useState(false);
   const PAGE_SIZE = 50;
   const [hasMore, setHasMore] = React.useState(initialProfiles.length >= PAGE_SIZE && stats.total > initialProfiles.length);
@@ -214,6 +216,13 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
     setSearch("");
     setActiveSegment(segment);
     if (!segment) {
+      if (initialSearch) {
+        // Opened already searched for one person: "Everyone" must fetch the full list, not reuse the filtered one.
+        setSegmentCount(null);
+        setSegmentLoading(false);
+        void runSearch("");
+        return;
+      }
       setProfiles(everyone.current);
       setHasMore(everyone.current.length >= PAGE_SIZE && stats.total > everyone.current.length);
       setSegmentCount(null);

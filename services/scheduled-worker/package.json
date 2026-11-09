@@ -16,6 +16,7 @@
   "dependencies": {
     "@trackme/analytics": "workspace:*",
     "@trackme/config": "workspace:*",
+    "@trackme/contracts": "workspace:*",
     "@trackme/db": "workspace:*",
     "ioredis": "^5.6.0",
     "node-cron": "^3.0.3",

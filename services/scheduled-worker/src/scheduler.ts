@@ -7,6 +7,7 @@ import { runUsageMetering } from "./jobs/usage-metering.js";
 import { reclaimDeadEdgeQuota } from "./jobs/quota-reclaim.js";
 import { runRetentionCleanup } from "./jobs/retention.js";
 import { runReconciliation } from "./jobs/reconciliation.js";
+import { runErrorRegressions } from "./jobs/error-regressions.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
 import { withDistributedLock } from "./lock.js";
 
@@ -62,6 +63,22 @@ cron.schedule("*/5 * * * *", async () => {
     );
   } catch (err) {
     console.error("Failed reclaiming dead-edge quota:", err);
+  }
+});
+
+// 2c. Error regressions: every minute, reopen resolved issues that have occurred again. Cheap: one read of the
+// (small) resolved list and one ClickHouse query per 500 issues over the 30-day error_events table.
+cron.schedule("* * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:error_regressions",
+      50,
+      "Error Regressions",
+      instrumentJob("error_regressions", () => runErrorRegressions().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed checking error regressions:", err);
   }
 });
 

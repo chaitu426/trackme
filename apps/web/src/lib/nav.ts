@@ -5,6 +5,7 @@ import {
   Gauge,
   MapPinned,
   Radio,
+  Bug,
   Settings2,
   Target,
   TrendingUp,
@@ -59,6 +60,11 @@ export const NAV_SUITES: NavSuite[] = [
       { path: "pages", label: "Page Performance", icon: FileText },
       { path: "vitals", label: "Web Vitals", icon: Gauge },
     ],
+  },
+  {
+    id: "reliability",
+    title: "Errors & Reliability",
+    items: [{ path: "errors", label: "Error Tracking", icon: Bug, flag: "errors" }],
   },
 ];
 

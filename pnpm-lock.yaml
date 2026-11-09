@@ -352,6 +352,9 @@ importers:
       '@trackme/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@trackme/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@trackme/db':
         specifier: workspace:*
         version: link:../../packages/db
