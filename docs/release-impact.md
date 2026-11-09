@@ -1,6 +1,6 @@
 # Release Impact
 
-`Errors & Reliability > Release Impact` (hidden until `FEATURE_FLAGS` contains `releases`). It answers: did this deploy make
+`Errors & Reliability > Release Impact`. It answers: did this deploy make
 the site better or worse?
 
 ## Needs

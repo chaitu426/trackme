@@ -13,7 +13,6 @@ interface DashboardShellProps {
   workspaces: { id: string; name: string; slug: string; role: string }[];
   sites: { id: string; domain: string; displayName: string }[];
   primarySiteDomain: string;
-  featureFlags: string[];
   user: { id: string; email: string };
 }
 
@@ -23,7 +22,6 @@ export function DashboardShell({
   workspaces,
   sites,
   primarySiteDomain,
-  featureFlags,
   user,
 }: DashboardShellProps) {
   const [collapsed, setCollapsed] = React.useState(false);
@@ -91,7 +89,6 @@ export function DashboardShell({
         workspace={workspace}
         sites={sites}
         primarySiteDomain={activeSiteDomain}
-        featureFlags={featureFlags}
         user={user}
         role={currentWorkspace.role}
         collapsed={collapsed}

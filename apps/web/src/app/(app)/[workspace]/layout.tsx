@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { listUserWorkspaces, listWorkspaceSites, requireWorkspaceBySlug } from "@/lib/tenancy";
-import { env } from "@trackme/config";
-import { parseFeatureFlags } from "@/lib/nav";
 import { DashboardShell } from "@/components/dashboard-shell";
 
 export default async function WorkspaceLayout({
@@ -37,7 +35,6 @@ export default async function WorkspaceLayout({
       workspaces={userWorkspaces}
       sites={siteList}
       primarySiteDomain={primarySiteDomain}
-      featureFlags={[...parseFeatureFlags(env.FEATURE_FLAGS)]}
       user={{
         id: user.id,
         email: user.email,

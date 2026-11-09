@@ -16,15 +16,13 @@ import {
   Globe,
   type LucideIcon,
 } from "lucide-react";
-import { NAV_SUITES, SITE_SETTINGS_ITEM, parseFeatureFlags, visibleSuites } from "@/lib/nav";
+import { NAV_SUITES, SITE_SETTINGS_ITEM } from "@/lib/nav";
 
 const SUITES_STORAGE_KEY = "trackme_sidebar_closed_suites";
 interface SidebarProps {
   workspace: { id: string; name: string; slug: string };
   sites: { id: string; domain: string; displayName: string }[];
   primarySiteDomain: string;
-  /** Feature flags switched on (FEATURE_FLAGS); flagged nav items stay hidden without them. */
-  featureFlags: string[];
   user: { id: string; email: string };
   role: string;
   mobileOpen: boolean;
@@ -37,7 +35,6 @@ export function Sidebar({
   workspace,
   sites,
   primarySiteDomain,
-  featureFlags,
   user,
   role,
   mobileOpen,
@@ -76,9 +73,8 @@ export function Sidebar({
   type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "live" | "new"; scoped?: boolean };
   type NavGroup = { id: string; title: string; items: NavItem[] };
 
-  const flags = React.useMemo(() => parseFeatureFlags(featureFlags.join(",")), [featureFlags]);
   const navGroups: NavGroup[] = [
-    ...visibleSuites(NAV_SUITES, flags).map((suite) => ({
+    ...NAV_SUITES.map((suite) => ({
       id: suite.id,
       title: suite.title,
       items: suite.items.map((item): NavItem => ({

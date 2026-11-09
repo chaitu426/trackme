@@ -16,9 +16,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** Suite features that ship behind a flag. An item naming one is hidden until FEATURE_FLAGS lists it. */
-export type FeatureFlag = "errors" | "retention" | "segments" | "releases";
-
 export interface NavItem {
   /** Path under the active site (`/<workspace>/sites/<domain>/<path>`), or under the workspace when `workspace` is set. */
   path: string;
@@ -26,7 +23,6 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   badge?: "live" | "new";
-  flag?: FeatureFlag;
 }
 
 export interface NavSuite {
@@ -36,9 +32,8 @@ export interface NavSuite {
 }
 
 /**
- * The site-scoped suites. Pages that already exist live here; each new feature is added to its
- * suite in the commit that ships its page, with a `flag` until it is approved. A suite with no
- * visible item is hidden, so there are never empty groups or dead links.
+ * The site-scoped suites. Every page that exists is listed here, and a page is added to its suite in the
+ * commit that ships it. Nothing is hidden behind a flag: if it is built, it is in the sidebar.
  */
 export const NAV_SUITES: NavSuite[] = [
   {
@@ -53,7 +48,7 @@ export const NAV_SUITES: NavSuite[] = [
       { path: "acquisition", label: "Acquisition", icon: TrendingUp },
       { path: "geography", label: "Audience Geography", icon: MapPinned },
       { path: "events", label: "Goals & Events", icon: Target },
-      { path: "retention", label: "Retention & Cohorts", icon: Repeat2, flag: "retention" },
+      { path: "retention", label: "Retention & Cohorts", icon: Repeat2 },
     ],
   },
   {
@@ -68,27 +63,10 @@ export const NAV_SUITES: NavSuite[] = [
     id: "reliability",
     title: "Errors & Reliability",
     items: [
-      { path: "errors", label: "Error Tracking", icon: Bug, flag: "errors" },
-      { path: "releases", label: "Release Impact", icon: Rocket, flag: "releases" },
+      { path: "errors", label: "Error Tracking", icon: Bug },
+      { path: "releases", label: "Release Impact", icon: Rocket },
     ],
   },
 ];
 
 export const SITE_SETTINGS_ITEM = { path: "settings", label: "Site Settings", icon: Settings2 } as const;
-
-/** Flags listed in FEATURE_FLAGS ("errors, retention"), trimmed and lower-cased. */
-export function parseFeatureFlags(raw: string | undefined): Set<string> {
-  return new Set(
-    (raw ?? "")
-      .split(",")
-      .map((flag) => flag.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
-
-/** Suites reduced to the items whose flag is on; suites left empty are dropped. */
-export function visibleSuites(suites: NavSuite[], enabled: ReadonlySet<string>): NavSuite[] {
-  return suites
-    .map((suite) => ({ ...suite, items: suite.items.filter((item) => !item.flag || enabled.has(item.flag)) }))
-    .filter((suite) => suite.items.length > 0);
-}

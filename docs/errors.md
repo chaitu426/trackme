@@ -59,7 +59,7 @@ in storage; test rows removed. **Not verified:** the full Kafka path, load, and 
 Built and verified in a real browser: see [`sdk.md`](sdk.md) (options, API, what is collected, sizes).
 
 ## Dashboard (Errors & Reliability > Error Tracking)
-Hidden until `FEATURE_FLAGS` contains `errors`.
+In the sidebar under Errors & Reliability.
 
 - **Issue list** (`/<workspace>/sites/<site>/errors`): title, level, status, first seen, release, a daily trend, events,
   users and last seen. Filters for status (open by default), release, environment, level, sort (last seen, events,

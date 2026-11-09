@@ -63,7 +63,7 @@ Down-migration: apply, roll back, apply again.
 
 ## 7. Flags
 
-Dashboard items use `FEATURE_FLAGS` (done: `apps/web/src/lib/nav.ts`). Server-side gates reuse the same list.
+No feature flags: a finished page goes straight into the sidebar (`apps/web/src/lib/nav.ts`). Decision: the owner approved shipping everything unflagged and asked that nothing be flagged in future.
 
 ## 8. Risks
 

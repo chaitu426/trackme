@@ -1,6 +1,6 @@
 # Retention & Cohorts
 
-`Analytics > Retention & Cohorts` (hidden until `FEATURE_FLAGS` contains `retention`). It answers: of the people who
+`Analytics > Retention & Cohorts`. It answers: of the people who
 first showed up in a period, how many came back in each period after?
 
 ## Identified users only
