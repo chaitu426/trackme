@@ -11,6 +11,8 @@ import { runErrorRegressions } from "./jobs/error-regressions.js";
 import { runSourceMapRetention } from "./jobs/sourcemap-retention.js";
 import { runPaymentPayloadRetention } from "./jobs/payment-payload-retention.js";
 import { runRevenueLeakRollup } from "./jobs/revenue-leak-rollup.js";
+import { publishAlertEvent } from "./jobs/alert-events.js";
+import { createClickHouseNewGroupFetch, publishNewErrorGroups } from "./jobs/new-error-groups.js";
 import { classifyPending } from "./jobs/payment-failure-classifier.js";
 import { createClickHouseClassifierDeps } from "./jobs/payment-failure-classifier.db.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
@@ -80,7 +82,9 @@ cron.schedule("* * * * *", async () => {
       "lock:scheduled:error_regressions",
       50,
       "Error Regressions",
-      instrumentJob("error_regressions", () => runErrorRegressions().then(() => undefined))
+      instrumentJob("error_regressions", () =>
+        runErrorRegressions((issue, release, now) => publishAlertEvent(redis, { type: "error_regression", siteId: issue.siteId, groupId: issue.groupId, release, at: now.toISOString() })).then(() => undefined)
+      )
     );
   } catch (err) {
     console.error("Failed checking error regressions:", err);
@@ -156,6 +160,27 @@ cron.schedule("* * * * *", async () => {
     );
   } catch (err) {
     console.error("Failed classifying payment failures:", err);
+  }
+});
+
+// Alert events: every minute, publish a "new error group" event for each issue first seen in the last 15 minutes (once per issue).
+cron.schedule("* * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:new_error_groups",
+      55,
+      "New Error Groups",
+      instrumentJob("new_error_groups", () =>
+        publishNewErrorGroups({
+          fetchRecent: createClickHouseNewGroupFetch(),
+          claim: async (siteId, groupId) => (await redis.set(`alerts:newgroup:${siteId}:${groupId}`, "1", "EX", 7 * 86400, "NX")) === "OK",
+          publish: (event) => publishAlertEvent(redis, event),
+        }).then(() => undefined)
+      )
+    );
+  } catch (err) {
+    console.error("Failed publishing new error groups:", err);
   }
 });
 

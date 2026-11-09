@@ -16,6 +16,8 @@ export interface RegressionDeps {
   fetchSeen(issues: ResolvedIssue[]): Promise<RecentRelease[]>;
   /** Marks one issue open and regressed. Returns false if it was no longer resolved (someone changed it meanwhile). */
   reopen(issue: ResolvedIssue, release: string, now: Date): Promise<boolean>;
+  /** Called after an issue was reopened, to tell the alert engine. A failure here never undoes the reopen. */
+  onReopened?(issue: ResolvedIssue, release: string, now: Date): Promise<void>;
   now?: Date;
 }
 
@@ -47,15 +49,19 @@ export async function detectRegressions(deps: RegressionDeps): Promise<number> {
         lastSeen: new Date(r.lastSeen),
       }));
       const regression = findRegression(issue.state, events);
-      if (regression && (await deps.reopen(issue, regression.release, now))) reopened += 1;
+      if (regression && (await deps.reopen(issue, regression.release, now))) {
+        reopened += 1;
+        if (deps.onReopened) await deps.onReopened(issue, regression.release, now).catch(() => undefined);
+      }
     }
   }
   return reopened;
 }
 
 /** The job as scheduled: Postgres for the decisions, ClickHouse for what has happened since. */
-export async function runErrorRegressions(): Promise<number> {
+export async function runErrorRegressions(onReopened?: RegressionDeps["onReopened"]): Promise<number> {
   return detectRegressions({
+    ...(onReopened ? { onReopened } : {}),
     loadResolved: async () => {
       const rows = await db.select().from(siteErrorStatus).where(eq(siteErrorStatus.status, "resolved"));
       return rows.map((row) => ({
