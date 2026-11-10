@@ -20,7 +20,7 @@
     "test": "node --import tsx --test"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.11.0",
+    "@clickhouse/client": "^1.25.0",
     "@trackme/config": "workspace:*",
     "@trackme/contracts": "workspace:*"
   },
