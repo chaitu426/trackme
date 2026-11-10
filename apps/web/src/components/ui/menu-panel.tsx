@@ -7,26 +7,61 @@ import { cn } from "@/lib/utils";
 
 /**
  * The floating surface under a dropdown, switcher or popover. It fades in and settles a few pixels from the trigger, and fades
- * out on close, so every menu in the app opens the same way. Position it with `className` (it is `absolute`; the trigger's wrapper
- * needs `relative`).
+ * out on close, so every menu in the app opens the same way.
+ *
+ * It is drawn in a portal on the page, positioned from its trigger's wrapper (the element it is written inside, which needs no
+ * special style), so no card, header or animated section can stack above it or clip it. `className` sets the width and look;
+ * `left-0 right-0` makes it as wide as the trigger. It carries `data-portal-menu`, so a click-outside handler can tell a click
+ * inside the menu from one outside it.
  */
 export function MenuPanel({ open, children, className, ...aria }: { open: boolean; children: React.ReactNode; className?: string } & Pick<React.HTMLAttributes<HTMLDivElement>, "role" | "aria-label" | "id">) {
+  const marker = React.useRef<HTMLSpanElement>(null);
+  const [box, setBox] = React.useState<{ left: number; top: number; width: number } | null>(null);
+  const stretch = /(^|\s)right-0(\s|$)/.test(className ?? "");
+  // Position words are handled here; the rest of the classes (width, padding, overflow) pass through.
+  const rest = (className ?? "").replace(/(^|\s)(left-0|right-0|top-full|mt-2)(?=\s|$)/g, " ").trim();
+
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const rect = marker.current?.parentElement?.getBoundingClientRect();
+      if (!rect) return;
+      const next = { left: rect.left, top: rect.bottom + 8, width: rect.width };
+      setBox((prev) => (prev && prev.left === next.left && prev.top === next.top && prev.width === next.width ? prev : next));
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          {...aria}
-          className={cn("absolute z-50 rounded-xl border border-border bg-card shadow-float", className)}
-          style={{ transformOrigin: "top" }}
-          initial={{ opacity: 0, y: -6, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {children}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      <span ref={marker} hidden />
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && box && (
+              <motion.div
+                {...aria}
+                data-portal-menu=""
+                className={cn("fixed z-[110] rounded-xl border border-border bg-card shadow-float", rest)}
+                style={{ left: box.left, top: box.top, ...(stretch ? { width: box.width } : {}), transformOrigin: "top" }}
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {children}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+    </>
   );
 }
 

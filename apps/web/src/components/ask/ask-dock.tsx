@@ -3,7 +3,7 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, ArrowUp, ChevronDown, History, Plus, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowUp, ChevronDown, History, Plus } from "lucide-react";
 import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/field";
@@ -212,8 +212,7 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
 
         <form onSubmit={submit} className="glass pointer-events-auto flex items-end gap-1 rounded-[26px] p-1.5">
           <Tooltip content={`${site}${more > 0 ? ` +${more}` : ""} · ${rangeLabel.toLowerCase()} · ${sourcesOn} ${sourcesOn === 1 ? "source" : "sources"}`} side="top">
-            <button type="button" onClick={() => dispatch({ type: "view", view: "configure" })} aria-label="Configure what Ask can read" className="press mb-0 flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-white/[0.06] px-3 text-xs text-zinc-300 hover:bg-white/[0.1] hover:text-zinc-50">
-              <Sparkles className="size-3.5" aria-hidden="true" />
+            <button type="button" onClick={() => dispatch({ type: "view", view: "configure" })} aria-label="Configure what Ask can read" className="press mb-0 flex h-8 shrink-0 items-center rounded-full bg-white/[0.08] px-3.5 text-xs text-zinc-300 hover:bg-white/[0.1] hover:text-zinc-50">
               <span className="max-w-[110px] truncate">{ctx.page ?? "Ask"}</span>
             </button>
           </Tooltip>

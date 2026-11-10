@@ -36,7 +36,7 @@ export function SelectDropdown<T extends string | number>({ value, onChange, opt
   React.useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (wrapper.current && !wrapper.current.contains(e.target as Node)) setOpen(false);
+      if (wrapper.current && !wrapper.current.contains(e.target as Node) && !(e.target as Element).closest?.("[data-portal-menu]")) setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     // Focus the chosen option (or the first) so the arrows work straight away.

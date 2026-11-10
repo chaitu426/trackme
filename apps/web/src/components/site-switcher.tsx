@@ -26,7 +26,7 @@ export function SiteSwitcher({
 
   React.useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(event.target as Node) && !(event.target as Element).closest?.("[data-portal-menu]")) setOpen(false);
     };
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);

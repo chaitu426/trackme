@@ -45,8 +45,8 @@ export function AnalyticsFilterBar({
   // Close on outside click
   React.useEffect(() => {
     function handleOutside(e: MouseEvent) {
-      if (countryRef.current && !countryRef.current.contains(e.target as Node)) setCountryOpen(false);
-      if (deviceRef.current && !deviceRef.current.contains(e.target as Node)) setDeviceOpen(false);
+      if (countryRef.current && !countryRef.current.contains(e.target as Node) && !(e.target as Element).closest?.("[data-portal-menu]")) setCountryOpen(false);
+      if (deviceRef.current && !deviceRef.current.contains(e.target as Node) && !(e.target as Element).closest?.("[data-portal-menu]")) setDeviceOpen(false);
     }
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
