@@ -77,9 +77,9 @@ export function AskConfigure({ scope, sites, onChange }: { scope: AskScope; site
         <Row title="Most rows per query" detail="A query that would return more is stopped, not truncated silently.">
           <div className="w-28">
             <NativeSelect aria-label="Most rows per query" value={String(scope.maxRows)} onChange={(e) => set({ maxRows: Number(e.target.value) })} className="w-full">
+              <option value="100">100</option>
+              <option value="500">500</option>
               <option value="1000">1,000</option>
-              <option value="10000">10,000</option>
-              <option value="100000">100,000</option>
             </NativeSelect>
           </div>
         </Row>

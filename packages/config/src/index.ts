@@ -64,6 +64,9 @@ const EnvironmentSchema = z.object({
    */
   DASHBOARD_TENANT_CONCURRENCY: z.coerce.number().int().positive().default(4),
   DASHBOARD_TENANT_QUEUE: z.coerce.number().int().min(0).default(64),
+  /** Server-side ceiling on one dashboard query: seconds it may run and rows it may return (ClickHouse settings). */
+  DASHBOARD_QUERY_MAX_SECONDS: z.coerce.number().int().positive().default(10),
+  DASHBOARD_QUERY_MAX_ROWS: z.coerce.number().int().positive().default(100_000),
 
   // Redis (shared default for development; production should split by failure domain)
   REDIS_URL: z.string().default(DEV_DEFAULTS.REDIS_URL),
@@ -144,6 +147,27 @@ const EnvironmentSchema = z.object({
   /** Path to the ClickHouse server CA PEM, when the service uses a private CA. */
   CLICKHOUSE_CA_CERT_PATH: z.string().optional(),
 
+  // Ask (the in-app agent): OpenAI planner + vetted query templates, run by the ask worker
+  /** Master switch. Off keeps Ask on the canned demo engine; on requires OPENAI_API_KEY to answer questions. */
+  ASK_ENABLED: z
+    .string()
+    .transform((val) => val === "true" || val === "1")
+    .default("false"),
+  OPENAI_API_KEY: z.string().optional(),
+  ASK_MODEL: z.string().default("gpt-4.1"),
+  /** Upper bound on tokens one planner call may produce. */
+  ASK_MAX_TOKENS: z.coerce.number().int().positive().default(8192),
+  /** Tool-call rounds one run may take before it must finish, so a loop cannot run away. */
+  ASK_MAX_STEPS: z.coerce.number().int().min(1).default(6),
+  /** Planner completions one workspace may have in flight at once, shared across every node (Redis). */
+  ASK_WORKSPACE_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  /** Planner completions per minute across all workspaces and nodes (Redis token bucket) to stay under the provider's limit. */
+  ASK_LLM_RPM: z.coerce.number().int().positive().default(120),
+  /** A run still `queued` or `running` with no heartbeat for this long is re-queued by the sweeper. */
+  ASK_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  /** Prometheus /metrics port for the ask worker; 0 disables it. */
+  ASK_METRICS_PORT: z.coerce.number().int().min(0).default(9466),
+
   // Geolocation & Privacy
   DERIVE_GEO_AT_EDGE: z
     .string()
@@ -188,6 +212,9 @@ export function productionProblems(candidate: Environment): string[] {
     problems.push(
       "SESSION_COOKIE_DOMAIN shares the session cookie with every subdomain; set SESSION_COOKIE_SHARED_ACK=true to accept that, or unset it"
     );
+  }
+  if (candidate.ASK_ENABLED && !candidate.OPENAI_API_KEY?.trim()) {
+    problems.push("ASK_ENABLED is on but OPENAI_API_KEY is unset; Ask cannot answer questions without it");
   }
   return problems;
 }

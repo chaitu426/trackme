@@ -15,6 +15,7 @@
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@trackme/analytics": "workspace:*",
+    "@trackme/ask": "workspace:*",
     "@trackme/authz": "workspace:*",
     "@trackme/config": "workspace:*",
     "@trackme/contracts": "workspace:*",

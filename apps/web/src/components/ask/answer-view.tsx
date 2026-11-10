@@ -306,11 +306,13 @@ function Working({ steps, shown }: { steps: Step[]; shown: number }) {
           )}
         </motion.div>
       </AnimatePresence>
-      {steps.length > 0 && (
+      {shown > 0 && (
         <span className="ml-auto flex shrink-0 items-center gap-1" aria-label={`${finished} of ${steps.length} steps done`}>
+          {/* A live run does not know how many steps are coming, so that count rides at the end like a caret. */}
           {steps.map((s, i) => (
             <span key={s.id} className={cn("size-1 rounded-full transition-colors duration-200", i < finished ? "bg-good" : i === finished ? "bg-zinc-300" : "bg-white/[0.14]")} />
           ))}
+          {shown > steps.length && <span className="size-1 animate-pulse rounded-full bg-white/[0.14]" />}
         </span>
       )}
     </div>
@@ -325,6 +327,7 @@ export function TurnView({ turn, onFollow, site = "", range = "" }: { turn: Turn
   const [fresh] = React.useState(turn.status === "thinking");
   const [settled, setSettled] = React.useState(!fresh);
   const [openEvidence, setOpenEvidence] = React.useState<Set<number>>(new Set());
+  const [showSources, setShowSources] = React.useState(false);
   const [details, setDetails] = React.useState<"none" | "assumptions" | "steps">("none");
 
   const openOne = React.useCallback((n: number) => {
@@ -351,12 +354,13 @@ export function TurnView({ turn, onFollow, site = "", range = "" }: { turn: Turn
 
   return (
     <article className="flex flex-col gap-2.5" aria-busy={turn.status === "thinking"}>
-      <p className="glass w-fit max-w-[88%] rounded-2xl rounded-bl-md px-3.5 py-2 text-[13px] leading-5 text-zinc-200">{turn.question}</p>
+      <p className="glass ml-auto w-fit max-w-[80%] rounded-2xl rounded-br-md px-3.5 py-2 text-[13px] leading-5 text-zinc-100">{turn.question}</p>
 
-      <div className="glass flex flex-col gap-4 rounded-2xl px-5 py-4">
+      <div className="glass flex max-w-[94%] flex-col gap-4 rounded-2xl rounded-bl-md px-5 py-4">
         {turn.status === "thinking" && a === undefined ? <Working steps={turn.pending ?? []} shown={turn.shownSteps} /> : null}
         {turn.status === "thinking" && a !== undefined ? <Working steps={a.steps} shown={turn.shownSteps} /> : null}
 
+        {turn.status === "done" && turn.error ? <p role="alert" className="text-sm leading-6 text-zinc-300">{turn.error}</p> : null}
         {turn.status === "done" && a && (
           <>
             {first?.type === "text" ? <WrittenText text={first.text} onOpen={openOne} write={writeFirst} onDone={onWritten} /> : null}
@@ -380,8 +384,11 @@ export function TurnView({ turn, onFollow, site = "", range = "" }: { turn: Turn
                 {a.evidence.length > 0 && (
                   <motion.div {...rise(a.blocks.length + 1)} className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="mr-1 text-xs text-zinc-500">Sources</span>
-                      {a.evidence.map((e) => (
+                      <button type="button" onClick={() => setShowSources((v) => !v)} aria-expanded={showSources} className="press inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300">
+                        <ChevronRight className={cn("size-3 transition-transform duration-150", showSources && "rotate-90")} aria-hidden="true" />
+                        Based on {a.evidence.length} {a.evidence.length === 1 ? "source" : "sources"}
+                      </button>
+                      {showSources && a.evidence.map((e) => (
                         <button
                           key={e.n}
                           type="button"

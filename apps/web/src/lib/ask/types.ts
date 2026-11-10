@@ -139,6 +139,8 @@ export interface Turn {
   /** The steps of the run in progress, known up front by the demo; a streaming backend would append them as they happen. */
   pending?: Step[];
   answer?: Answer;
+  /** Why the run could not answer. Shown as is; there is no stand-in answer. */
+  error?: string;
 }
 
 export type PanelView = "ask" | "history" | "configure";
@@ -156,6 +158,6 @@ export const DEFAULT_SCOPE = (workspaceSlug: string, siteDomain: string | null):
   range: "30d",
   sources: { traffic: true, errors: true, payments: true, releases: true, people: false },
   piiMasked: true,
-  maxRows: 10_000,
+  maxRows: 1_000,
   instructions: "",
 });

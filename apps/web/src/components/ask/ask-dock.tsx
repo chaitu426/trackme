@@ -9,15 +9,14 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { askContext } from "@/lib/ask/context";
-import { answerFor } from "@/lib/ask/demo-engine";
+import { startRun, streamRun } from "@/lib/ask/run-client";
 import { initialState, reduce } from "@/lib/ask/state";
 import { DEFAULT_SCOPE, RANGES, type AskScope, type PastQuestion } from "@/lib/ask/types";
 import { TurnView } from "./answer-view";
 import { AskConfigure } from "./ask-configure";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-/** A small pause after the last step, so the answer does not land in the same frame as the final tick. */
-const SETTLE_MS = 220;
+const TIMEOUT_MS = 180_000;
 
 function read<T>(key: string): T | null {
   try {
@@ -39,7 +38,7 @@ function write(key: string, value: unknown) {
 function sanitize(saved: AskScope | null, base: AskScope, sites: string[]): AskScope {
   if (!saved) return base;
   const known = saved.siteDomains.filter((d) => sites.includes(d));
-  return { ...base, ...saved, workspaceSlug: base.workspaceSlug, siteDomains: known.length > 0 ? known : base.siteDomains, sources: { ...base.sources, ...saved.sources } };
+  return { ...base, ...saved, workspaceSlug: base.workspaceSlug, siteDomains: known.length > 0 ? known : base.siteDomains, sources: { ...base.sources, ...saved.sources }, maxRows: Math.min(saved.maxRows ?? base.maxRows, base.maxRows) };
 }
 
 /**
@@ -53,7 +52,7 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
   const ctx = React.useMemo(() => askContext(pathname, workspaceSlug), [pathname, workspaceSlug]);
   const base = React.useMemo(() => DEFAULT_SCOPE(workspaceSlug, siteDomain), [workspaceSlug, siteDomain]);
   const [state, dispatch] = React.useReducer(reduce, base, initialState);
-  const timers = React.useRef<number[]>([]);
+  const stops = React.useRef<Map<string, () => void>>(new Map());
   const input = React.useRef<HTMLTextAreaElement>(null);
   const body = React.useRef<HTMLDivElement>(null);
   const scopeKey = `trackme_ask_scope:${workspaceSlug}`;
@@ -76,26 +75,59 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
     [scopeKey]
   );
 
-  React.useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
-
-  const siteBase = `/${workspaceSlug}${state.scope.siteDomains[0] ? `/sites/${state.scope.siteDomains[0]}` : ""}`;
+  React.useEffect(
+    () => () => {
+      stops.current.forEach((stop) => stop());
+    },
+    []
+  );
 
   const ask = React.useCallback(
     (question: string) => {
       const q = question.trim();
       if (!q) return;
       const id = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-      const answer = answerFor(q, state.scope, siteBase);
-      dispatch({ type: "ask", id, question: q, page: ctx.page ?? "Ask", at: new Date().toISOString(), steps: answer.steps });
-      // A real run streams its steps as it works; the preview reveals each one after the time it says it took.
-      let at = 250;
-      for (const step of answer.steps) {
-        timers.current.push(window.setTimeout(() => dispatch({ type: "step", id }), at));
-        at += step.ms;
-      }
-      timers.current.push(window.setTimeout(() => dispatch({ type: "answer", id, answer }), at + SETTLE_MS));
+      // A live run starts with no steps known: the worker publishes them as it reads, and they arrive over SSE.
+      dispatch({ type: "ask", id, question: q, page: ctx.page ?? "Ask", at: new Date().toISOString() });
+
+      const fail = (message: string) => {
+        dispatch({ type: "fail", id, message });
+        stops.current.delete(id);
+      };
+      const timeout = window.setTimeout(() => {
+        stops.current.get(id)?.();
+        fail("This took too long. Try again, or narrow the range.");
+      }, TIMEOUT_MS);
+
+      startRun(q, state.scope, ctx.page ?? undefined)
+        .then(({ runId }) => {
+          if (stops.current.get(id) === undefined) return;
+          stops.current.set(
+            id,
+            streamRun(runId, {
+              onStep: (step) => dispatch({ type: "pushStep", id, step }),
+              onAnswer: (answer) => {
+                window.clearTimeout(timeout);
+                stops.current.delete(id);
+                dispatch({ type: "answer", id, answer });
+              },
+              onError: (message) => {
+                window.clearTimeout(timeout);
+                fail(message);
+              },
+            })
+          );
+        })
+        .catch((err: unknown) => {
+          window.clearTimeout(timeout);
+          stops.current.delete(id);
+          fail(err instanceof Error ? err.message : "Ask could not start. Try again.");
+        });
+
+      // Mark the turn as live so a stop can be found, even before the POST returns.
+      stops.current.set(id, () => window.clearTimeout(timeout));
     },
-    [ctx.page, state.scope, siteBase]
+    [ctx.page, state.scope]
   );
 
   // Keyboard: "/" asks from anywhere (except while typing), Escape folds.
@@ -151,7 +183,7 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
               <div
                 ref={body}
                 className="pointer-events-auto min-h-0 overflow-y-auto px-1 pb-1 pt-8"
-                style={{ maxHeight: "min(62vh, 620px)", maskImage: "linear-gradient(to bottom, transparent 0, #000 32px)", WebkitMaskImage: "linear-gradient(to bottom, transparent 0, #000 32px)" }}
+                style={{ maxHeight: "min(62vh, 620px)" }}
               >
                 {state.view === "ask" &&
                   (state.turns.length === 0 ? (

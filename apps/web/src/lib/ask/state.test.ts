@@ -78,3 +78,14 @@ test("suggestions follow the part of the app", () => {
   assert.equal(c.page, "Gateway Health");
   assert.equal(c.suggestions.length, 3);
 });
+
+test("live steps append to the turn as they arrive, and stop counting once the answer lands", () => {
+  let s = ask();
+  s = reduce(s, { type: "pushStep", id: "t1", step: { id: "q1", label: "Reading payments", ms: 40 } });
+  s = reduce(s, { type: "pushStep", id: "t1", step: { id: "q2", label: "Reading errors", ms: 30 } });
+  assert.deepEqual(s.turns[0]!.pending?.map((p) => p.id), ["q1", "q2"]);
+  assert.equal(s.turns[0]!.shownSteps, 2);
+  s = reduce(s, { type: "answer", id: "t1", answer });
+  assert.equal(s.turns[0]!.status, "done");
+  assert.equal(reduce(s, { type: "pushStep", id: "t1", step: { id: "q3", label: "late", ms: 1 } }).turns[0]!.pending?.length, 2);
+});

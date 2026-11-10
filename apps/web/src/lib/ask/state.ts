@@ -22,7 +22,10 @@ export type AskAction =
   | { type: "draft"; text: string }
   | { type: "ask"; id: string; question: string; page: string; at: string; steps?: Step[] }
   | { type: "step"; id: string }
+  /** A live run appends each step as the worker publishes it; the demo instead knows the whole list up front. */
+  | { type: "pushStep"; id: string; step: Step }
   | { type: "answer"; id: string; answer: Answer }
+  | { type: "fail"; id: string; message: string }
   | { type: "clear" }
   | { type: "scope"; scope: AskScope }
   | { type: "load"; scope?: AskScope; history?: PastQuestion[] };
@@ -53,12 +56,23 @@ export function reduce(state: AskState, action: AskAction): AskState {
     }
     case "step":
       return { ...state, turns: state.turns.map((t) => (t.id === action.id && t.status === "thinking" ? { ...t, shownSteps: t.shownSteps + 1 } : t)) };
+    case "pushStep":
+      return {
+        ...state,
+        turns: state.turns.map((t) =>
+          t.id !== action.id || t.status !== "thinking"
+            ? t
+            : { ...t, pending: [...(t.pending ?? []), action.step], shownSteps: (t.pending?.length ?? 0) + 1 }
+        ),
+      };
     case "answer":
       return {
         ...state,
         turns: state.turns.map((t) => (t.id === action.id ? { ...t, status: "done", answer: action.answer, shownSteps: action.answer.steps.length } : t)),
         unseen: !state.open,
       };
+    case "fail":
+      return { ...state, turns: state.turns.map((t) => (t.id === action.id ? { ...t, status: "done", error: action.message } : t)), unseen: !state.open };
     case "clear":
       return { ...state, turns: [], draft: "" };
     case "scope":

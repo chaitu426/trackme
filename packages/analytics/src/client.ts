@@ -70,6 +70,11 @@ const gate = createTenantGate(env.DASHBOARD_TENANT_CONCURRENCY, env.DASHBOARD_TE
  * makes ClickHouse answer only once the query has finished, so the time spent inside the gate is the
  * time the query holds a server slot (without it the response starts streaming while the query is
  * still running and the slot would be released too early).
+ *
+ * A server-side ceiling is applied here too (`max_execution_time`, `max_result_rows`), so no dashboard
+ * query — including one the Ask worker builds from a template — can outlive the request timeout or
+ * return an unbounded result. The read-only user's profile is per-user, so this per-query cap is the
+ * per-workspace guarantee; callers may tighten it, never raise it.
  */
 function withTenantGate(client: ClickHouseClient): ClickHouseClient {
   return new Proxy(client, {
@@ -78,7 +83,16 @@ function withTenantGate(client: ClickHouseClient): ClickHouseClient {
       if (prop !== "query") return typeof value === "function" ? value.bind(target) : value;
       return (params: Parameters<ClickHouseClient["query"]>[0]) =>
         gate(tenantOf(params), () =>
-          target.query({ ...params, clickhouse_settings: { wait_end_of_query: 1, ...params.clickhouse_settings } })
+          target.query({
+            ...params,
+            clickhouse_settings: {
+              wait_end_of_query: 1,
+              max_execution_time: env.DASHBOARD_QUERY_MAX_SECONDS,
+              max_result_rows: String(env.DASHBOARD_QUERY_MAX_ROWS),
+              result_overflow_mode: "break",
+              ...params.clickhouse_settings,
+            },
+          })
         );
     },
   });

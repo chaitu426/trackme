@@ -71,6 +71,13 @@
       "when": 1794221657779,
       "tag": "0009_site_payment_gateways",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794288948331,
+      "tag": "0010_wooden_rattler",
+      "breakpoints": true
     }
   ]
 }

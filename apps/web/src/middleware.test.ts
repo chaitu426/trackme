@@ -26,6 +26,8 @@ test("public API endpoints are explicitly allowlisted", () => {
 
 test("non-public API routes are denied by default", () => {
   assert.equal(isPublicPath("/api/v1/metrics/overview"), false);
+  assert.equal(isPublicPath("/api/v1/ask/runs"), false);
+  assert.equal(isPublicPath("/api/v1/ask/runs/abc/events"), false);
   assert.equal(isPublicPath("/api/v1/workspaces"), false);
   assert.equal(isPublicPath("/api/v1/sites/abc/settings"), false);
   assert.equal(isPublicPath("/dashboard"), false);
