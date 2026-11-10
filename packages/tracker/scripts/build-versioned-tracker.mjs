@@ -14,18 +14,31 @@ const versionHash = createHash("sha256").update(raw).digest("hex").slice(0, 8);
 const outputName = `tracker.${packageJson.version}.${versionHash}.js`;
 const outputPath = path.join(distDir, outputName);
 
+// Lazy chunks (scripts/build-iife.mjs) are already content-named; publish them beside the main file.
+const chunks = existsSync(path.join(distDir, "chunks.json"))
+  ? Object.values(JSON.parse(readFileSync(path.join(distDir, "chunks.json"), "utf8")))
+  : [];
+for (const chunk of chunks) {
+  writeFileSync(path.join(distDir, `${chunk.f}.br`), brotliCompressSync(readFileSync(path.join(distDir, chunk.f))));
+}
+
 writeFileSync(outputPath, raw);
 writeFileSync(path.join(distDir, `${outputName}.br`), brotliCompressSync(raw));
 writeFileSync(path.join(distDir, "manifest.json"), JSON.stringify({
   latest: packageJson.version,
   file: outputName,
   sri: `sha384-${createHash("sha384").update(raw).digest("base64")}`,
+  chunks: chunks.map((chunk) => ({ file: chunk.f, sri: chunk.i })),
 }, null, 2));
 
 const aliasRoot = path.resolve(__dirname, "../../../apps/web/public");
 mkdirSync(path.join(aliasRoot, "t", "v1"), { recursive: true });
 copyFileSync(outputPath, path.join(aliasRoot, "tracker.js"));
 copyFileSync(outputPath, path.join(aliasRoot, "t", "v1", "tracker.js"));
+for (const chunk of chunks) {
+  copyFileSync(path.join(distDir, chunk.f), path.join(aliasRoot, chunk.f));
+  copyFileSync(path.join(distDir, chunk.f), path.join(aliasRoot, "t", "v1", chunk.f));
+}
 const mapSource = path.join(distDir, "tracker.global.js.map");
 if (existsSync(mapSource)) {
   copyFileSync(mapSource, path.join(aliasRoot, "t", "v1", "tracker.js.map"));

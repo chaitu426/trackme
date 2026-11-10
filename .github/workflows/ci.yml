@@ -117,7 +117,7 @@ jobs:
           run_install: false
 
       # Each rule in scripts/security-guard.mjs corresponds to a vulnerability that was found and fixed
-      # (docs/SECURITY_AUDIT.md). A change that brings the pattern back fails here.
+      # (docs/operations/SECURITY_AUDIT.md). A change that brings the pattern back fails here.
       - name: Security guard rules
         run: node scripts/security-guard.mjs
 
@@ -125,7 +125,7 @@ jobs:
         run: node --test scripts/security-guard.test.mjs
 
       # High and critical advisories in production dependencies fail the build. The one advisory that is
-      # ignored on purpose (zod, GHSA-mrhx-c7xc-m3w5) is listed in package.json with its reason in docs/SECURITY_AUDIT.md.
+      # ignored on purpose (zod, GHSA-mrhx-c7xc-m3w5) is listed in package.json with its reason in docs/operations/SECURITY_AUDIT.md.
       - name: Dependency advisories (production dependencies)
         run: pnpm audit --prod --audit-level=high
 

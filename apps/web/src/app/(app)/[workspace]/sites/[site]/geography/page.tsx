@@ -40,7 +40,7 @@ export default async function AudienceGeographyPage({
   }
   const { workspace, site } = context;
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Audience Geography" art="globe" actions={<RangeSwitcher range={range} extraQuery={selectedCountry ? `&country=${selectedCountry}` : ""} />}>
         Where visitors come from, by country, for <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>
@@ -58,7 +58,7 @@ export default async function AudienceGeographyPage({
       <div className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs text-zinc-400 text-left">
         <Compass className="mt-0.5 h-4 w-4 shrink-0 text-zinc-200" />
         <p className="leading-relaxed">
-          Country is derived transiently from connection headers at the ingestion edge and stored only in aggregate. TrackMe never logs raw IP addresses or tracks precise visitor latitude/longitude coordinates.
+          Country is derived from connection headers at the ingestion edge. Only the country is kept, never raw IP addresses or precise coordinates.
         </p>
       </div>
     </div>
@@ -198,10 +198,10 @@ async function GeographyBody({
         <StatsCard
           title={audienceLabel}
           value={formatNumber(focusMetrics.visitors)}
-          subtitle="Unique visitors in selected timeframe"
+          subtitle={range === "24h" ? "Unique visitors in the last 24 hours" : "Daily-unique visitors in selected timeframe"}
         />
         <StatsCard
-          title="Audience Engagement"
+          title="Pageviews"
           value={formatNumber(focusMetrics.pageviews)}
           subtitle={`Pageviews from ${focusedCountry ? countryName(focusedCountry.name) : "all markets"}`}
         />
@@ -229,7 +229,7 @@ async function GeographyBody({
               items={topPages.items.map((item) => ({
                 name: item.name,
                 value: item.pageviews,
-                percentage: item.percentage,
+                percentage: Math.min(100, (item.pageviews / Math.max(focusMetrics.pageviews, 1)) * 100),
               }))}
               empty="No page data for this audience yet."
               valueFormatter={formatNumber}

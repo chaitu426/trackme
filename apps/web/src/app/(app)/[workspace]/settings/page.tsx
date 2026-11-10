@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { requireWorkspaceBySlug } from "@/lib/tenancy";
+import { requireWorkspaceBySlug, listApiKeys, getWorkspaceUsage } from "@/lib/tenancy";
+import { ApiKeysManager, type ApiKeySummary } from "@/components/api-keys-manager";
+import { UsageQuotaCard } from "@/components/usage-quota-card";
 import { db, workspaceMembers, workspaceInvites, users, eq, and } from "@trackme/db";
 import { listWorkspaceAuditLogs } from "@/lib/audit";
 import { OrganizationSettingsClient } from "./organization-settings-client";
@@ -19,7 +21,7 @@ export default async function OrganizationSettingsPage(props: {
   }
 
   // Parallel load: members, pending invites, and recent workspace audit events
-  const [memberRows, inviteRows, auditLogRows] = await Promise.all([
+  const [memberRows, inviteRows, auditLogRows, apiKeyRows, usage] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -50,7 +52,19 @@ export default async function OrganizationSettingsPage(props: {
       ),
 
     listWorkspaceAuditLogs(workspace.id, 25),
+    listApiKeys(workspace.id),
+    getWorkspaceUsage(workspace.id),
   ]);
+
+  const apiKeys: ApiKeySummary[] = apiKeyRows.map((key) => ({
+    id: key.id,
+    name: key.name,
+    prefix: key.prefix,
+    scopes: key.scopes,
+    lastUsedAt: key.lastUsedAt ? key.lastUsedAt.toISOString() : null,
+    expiresAt: key.expiresAt ? key.expiresAt.toISOString() : null,
+    createdAt: key.createdAt.toISOString(),
+  }));
 
   const initialMembers = memberRows.map((m) => ({
     ...m,
@@ -65,12 +79,20 @@ export default async function OrganizationSettingsPage(props: {
   }));
 
   return (
-    <OrganizationSettingsClient
-      workspace={workspace}
-      initialMembers={initialMembers}
-      initialInvites={initialInvites}
-      initialAuditLogs={auditLogRows}
-      currentUserEmail={user.email}
-    />
+    <div className="w-full space-y-8">
+      <OrganizationSettingsClient
+        workspace={workspace}
+        initialMembers={initialMembers}
+        initialInvites={initialInvites}
+        initialAuditLogs={auditLogRows}
+        currentUserEmail={user.email}
+      />
+      <section id="usage">
+        <UsageQuotaCard usage={usage} />
+      </section>
+      <section id="tokens">
+        <ApiKeysManager workspaceId={workspace.id} initialKeys={apiKeys} />
+      </section>
+    </div>
   );
 }

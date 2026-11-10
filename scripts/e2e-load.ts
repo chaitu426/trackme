@@ -5,7 +5,7 @@
  *   run       staged load against the live ingestion edge, then measure delivery
  *             through Kafka -> event worker -> ClickHouse and Redis realtime
  *   probe     sample Postgres, Redis and ClickHouse latency during the run
- *   baseline  Phase 0 of docs/INGESTION_SCALE_ARCHITECTURE.md: open-loop, Zipf-distributed
+ *   baseline  Phase 0 of docs/architecture/INGESTION_SCALE_ARCHITECTURE.md: open-loop, Zipf-distributed
  *             load; reconciles acked vs stored per site and prints which findings reproduce
  *   teardown  delete the throwaway sites
  *

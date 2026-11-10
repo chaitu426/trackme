@@ -364,6 +364,827 @@
           "source": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         }
       }
+    },
+    {
+      "name": "valid release and environment",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "release": "web@1.4.2+build.7",
+        "environment": "staging"
+      }
+    },
+    {
+      "name": "release with spaces",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "release": "v 1"
+      }
+    },
+    {
+      "name": "release longer than 64",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "release": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      }
+    },
+    {
+      "name": "unknown environment",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "environment": "prod"
+      }
+    },
+    {
+      "name": "unknown event kind",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "purchase",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "valid error event",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
+    },
+    {
+      "name": "valid error with fingerprint override",
+      "valid": true,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          },
+          "fingerprint": "checkout-null-user"
+        }
+      }
+    },
+    {
+      "name": "error kind without payload",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing"
+      }
+    },
+    {
+      "name": "payload on a pageview",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "pageview",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
+    },
+    {
+      "name": "error message longer than 1 KB",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
+    },
+    {
+      "name": "51 stack frames",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            },
+            {
+              "file": "a.js"
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
+    },
+    {
+      "name": "21 breadcrumbs",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            },
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "x"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
+    },
+    {
+      "name": "breadcrumb text over 200",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1,
+              "k": "log",
+              "m": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown breadcrumb kind",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1,
+              "k": "scroll",
+              "m": "x"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
+    },
+    {
+      "name": "11 tags",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "t0": "v",
+            "t1": "v",
+            "t2": "v",
+            "t3": "v",
+            "t4": "v",
+            "t5": "v",
+            "t6": "v",
+            "t7": "v",
+            "t8": "v",
+            "t9": "v",
+            "t10": "v"
+          }
+        }
+      }
+    },
+    {
+      "name": "tag value over 200",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "error",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "a": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown level",
+      "valid": false,
+      "event": {
+        "schemaVersion": 1,
+        "eventId": "3f2b8c1e-5a47-4d9e-8b21-0c6f7a1d9e42",
+        "type": "error",
+        "occurredAt": "2026-10-09T12:00:00.000Z",
+        "siteKey": "site_key_12345",
+        "sessionId": "session-1234",
+        "visitorPseudonym": "visitor-1234",
+        "url": "https://example.com/pricing",
+        "path": "/pricing",
+        "error": {
+          "type": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "level": "panic",
+          "frames": [
+            {
+              "fn": "onSubmit",
+              "file": "https://example.com/assets/app.js",
+              "line": 10,
+              "col": 4,
+              "inApp": true
+            }
+          ],
+          "breadcrumbs": [
+            {
+              "ts": 1760000000000,
+              "k": "click",
+              "m": "click button#pay \"Pay now\""
+            },
+            {
+              "ts": 1760000001000,
+              "k": "fetch",
+              "m": "POST /api/pay 500 120ms"
+            }
+          ],
+          "tags": {
+            "plan": "pro"
+          }
+        }
+      }
     }
   ]
 }

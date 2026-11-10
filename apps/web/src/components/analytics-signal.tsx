@@ -12,7 +12,7 @@ export function AnalyticsSignal({ items }: { items: BreakdownItem[] }) {
 
   if (!visibleItems.length) {
     return (
-      <div className="flex h-[180px] items-center justify-center rounded-lg border border-dashed border-white/10 text-xs text-zinc-500">
+      <div className="flex h-[180px] items-center justify-center rounded-lg border border-dashed border-border text-xs text-zinc-500">
         Page attention will appear once traffic arrives.
       </div>
     );
@@ -26,7 +26,7 @@ export function AnalyticsSignal({ items }: { items: BreakdownItem[] }) {
           return (
             <div key={item.name} className="group flex h-full min-w-0 flex-1 flex-col justify-end">
               <div className="relative flex flex-1 items-end justify-center">
-                <div className="pointer-events-none absolute bottom-full mb-2 hidden w-max max-w-[150px] rounded-md border border-white/10 bg-card px-2 py-1 text-xs text-zinc-200 shadow-float group-hover:block">
+                <div className="pointer-events-none absolute bottom-full mb-2 hidden w-max max-w-[150px] rounded-md border border-border bg-card px-2 py-1 text-xs text-zinc-200 shadow-float group-hover:block">
                   {item.name}: {item.pageviews.toLocaleString()} pageviews
                 </div>
                 <div

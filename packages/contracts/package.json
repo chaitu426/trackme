@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
+    },
+    "./scrub": {
+      "types": "./dist/scrub.d.ts",
+      "import": "./dist/scrub.js",
+      "require": "./dist/scrub.js"
     }
   },
   "scripts": {

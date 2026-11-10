@@ -6,21 +6,6 @@ const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.met
 };
 
 export default defineConfig([
-  // Standalone script bundle for <script src="...">
-  {
-    entry: {
-      tracker: "src/browser.ts",
-    },
-    format: ["iife"],
-    noExternal: ["web-vitals"],
-    outDir: "dist",
-    minify: true,
-    target: "es2020",
-    clean: false,
-    define: {
-      __TRACKER_VERSION__: JSON.stringify(packageJson.version),
-    },
-  },
   // NPM module build for ESM and CJS imports
   {
     entry: {
@@ -33,6 +18,8 @@ export default defineConfig([
     clean: false,
     define: {
       __TRACKER_VERSION__: JSON.stringify(packageJson.version),
+      // The standalone script and its lazy chunks are built by scripts/build-iife.mjs.
+      __LAZY__: "false",
     },
   },
 ]);

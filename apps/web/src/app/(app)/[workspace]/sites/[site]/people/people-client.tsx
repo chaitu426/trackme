@@ -1,12 +1,15 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
+import { AnimatePresence } from "motion/react";
+import { SidePanelFrame } from "@/components/ui/dialog";
 import {
   Search,
   Code,
   X,
-  Loader2,
   ChevronRight,
   Check,
   Copy,
@@ -22,6 +25,7 @@ import { StatsCard } from "@/components/ui/stats-card";
 import { MatrixArt } from "@/components/ui/matrix-art";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SessionReplay } from "@/components/session-replay";
+import { UserTimeline } from "@/components/user-timeline";
 import { SegmentBuilder, type SavedSegment } from "./segment-builder";
 import { describeBehavior, describeCondition } from "@/lib/segment-schema";
 import { formatRelativeTime } from "@/lib/format";
@@ -43,7 +47,10 @@ export interface UserProfileItem {
 interface PeopleClientProps {
   site: { id: string; domain: string };
   initialProfiles: UserProfileItem[];
-  stats: { total: number; active7d: number };
+  /** A search the page was opened with; the list is already filtered to it. */
+  initialSearch?: string;
+  workspaceSlug: string;
+  stats: { total: number; active7d: number; avgEvents: number };
 }
 
 const IDENTIFY_SNIPPET = `// In your frontend code once the user logs in:
@@ -66,7 +73,7 @@ function initialsOf(label: string): string {
 /** Green when seen in the last 5 minutes, blue within a day, grey otherwise. */
 function activityOf(lastSeenAt: string): { label: string; dot: string } {
   const age = Date.now() - new Date(lastSeenAt).getTime();
-  if (age < 5 * 60_000) return { label: "Active now", dot: "bg-[#4cc38a]" };
+  if (age < 5 * 60_000) return { label: "Active now", dot: "bg-good" };
   if (age < 24 * 3_600_000) return { label: "Active today", dot: "bg-zinc-300" };
   return { label: "Inactive", dot: "bg-zinc-600" };
 }
@@ -83,9 +90,9 @@ function Avatar({ label, size = "md" }: { label: string; size?: "md" | "lg" }) {
   );
 }
 
-export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps) {
+export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSearch = "", stats }: PeopleClientProps) {
   const [profiles, setProfiles] = React.useState<UserProfileItem[]>(initialProfiles);
-  const [search, setSearch] = React.useState("");
+  const [search, setSearch] = React.useState(initialSearch);
   const [isSearching, setIsSearching] = React.useState(false);
   const PAGE_SIZE = 50;
   const [hasMore, setHasMore] = React.useState(initialProfiles.length >= PAGE_SIZE && stats.total > initialProfiles.length);
@@ -214,6 +221,13 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
     setSearch("");
     setActiveSegment(segment);
     if (!segment) {
+      if (initialSearch) {
+        // Opened already searched for one person: "Everyone" must fetch the full list, not reuse the filtered one.
+        setSegmentCount(null);
+        setSegmentLoading(false);
+        void runSearch("");
+        return;
+      }
       setProfiles(everyone.current);
       setHasMore(everyone.current.length >= PAGE_SIZE && stats.total > everyone.current.length);
       setSegmentCount(null);
@@ -254,6 +268,15 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
     }
   }
 
+  // Reached through a link to one person (an error's affected users, a copied link): open their profile directly.
+  const autoOpened = React.useRef(false);
+  React.useEffect(() => {
+    if (autoOpened.current || !initialSearch || initialProfiles.length !== 1) return;
+    autoOpened.current = true;
+    void openUserDrawer(initialProfiles[0]!);
+    // Runs once on arrival.
+  }, []);
+
   // Timelines already opened this session, so reopening a profile is instant.
   const timelineCache = React.useRef(new Map<string, UserTimelineEvent[]>());
 
@@ -291,19 +314,17 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
     setTimeout(() => setCopiedSnippet(false), 2000);
   }
 
-  const avgEvents =
-    profiles.length > 0 ? Math.round(profiles.reduce((acc, p) => acc + (p.totalEvents || 1), 0) / profiles.length) : 0;
   const searching = search.trim().length > 0;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="User Profiles" art="stream" actions={<button
           type="button"
           onClick={copyIdentifySnippet}
           className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/[0.1] bg-[#232325]/80 px-3 font-mono text-xs text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-white/[0.2]"
           title="Copy the identify() snippet"
         >
-          {copiedSnippet ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Code className="h-4 w-4 text-zinc-400" />}
+          {copiedSnippet ? <Check className="h-4 w-4 text-good" /> : <Code className="h-4 w-4 text-zinc-400" />}
           {copiedSnippet ? "Copied" : "trackme.identify()"}
         </button>}>
         Who your customers are, and the path each one took through <span className="font-mono text-zinc-300">{site.domain}</span>
@@ -323,8 +344,8 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
         />
         <StatsCard
           title="Avg events per user"
-          value={stats.total > 0 ? avgEvents.toLocaleString() : "–"}
-          subtitle="Lifetime events per profile"
+          value={stats.total > 0 ? stats.avgEvents.toLocaleString() : "–"}
+          subtitle="Lifetime average across all identified users"
         />
       </div>
 
@@ -368,7 +389,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
             type="button"
             onClick={() => setBuilderOpen(true)}
             disabled={segmentsStatus === "unavailable"}
-            title={segmentsStatus === "unavailable" ? "Saved segments need a one-time database update" : undefined}
+            title={segmentsStatus === "unavailable" ? "Saved segments are unavailable right now" : undefined}
             className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.08] px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-white/[0.16] hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
@@ -378,8 +399,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
 
         {segmentsStatus === "unavailable" && (
           <p className="text-xs text-zinc-600">
-            Saved segments are not set up for this database yet. Run{" "}
-            <code className="font-mono text-zinc-400">node packages/db/apply-segments.mjs</code> once.
+            Saved segments are unavailable right now. Everything else on this page still works; try again shortly or contact your administrator.
           </p>
         )}
 
@@ -401,7 +421,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
               )}
             </div>
             {confirmDelete ? (
-              <span className="flex items-center gap-1 rounded-md border border-[#e5484d]/25 bg-[#e5484d]/10 pl-2 text-xs text-[#e5484d]">
+              <span className="flex items-center gap-1 rounded-md border border-bad/25 bg-bad/10 pl-2 text-xs text-bad">
                 Delete segment?
                 <button type="button" onClick={() => void deleteSegment(activeSegment)} className="px-2 py-1 font-medium hover:text-white">
                   Yes
@@ -416,7 +436,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Delete segment"
                 title="Delete segment"
-                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
+                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-bad/10 hover:text-bad"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -453,7 +473,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
               className="h-9 w-full rounded-lg border border-white/[0.1] bg-sidebar pl-9 pr-8 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-white/[0.3]"
             />
             {isSearching ? (
-              <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-zinc-400" />
+              <MatrixSpinner className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             ) : (
               searching && (
                 <button
@@ -548,22 +568,26 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
         )}
       </Card>
 
-      {builderOpen && (
-        <SegmentBuilder
-          siteId={site.id}
-          traitKeys={traitKeys}
-          onClose={() => setBuilderOpen(false)}
-          onSaved={(segment) => {
-            setSegments((prev) => [segment, ...prev]);
-            setBuilderOpen(false);
-            void selectSegment(segment);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {builderOpen && (
+          <SegmentBuilder
+            siteId={site.id}
+            traitKeys={traitKeys}
+            onClose={() => setBuilderOpen(false)}
+            onSaved={(segment) => {
+              setSegments((prev) => [segment, ...prev]);
+              setBuilderOpen(false);
+              void selectSegment(segment);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
+      <AnimatePresence>
       {selectedUser && (
         <ProfileDrawer
           user={selectedUser}
+          site={{ id: site.id, domain: site.domain, workspaceSlug }}
           timeline={timeline}
           loading={loadingTimeline}
           error={timelineError}
@@ -574,6 +598,7 @@ export function PeopleClient({ site, initialProfiles, stats }: PeopleClientProps
           onClose={() => setSelectedUser(null)}
         />
       )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -600,14 +625,10 @@ function EmptyState({ searching, onCopy, copied }: { searching: boolean; onCopy:
         </div>
         <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-black/40 text-left">
           <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-zinc-300">{IDENTIFY_SNIPPET}</pre>
-          <button
-            type="button"
-            onClick={onCopy}
-            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/[0.1] bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-300 hover:text-white"
-          >
-            {copied ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+          <Button type="button" variant="secondary" size="sm" onClick={onCopy} className="absolute right-2 top-2">
+            {copied ? <Check className="text-good" /> : <Copy />}
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -661,6 +682,7 @@ function isGoalEvent(event: UserTimelineEvent): boolean {
 
 function ProfileDrawer({
   user,
+  site,
   timeline,
   loading,
   error,
@@ -668,6 +690,7 @@ function ProfileDrawer({
   onClose,
 }: {
   user: UserProfileItem;
+  site: { id: string; domain: string; workspaceSlug: string };
   timeline: UserTimelineEvent[];
   loading: boolean;
   error: boolean;
@@ -676,38 +699,14 @@ function ProfileDrawer({
 }) {
   const closeRef = React.useRef<HTMLButtonElement>(null);
   const [copiedId, setCopiedId] = React.useState(false);
+  const [view, setView] = React.useState<"timeline" | "sessions">("timeline");
   const label = displayNameOf(user);
   const traits = Object.entries(user.traits || {});
   const sessions = React.useMemo(() => groupBySession(timeline), [timeline]);
   const pageviews = timeline.filter((e) => e.type === "pageview").length;
 
-  // The parent passes a fresh onClose every render; hold it in a ref so the effect (which
-  // grabs focus and locks scroll) runs once per open, not on every timeline update.
-  const onCloseRef = React.useRef(onClose);
-  onCloseRef.current = onClose;
-  React.useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCloseRef.current();
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
-
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={onClose}>
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Profile for ${label}`}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-xl flex-col border-l border-white/[0.08] bg-card shadow-2xl"
-      >
+    <SidePanelFrame onClose={onClose} label={`Profile for ${label}`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] p-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -726,7 +725,7 @@ function ProfileDrawer({
                 title="Copy distinct ID"
               >
                 {user.distinctId}
-                {copiedId ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+                {copiedId ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
               </button>
             </div>
           </div>
@@ -772,7 +771,27 @@ function ProfileDrawer({
             </section>
           )}
 
+          <div role="tablist" aria-label="Activity view" className="flex w-fit items-center gap-0.5 rounded-lg border border-white/[0.08] p-0.5 text-xs">
+            {(["timeline", "sessions"] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={view === id}
+                onClick={() => setView(id)}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === id ? "bg-raised text-zinc-50" : "text-zinc-400 hover:text-zinc-100"}`}
+              >
+                {id === "timeline" ? "Timeline" : "Sessions & replay"}
+              </button>
+            ))}
+          </div>
+
+          {view === "timeline" && (
+            <UserTimeline siteId={site.id} distinctId={user.distinctId} workspaceSlug={site.workspaceSlug} siteDomain={site.domain} />
+          )}
+
           {/* Journey */}
+          {view === "sessions" && (
           <section className="space-y-3">
             <div className="flex items-end justify-between">
               <h3 className="text-xs font-medium text-zinc-400">Journey</h3>
@@ -795,8 +814,8 @@ function ProfileDrawer({
                 ))}
               </div>
             ) : error ? (
-              <div className="rounded-xl border border-dashed border-[#e5484d]/30 bg-[#e5484d]/5 p-6 text-center">
-                <p className="text-xs text-[#e5484d]">The activity stream could not be loaded.</p>
+              <div className="rounded-xl border border-dashed border-bad/30 bg-bad/5 p-6 text-center">
+                <p className="text-xs text-bad">The activity stream could not be loaded.</p>
                 <button
                   type="button"
                   onClick={onRetry}
@@ -806,7 +825,7 @@ function ProfileDrawer({
                 </button>
               </div>
             ) : sessions.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-500">
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-zinc-500">
                 No events recorded for this person yet.
               </div>
             ) : (
@@ -817,9 +836,9 @@ function ProfileDrawer({
               </ol>
             )}
           </section>
+          )}
         </div>
-      </aside>
-    </div>
+    </SidePanelFrame>
   );
 }
 
@@ -912,7 +931,7 @@ function SessionCard({ session, defaultOpen }: { session: SessionGroup; defaultO
                 <li key={event.eventId} className="relative">
                   <span
                     className={`absolute -left-[17px] top-1.5 h-[7px] w-[7px] rounded-full ring-2 ring-[#19191b] ${
-                      goal ? "bg-white/[0.06]" : action ? "bg-[#4cc38a]" : "bg-zinc-500"
+                      goal ? "bg-white/[0.06]" : action ? "bg-good" : "bg-zinc-500"
                     }`}
                   />
                   <div className="flex items-baseline justify-between gap-3">
@@ -920,7 +939,7 @@ function SessionCard({ session, defaultOpen }: { session: SessionGroup; defaultO
                       {action && (
                         <span
                           className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-px text-xs font-medium ${
-                            goal ? "bg-white/[0.06] text-zinc-300" : "bg-[#4cc38a]/10 text-[#4cc38a]"
+                            goal ? "bg-white/[0.06] text-zinc-300" : "bg-good/10 text-good"
                           }`}
                         >
                           {goal && <Zap className="h-4 w-4" />}

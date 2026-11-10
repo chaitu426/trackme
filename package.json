@@ -22,18 +22,20 @@
     "seed:demo": "tsx scripts/seed-demo-site.ts",
     "seed:identified": "tsx scripts/seed-identified-users.ts",
     "geoip:download": "bash scripts/download-geoip.sh",
-    "build:app": "turbo run build --filter=@trackme/web --filter=@trackme/tracker-docs --filter=@trackme/ingestion-go --filter=@trackme/event-worker --filter=@trackme/scheduled-worker --env-mode=loose",
+    "build:app": "turbo run build --filter=@trackme/web --filter=@trackme/tracker-docs --filter=@trackme/ingestion-go --filter=@trackme/event-worker --filter=@trackme/scheduled-worker --filter=@trackme/ask-worker --env-mode=loose",
     "start:web": "pnpm --filter @trackme/web start",
     "start:docs": "pnpm --filter @trackme/tracker-docs start",
     "start:edge": "pnpm --filter @trackme/ingestion-go start",
     "start:worker": "pnpm --filter @trackme/event-worker start",
     "start:scheduler": "pnpm --filter @trackme/scheduled-worker start",
-    "start:all": "turbo run start --filter=@trackme/web --filter=@trackme/tracker-docs --filter=@trackme/ingestion-go --filter=@trackme/event-worker --filter=@trackme/scheduled-worker --env-mode=loose --ui=stream",
+    "start:ask": "pnpm --filter @trackme/ask-worker start",
+    "start:all": "turbo run start --filter=@trackme/web --filter=@trackme/tracker-docs --filter=@trackme/ingestion-go --filter=@trackme/event-worker --filter=@trackme/scheduled-worker --filter=@trackme/ask-worker --env-mode=loose --ui=stream",
     "dev:ingest": "pnpm --filter @trackme/ingestion-go dev",
     "dev:ingest-proxy": "cd services/ingest-proxy && go run .",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
-    "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f"
+    "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f",
+    "seed:suite": "pnpm --filter @trackme/scheduled-worker exec tsx seed-suite-demo.mts"
   },
   "devDependencies": {
     "prettier": "^3.5.2",

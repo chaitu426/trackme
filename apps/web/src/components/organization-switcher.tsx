@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuPanel } from "@/components/ui/menu-panel";
 import * as React from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Plus, Search } from "lucide-react";
@@ -20,7 +21,7 @@ export function OrganizationSwitcher({
 
   React.useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(event.target as Node) && !(event.target as Element).closest?.("[data-portal-menu]")) setOpen(false);
     };
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
@@ -42,21 +43,16 @@ export function OrganizationSwitcher({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="flex max-w-[150px] items-center gap-1 rounded-md px-1 py-0.5 text-left text-xs font-medium text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-200"
+        className="flex max-w-[150px] items-center gap-1 rounded-md px-1 py-0.5 text-left text-xs font-medium text-zinc-500 press hover:bg-white/[0.04] hover:text-zinc-200"
       >
         <span className="truncate">{current.name}</span>
         <ChevronDown className="h-4 w-4 shrink-0" />
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Switch organization"
-          className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-lg border border-white/10 bg-card p-2 shadow-float"
-        >
+      <MenuPanel open={open} role="dialog" aria-label="Switch organization" className="left-0 top-full mt-2 w-72 overflow-hidden p-2">
           <div className="px-3 pb-2 pt-2">
             <p className="text-xs font-medium text-zinc-600">Organizations</p>
-            <div className="mt-2 flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-border bg-white/[0.03] px-3 py-2">
               <Search className="h-4 w-4 text-zinc-500" />
               <input
                 ref={inputRef}
@@ -105,8 +101,7 @@ export function OrganizationSwitcher({
               Create organization
             </Link>
           </div>
-        </div>
-      )}
+      </MenuPanel>
     </div>
   );
 }

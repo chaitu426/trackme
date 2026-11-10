@@ -29,6 +29,8 @@ const (
 	ReasonCampaign   = "campaign"
 	ReasonWebVital   = "web_vital"
 	ReasonUser       = "user"
+	ReasonRelease    = "release"
+	ReasonError      = "error"
 )
 
 const (
@@ -40,6 +42,7 @@ const (
 	maxPath        = 512
 	maxTitle       = 512
 	maxUserID      = 256
+	maxRelease     = 64
 	minKey         = 8
 	maxKey         = 64
 )
@@ -58,7 +61,14 @@ var (
 	propKeyRe  = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 	vitalNames = map[string]bool{"CLS": true, "FCP": true, "FID": true, "INP": true, "LCP": true, "TTFB": true}
 	vitalRates = map[string]bool{"good": true, "needs-improvement": true, "poor": true}
-	eventTypes = map[string]bool{"pageview": true, "custom": true, "web_vital": true, "identify": true, "engagement": true}
+	releaseRe  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+@/-]*$`)
+	// Mirrors EVENT_TYPES and ENVIRONMENTS in packages/contracts/src/events.ts.
+	eventTypes = map[string]bool{
+		"pageview": true, "custom": true, "web_vital": true, "identify": true, "engagement": true,
+		"error": true, "api_call": true, "payment": true, "flag_exposure": true, "feedback": true,
+		"heartbeat": true, "deploy": true,
+	}
+	environments = map[string]bool{"production": true, "staging": true, "development": true}
 )
 
 // Event checks one event. On success it returns the event (with its timestamp
@@ -113,6 +123,13 @@ func Event(ev enrich.TrackerEvent, now time.Time, w Window) (out enrich.TrackerE
 		return ev, false, ReasonUser
 	}
 
+	if ev.Release != "" && (len(ev.Release) > maxRelease || !releaseRe.MatchString(ev.Release)) {
+		return ev, false, ReasonRelease
+	}
+	if ev.Environment != "" && !environments[ev.Environment] {
+		return ev, false, ReasonRelease
+	}
+
 	for _, v := range ev.Campaign {
 		if runes(v) > maxCampaignVal {
 			return ev, false, ReasonCampaign
@@ -121,6 +138,10 @@ func Event(ev enrich.TrackerEvent, now time.Time, w Window) (out enrich.TrackerE
 
 	if ev.Type == "web_vital" && !validWebVital(ev.WebVital) {
 		return ev, false, ReasonWebVital
+	}
+	// An error event carries an error payload, and no other kind does.
+	if (ev.Type == "error") != (ev.Error != nil) || (ev.Error != nil && !validError(ev.Error)) {
+		return ev, false, ReasonError
 	}
 
 	return ev, clamped, ""
@@ -226,4 +247,122 @@ func validWebVital(m map[string]interface{}) bool {
 		}
 	}
 	return true
+}
+
+// Caps for the error payload; they mirror ERROR_LIMITS in packages/contracts/src/events.ts.
+const (
+	maxErrType       = 128
+	maxErrMessage    = 1024
+	maxErrFingerprnt = 128
+	maxFrames        = 50
+	maxFrameFn       = 200
+	maxFrameFile     = 512
+	maxBreadcrumbs   = 20
+	maxCrumbText     = 200
+	maxErrTags       = 10
+	maxTagKey        = 32
+	maxTagValue      = 200
+)
+
+var (
+	errLevels      = map[string]bool{"fatal": true, "error": true, "warning": true, "info": true}
+	breadcrumbKind = map[string]bool{"navigation": true, "click": true, "fetch": true, "log": true}
+)
+
+// validError checks an error payload's shape and sizes. It never inspects the stack: the edge stays O(size of event).
+func validError(m map[string]interface{}) bool {
+	if t, ok := m["type"].(string); !ok || runes(t) == 0 || runes(t) > maxErrType {
+		return false
+	}
+	if msg, ok := m["message"].(string); !ok || runes(msg) > maxErrMessage {
+		return false
+	}
+	if v, present := m["level"]; present {
+		if s, ok := v.(string); !ok || !errLevels[s] {
+			return false
+		}
+	}
+	if v, present := m["fingerprint"]; present {
+		if s, ok := v.(string); !ok || runes(s) == 0 || runes(s) > maxErrFingerprnt {
+			return false
+		}
+	}
+	if v, present := m["frames"]; present {
+		frames, ok := v.([]interface{})
+		if !ok || len(frames) > maxFrames {
+			return false
+		}
+		for _, f := range frames {
+			if !validFrame(f) {
+				return false
+			}
+		}
+	}
+	if v, present := m["breadcrumbs"]; present {
+		crumbs, ok := v.([]interface{})
+		if !ok || len(crumbs) > maxBreadcrumbs {
+			return false
+		}
+		for _, c := range crumbs {
+			if !validBreadcrumb(c) {
+				return false
+			}
+		}
+	}
+	if v, present := m["tags"]; present {
+		tags, ok := v.(map[string]interface{})
+		if !ok || len(tags) > maxErrTags {
+			return false
+		}
+		for k, tv := range tags {
+			s, ok := tv.(string)
+			if !ok || runes(k) == 0 || runes(k) > maxTagKey || !propKeyRe.MatchString(k) || runes(s) > maxTagValue {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func nonNegativeInt(v interface{}) bool {
+	n, ok := v.(float64)
+	return ok && n >= 0 && n == math.Trunc(n) && !math.IsInf(n, 0)
+}
+
+func validFrame(v interface{}) bool {
+	f, ok := v.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	if file, ok := f["file"].(string); !ok || runes(file) == 0 || runes(file) > maxFrameFile {
+		return false
+	}
+	if fn, present := f["fn"]; present {
+		if s, ok := fn.(string); !ok || runes(s) > maxFrameFn {
+			return false
+		}
+	}
+	for _, key := range []string{"line", "col"} {
+		if n, present := f[key]; present && !nonNegativeInt(n) {
+			return false
+		}
+	}
+	if in, present := f["inApp"]; present {
+		if _, ok := in.(bool); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func validBreadcrumb(v interface{}) bool {
+	c, ok := v.(map[string]interface{})
+	if !ok || !nonNegativeInt(c["ts"]) {
+		return false
+	}
+	if k, ok := c["k"].(string); !ok || !breadcrumbKind[k] {
+		return false
+	}
+	m, ok := c["m"].(string)
+	return ok && runes(m) <= maxCrumbText
 }

@@ -1,31 +1,21 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  Users,
-  UserPlus,
-  Mail,
-  Shield,
-  ShieldAlert,
-  Trash2,
-  Clock,
-  CheckCircle2,
-  Loader2,
-  RefreshCw,
-  Crown,
-  Eye,
-  Send,
-  XCircle,
-  LogOut,
-  ArrowRightLeft,
-  Activity,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowRightLeft, Clock, LogOut, Mail, RefreshCw, Send, Trash2, UserPlus, Users, X } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
+import { ConfirmAction } from "@/components/ui/confirm-action";
+import { SelectDropdown } from "@/components/ui/select-dropdown";
+import { inputClass } from "@/components/ui/field";
+import { DrawCheck, Notice, PillTabs } from "@/components/motion/primitives";
 import { useInviteManager, type Invite } from "@/hooks/use-invite-manager";
 import { AuditLogViewer } from "@/components/audit-log-viewer";
 import type { AuditLogSummary } from "@/lib/audit";
+import { cn } from "@/lib/utils";
 
 interface Member {
   id: string;
@@ -36,468 +26,367 @@ interface Member {
 }
 
 interface OrganizationSettingsClientProps {
-  workspace: {
-    id: string;
-    name: string;
-    slug: string;
-    role: string;
-  };
+  workspace: { id: string; name: string; slug: string; role: string };
   initialMembers: Member[];
   initialInvites: Invite[];
   initialAuditLogs?: AuditLogSummary[];
   currentUserEmail: string;
 }
 
-const ROLE_META = {
-  admin: { label: "Admin", icon: Crown, color: "text-zinc-300 bg-white/[0.06] border-white/[0.1]" },
-  member: { label: "Member", icon: Users, color: "text-zinc-300 bg-white/[0.06] border-white/[0.1]" },
-  viewer: { label: "Viewer", icon: Eye, color: "text-zinc-300 bg-white/[0.06] border-white/[0.1]" },
-  owner: { label: "Owner", icon: Crown, color: "text-[#4cc38a] bg-[#4cc38a]/10 border-[#4cc38a]/20" },
+const ROLES = [
+  { role: "owner", label: "Owner", desc: "Everything, including billing and transferring ownership" },
+  { role: "admin", label: "Admin", desc: "Manage members, sites, tracking keys and settings" },
+  { role: "member", label: "Member", desc: "Read and edit analytics, goals and exports" },
+  { role: "viewer", label: "Viewer", desc: "Read-only dashboards and reports" },
+] as const;
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+const rowMotion = {
+  layout: "position" as const,
+  initial: { opacity: 0, y: -6 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, x: 16 },
+  transition: { duration: 0.22, ease: EASE },
 };
 
-export function OrganizationSettingsClient({
-  workspace,
-  initialMembers,
-  initialInvites,
-  initialAuditLogs = [],
-  currentUserEmail,
-}: OrganizationSettingsClientProps) {
+function initialsOf(name: string): string {
+  return name ? name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() : "TM";
+}
+
+export function OrganizationSettingsClient({ workspace, initialMembers, initialInvites, initialAuditLogs = [], currentUserEmail }: OrganizationSettingsClientProps) {
   const router = useRouter();
   const [members, setMembers] = React.useState<Member[]>(initialMembers);
   const [auditLogs] = React.useState<AuditLogSummary[]>(initialAuditLogs);
 
-  // Invite state via shared hook
   const inviteManager = useInviteManager(workspace.id);
   React.useEffect(() => {
     inviteManager.setInvites(initialInvites);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Invite form state
   const [inviteEmail, setInviteEmail] = React.useState("");
   const [inviteRole, setInviteRole] = React.useState<"member" | "admin" | "viewer">("member");
   const [inviteError, setInviteError] = React.useState<string | null>(null);
-  const [inviteSuccess, setInviteSuccess] = React.useState<string | null>(null);
+  const [inviteNonce, setInviteNonce] = React.useState(0);
+  const [sentTo, setSentTo] = React.useState<string | null>(null);
   const [isInviting, setIsInviting] = React.useState(false);
 
-  // Member action states
   const [busyMemberId, setBusyMemberId] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
 
-  // ── Invite send ─────────────────────────────────────────────────────────────
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
     setIsInviting(true);
     setInviteError(null);
-    setInviteSuccess(null);
-
-    const result = await inviteManager.sendInvite(inviteEmail.trim(), inviteRole);
+    setSentTo(null);
+    const email = inviteEmail.trim();
+    const result = await inviteManager.sendInvite(email, inviteRole);
     if (result.success) {
-      setInviteSuccess(`Invitation sent to ${inviteEmail} ✓`);
+      setSentTo(email);
       setInviteEmail("");
-      setTimeout(() => setInviteSuccess(null), 4000);
+      window.setTimeout(() => setSentTo(null), 4000);
     } else {
-      setInviteError(result.error ?? "Failed to send invitation.");
+      setInviteError(result.error ?? "The invitation could not be sent.");
+      setInviteNonce((n) => n + 1);
     }
     setIsInviting(false);
   }
 
-  // ── Resend ──────────────────────────────────────────────────────────────────
-  async function handleResend(invite: Invite) {
-    await inviteManager.resendInvite(invite.id, invite.email, invite.role as "admin" | "member" | "viewer");
+  async function memberRequest(memberId: string, init: RequestInit, failure: string): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+    setBusyMemberId(memberId);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/v1/workspaces/${workspace.id}/members/${memberId}`, init);
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) setActionError(typeof data.message === "string" ? data.message : failure);
+      return { ok: res.ok, data };
+    } catch {
+      setActionError("Network error. Try again.");
+      return { ok: false, data: {} };
+    } finally {
+      setBusyMemberId(null);
+    }
   }
 
-  // ── Revoke ──────────────────────────────────────────────────────────────────
-  async function handleRevokeInvite(inviteId: string) {
-    await inviteManager.revokeInvite(inviteId);
-  }
-
-  // ── Remove member ───────────────────────────────────────────────────────────
   async function handleRemoveMember(memberId: string) {
-    if (!confirm("Are you sure you want to remove this member from the organization?")) return;
-    setBusyMemberId(memberId);
-    setActionError(null);
-    try {
-      const res = await fetch(`/api/v1/workspaces/${workspace.id}/members/${memberId}`, { method: "DELETE" });
-      if (res.ok) {
-        setMembers((prev) => prev.filter((m) => m.id !== memberId));
-      } else {
-        const data = await res.json();
-        setActionError(data.message || "Failed to remove member.");
-      }
-    } catch {
-      setActionError("Network error while removing member.");
-    } finally {
-      setBusyMemberId(null);
+    const { ok } = await memberRequest(memberId, { method: "DELETE" }, "The member could not be removed.");
+    if (ok) setMembers((prev) => prev.filter((m) => m.id !== memberId));
+  }
+
+  async function handleLeave(memberId: string) {
+    const { ok } = await memberRequest(memberId, { method: "DELETE" }, "You could not leave the workspace.");
+    if (ok) {
+      router.push("/");
+      router.refresh();
     }
   }
 
-  // ── Leave workspace (self) ──────────────────────────────────────────────────
-  async function handleLeaveWorkspace(memberId: string) {
-    if (!confirm("Are you sure you want to leave this organization? You will lose access to its sites and analytics.")) {
-      return;
-    }
-    setBusyMemberId(memberId);
-    setActionError(null);
-    try {
-      const res = await fetch(`/api/v1/workspaces/${workspace.id}/members/${memberId}`, { method: "DELETE" });
-      if (res.ok) {
-        router.push("/");
-        router.refresh();
-      } else {
-        const data = await res.json();
-        setActionError(data.message || "Could not leave workspace.");
-      }
-    } catch {
-      setActionError("Network error.");
-    } finally {
-      setBusyMemberId(null);
-    }
-  }
-
-  // ── Change role or Transfer Ownership ───────────────────────────────────────
   async function handleChangeRole(memberId: string, newRole: "admin" | "member" | "viewer" | "owner") {
-    if (newRole === "owner") {
-      const targetMember = members.find((m) => m.id === memberId);
-      if (!confirm(`Are you sure you want to transfer workspace ownership to ${targetMember?.name || targetMember?.email}? You will become an Admin.`)) {
-        return;
-      }
-    }
-
-    setBusyMemberId(memberId);
-    setActionError(null);
-    try {
-      const res = await fetch(`/api/v1/workspaces/${workspace.id}/members/${memberId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        if (data.ownershipTransferred) {
-          // Current user is demoted to admin, target is now owner
-          setMembers((prev) =>
-            prev.map((m) => {
-              if (m.id === memberId) return { ...m, role: "owner" };
-              if (m.email.toLowerCase() === currentUserEmail.toLowerCase()) return { ...m, role: "admin" };
-              return m;
-            })
-          );
-          router.refresh();
-        } else {
-          setMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)));
-        }
-      } else {
-        setActionError(data.message || "Failed to update member role.");
-      }
-    } catch {
-      setActionError("Network error while updating role.");
-    } finally {
-      setBusyMemberId(null);
+    const { ok, data } = await memberRequest(
+      memberId,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: newRole }) },
+      "The role could not be changed."
+    );
+    if (!ok) return;
+    if (data.ownershipTransferred) {
+      setMembers((prev) =>
+        prev.map((m) => (m.id === memberId ? { ...m, role: "owner" } : m.email.toLowerCase() === currentUserEmail.toLowerCase() ? { ...m, role: "admin" } : m))
+      );
+      router.refresh();
+    } else {
+      setMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)));
     }
   }
 
   const invites = inviteManager.invites;
   const isOwner = workspace.role === "owner";
+  const canManage = isOwner || workspace.role === "admin";
 
   return (
-    <div className="w-full space-y-8 animate-in fade-in duration-300">
+    <div className="w-full space-y-6">
       <PageHeader title="Organization & Team" art="pulse">
-        Manage the profile, team members, access roles and invitations for {workspace.name}.
+        The team, access roles and invitations for {workspace.name}. API keys and usage are further down this page.
       </PageHeader>
 
-      {actionError && (
-        <div className="p-3 bg-[#e5484d]/10 border border-[#e5484d]/20 rounded-xl text-xs text-[#e5484d] flex items-center justify-between">
-          <span>{actionError}</span>
-          <button onClick={() => setActionError(null)} className="text-[#e5484d] hover:text-[#e5484d]">✕</button>
+      <AnimatePresence>
+        {actionError && (
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+            <Alert tone="danger" title="That did not work">
+              <span className="flex items-center justify-between gap-3">
+                {actionError}
+                <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss" className="press grid size-6 place-items-center rounded text-zinc-500 hover:text-zinc-100">
+                  <X className="size-3.5" />
+                </button>
+              </span>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-1">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Workspace</CardTitle>
+            </CardHeader>
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="text-xs text-zinc-500">Name</dt>
+                <dd className="text-zinc-100">{workspace.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Address</dt>
+                <dd className="font-mono text-xs text-zinc-300">/{workspace.slug}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Your role</dt>
+                <dd className="capitalize text-zinc-100">{workspace.role}</dd>
+              </div>
+            </dl>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>What each role can do</CardTitle>
+            </CardHeader>
+            <ul className="flex flex-col gap-3">
+              {ROLES.map((r) => (
+                <li key={r.role} className={cn("text-sm", r.role === workspace.role ? "text-zinc-100" : "text-zinc-400")}>
+                  <span className="font-medium text-zinc-100">{r.label}</span>
+                  <span className="block text-xs leading-5 text-zinc-500">{r.desc}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Organization Info & Role Legend */}
-        <div className="lg:col-span-1 space-y-4">
-          {/* Org info */}
-          <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-5 space-y-4">
-            <h3 className="text-sm font-medium text-zinc-100">Organization Info</h3>
-            <div className="space-y-3 text-xs">
-              <div>
-                <span className="text-zinc-500 block text-xs">Organization Name</span>
-                <span className="font-medium text-zinc-200">{workspace.name}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500 block text-xs">Workspace Slug</span>
-                <span className="font-mono text-zinc-300 bg-white/[0.04] px-2 py-0.5 rounded text-xs">
-                  {workspace.slug}
-                </span>
-              </div>
-              <div>
-                <span className="text-zinc-500 block text-xs">Your Access Level</span>
-                <span className="inline-flex items-center gap-1 font-medium text-xs px-2 py-0.5 rounded-full bg-[#4cc38a]/10 text-[#4cc38a] border border-[#4cc38a]/20">
-                  <Shield className="w-3 h-3" />{workspace.role}
-                </span>
-              </div>
-            </div>
-          </div>
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <UserPlus className="size-4 text-zinc-400" aria-hidden="true" />
+                Invite a teammate
+              </CardTitle>
+              <CardDescription>The link works for 7 days. Someone who already has an account is added straight away; a new person sets up theirs on the invite page.</CardDescription>
+            </CardHeader>
 
-          {/* Role permission legend */}
-          <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-5 space-y-3">
-            <h3 className="text-xs font-medium text-zinc-400">Role Permissions</h3>
-            {[
-              { role: "owner", desc: "Full access, billing, and ownership transfer" },
-              { role: "admin", desc: "Manage members, sites, tracking keys, settings" },
-              { role: "member", desc: "Read & edit analytics, goals, and exports" },
-              { role: "viewer", desc: "Read-only analytics dashboards and reports" },
-            ].map((r) => {
-              const meta = ROLE_META[r.role as keyof typeof ROLE_META];
-              return (
-                <div key={r.role} className="flex items-start gap-3">
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 mt-0.5 ${meta.color}`}>
-                    {r.role}
-                  </span>
-                  <span className="text-xs text-zinc-500 leading-relaxed">{r.desc}</span>
+            <div className="flex flex-col gap-4">
+              <PillTabs
+                kind="radio"
+                label="Role for the new member"
+                value={inviteRole}
+                onChange={setInviteRole}
+                className="self-start"
+                items={[
+                  { id: "admin", label: "Admin" },
+                  { id: "member", label: "Member" },
+                  { id: "viewer", label: "Viewer" },
+                ]}
+              />
+
+              <form onSubmit={handleInvite} className="flex gap-3">
+                <div className="relative flex-1">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" aria-hidden="true" />
+                  <input
+                    type="email"
+                    required
+                    aria-label="Email address"
+                    placeholder="teammate@company.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className={cn(inputClass, "pl-9")}
+                  />
                 </div>
-              );
-            })}
-          </div>
+                <button
+                  type="submit"
+                  disabled={isInviting || !inviteEmail.trim()}
+                  className="press inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#ededed] px-4 text-sm font-medium text-[#141415] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:bg-white disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {isInviting ? <MatrixSpinner /> : <Send className="size-4" aria-hidden="true" />}
+                  {isInviting ? "Sending" : "Send invite"}
+                </button>
+              </form>
 
-          {/* Privacy & Security */}
-          <div className="rounded-2xl border border-[#4cc38a]/20 bg-[#4cc38a]/20 p-4 space-y-2">
-            <div className="flex items-center gap-2 text-[#4cc38a] text-xs font-medium">
-              <ShieldAlert className="w-4 h-4" />
-              <span>Multi-Tenant Cryptographic Isolation</span>
+              {inviteError && (
+                <Notice nonce={inviteNonce} className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
+                  {inviteError}
+                </Notice>
+              )}
+              <AnimatePresence>
+                {sentTo && (
+                  <motion.p role="status" className="flex items-center gap-2 text-sm text-zinc-300" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                    <DrawCheck size={18} />
+                    Invitation sent to {sentTo}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Every query and event stream is strictly partitioned to this workspace's tenant boundary.
-            </p>
-          </div>
-        </div>
+          </Card>
 
-        {/* Right Column: Invite Form, Pending Invites, Active Members, and Audit Trail */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Invite Form */}
-          <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-6 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-zinc-300" />
-                Invite Team Member
-              </h3>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Send an invitation link valid for 7 days. Existing users are added instantly; new users set up their account on the invite page.
-              </p>
-            </div>
-
-            {/* Role selector */}
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              {(["admin", "member", "viewer"] as const).map((r) => {
-                const meta = ROLE_META[r];
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setInviteRole(r)}
-                    className={`rounded-xl border px-3 py-2 text-left transition ${meta.color} ${inviteRole === r ? "ring-1 ring-white/20" : "opacity-50 hover:opacity-75"}`}
-                  >
-                    <div className="font-medium capitalize">{r}</div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <form onSubmit={handleInvite} className="flex gap-3">
-              <div className="relative flex-1">
-                <input
-                  type="email"
-                  required
-                  placeholder="teammate@company.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-3 pl-9 text-xs text-zinc-100 placeholder-zinc-500 focus:border-white/[0.1] focus:outline-none transition"
-                />
-                <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-              <Button type="submit" disabled={isInviting || !inviteEmail.trim()} className="h-10 text-xs font-medium shrink-0 gap-2">
-                {isInviting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                {isInviting ? "Sending…" : "Send Invite"}
-              </Button>
-            </form>
-
-            {inviteError && (
-              <p className="text-xs text-[#e5484d] bg-[#e5484d]/10 border border-[#e5484d]/20 rounded-xl px-3 py-2 flex items-center gap-2">
-                <XCircle className="w-3.5 h-3.5 shrink-0" />{inviteError}
-              </p>
+          <AnimatePresence initial={false}>
+            {invites.length > 0 && (
+              <motion.div key="pending" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: EASE }}>
+                <Card className="px-0 pb-0">
+                  <CardHeader className="border-b border-white/[0.06] px-5 pb-3">
+                    <CardTitle>
+                      <Clock className="size-4 text-zinc-400" aria-hidden="true" />
+                      Waiting to join
+                      <span className="font-mono text-xs text-zinc-500">{invites.length}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <ul className="divide-y divide-white/[0.06]">
+                    <AnimatePresence initial={false}>
+                      {invites.map((invite) => {
+                        const expiry = inviteManager.getExpiryMeta(invite.expiresAt);
+                        const resending = Boolean(inviteManager.busy[`resend:${invite.id}`]);
+                        return (
+                          <motion.li key={invite.id} {...rowMotion} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+                            <div className="min-w-0">
+                              <span className="block truncate text-zinc-100">{invite.email}</span>
+                              <span className="flex items-center gap-2 text-xs">
+                                <span className="capitalize text-zinc-500">{invite.role}</span>
+                                <span className={cn(expiry.expired ? "text-bad" : expiry.urgent ? "text-warn" : "text-zinc-500")}>{expiry.label}</span>
+                              </span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => inviteManager.resendInvite(invite.id, invite.email, invite.role)}
+                                disabled={resending}
+                                title="Resend invite"
+                                aria-label="Resend invite"
+                                className="press grid size-8 place-items-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100 disabled:opacity-40"
+                              >
+                                {resending ? <MatrixSpinner /> : <RefreshCw className="size-4" aria-hidden="true" />}
+                              </button>
+                              <ConfirmAction icon={Trash2} title="Revoke invite" confirmLabel="Revoke" onConfirm={() => inviteManager.revokeInvite(invite.id)} />
+                            </div>
+                          </motion.li>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </ul>
+                </Card>
+              </motion.div>
             )}
-            {inviteSuccess && (
-              <p className="text-xs text-[#4cc38a] bg-[#4cc38a]/10 border border-[#4cc38a]/20 rounded-xl px-3 py-2 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />{inviteSuccess}
-              </p>
-            )}
-          </div>
+          </AnimatePresence>
 
-          {/* Pending Invites */}
-          {invites.length > 0 && (
-            <div className="rounded-2xl border border-white/[0.1] bg-white/[0.06] p-5 space-y-3">
-              <h4 className="text-xs font-medium text-zinc-300 flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5" />
-                Pending Invitations ({invites.length})
-              </h4>
-              <div className="divide-y divide-white/[0.06]">
-                {invites.map((invite) => {
-                  const expiry = inviteManager.getExpiryMeta(invite.expiresAt);
-                  const isResending = inviteManager.busy[`resend:${invite.id}`];
+          <Card className="px-0 pb-0">
+            <CardHeader className="border-b border-white/[0.06] px-5 pb-3">
+              <CardTitle>
+                <Users className="size-4 text-zinc-400" aria-hidden="true" />
+                Members
+                <span className="font-mono text-xs text-zinc-500">{members.length}</span>
+              </CardTitle>
+            </CardHeader>
+            <ul className="divide-y divide-white/[0.06]">
+              <AnimatePresence initial={false}>
+                {members.map((member) => {
+                  const isSelf = member.email.toLowerCase() === currentUserEmail.toLowerCase();
+                  const memberIsOwner = member.role === "owner";
+                  const busy = busyMemberId === member.id;
                   return (
-                    <div key={invite.id} className="flex items-center justify-between py-3 text-xs">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-zinc-200">{invite.email}</span>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded border ${
-                            invite.role === "admin" ? "text-zinc-300 bg-white/[0.06] border-white/[0.1]" :
-                            invite.role === "viewer" ? "text-zinc-300 bg-white/[0.06] border-white/[0.1]" :
-                            "text-zinc-300 bg-white/[0.06] border-white/[0.1]"
-                          }`}>{invite.role}</span>
-                          <span className={`flex items-center gap-1 ${expiry.expired ? "text-[#e5484d]" : expiry.urgent ? "text-zinc-300" : "text-zinc-500"}`}>
-                            <Clock className="w-2.5 h-2.5" />{expiry.label}
+                    <motion.li key={member.id} {...rowMotion} className="flex items-center justify-between gap-3 px-5 py-3.5 text-sm">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-raised text-xs font-medium text-zinc-200">{initialsOf(member.name)}</span>
+                        <div className="min-w-0">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-zinc-100">{member.name}</span>
+                            {isSelf && <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[11px] text-zinc-400">You</span>}
                           </span>
+                          <span className="block truncate text-xs text-zinc-500">{member.email}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 ml-3">
-                        {/* Resend */}
-                        <button
-                          onClick={() => handleResend(invite)}
-                          disabled={!!isResending}
-                          className="text-zinc-500 hover:text-zinc-300 transition p-2 rounded-lg hover:bg-white/[0.04]"
-                          title="Resend invite"
-                        >
-                          {isResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        </button>
-                        {/* Revoke */}
-                        <button
-                          onClick={() => handleRevokeInvite(invite.id)}
-                          className="text-zinc-500 hover:text-[#e5484d] transition p-2 rounded-lg hover:bg-white/[0.04]"
-                          title="Revoke invite"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+                      <div className="flex shrink-0 items-center gap-1">
+                        {memberIsOwner ? (
+                          <span className="px-2 text-xs text-zinc-300">Owner</span>
+                        ) : (
+                          <SelectDropdown
+                            ariaLabel={`Role for ${member.name}`}
+                            value={member.role}
+                            disabled={busy || isSelf || !canManage}
+                            onChange={(role) => void handleChangeRole(member.id, role as "admin" | "member" | "viewer")}
+                            options={[
+                              { value: "admin", label: "Admin" },
+                              { value: "member", label: "Member" },
+                              { value: "viewer", label: "Viewer" },
+                            ]}
+                            className="w-32"
+                          />
+                        )}
+
+                        {isOwner && !memberIsOwner && member.role === "admin" && (
+                          <ConfirmAction
+                            icon={ArrowRightLeft}
+                            tone="neutral"
+                            title="Transfer ownership"
+                            confirmLabel="Make owner"
+                            busy={busy}
+                            onConfirm={() => void handleChangeRole(member.id, "owner")}
+                          />
+                        )}
+                        {!memberIsOwner && !isSelf && canManage && (
+                          <ConfirmAction icon={Trash2} title={`Remove ${member.name}`} confirmLabel="Remove" busy={busy} onConfirm={() => void handleRemoveMember(member.id)} />
+                        )}
+                        {isSelf && !memberIsOwner && (
+                          <ConfirmAction icon={LogOut} title="Leave this organization" confirmLabel="Leave" busy={busy} onConfirm={() => void handleLeave(member.id)} />
+                        )}
                       </div>
-                    </div>
+                    </motion.li>
                   );
                 })}
-              </div>
-            </div>
-          )}
+              </AnimatePresence>
+            </ul>
+          </Card>
 
-          {/* Members List */}
-          <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-6 space-y-4">
-            <h3 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
-              <Users className="w-4 h-4 text-zinc-400" />
-              Active Members ({members.length})
+          <section aria-labelledby="audit-heading" className="space-y-3">
+            <h3 id="audit-heading" className="text-sm font-medium text-zinc-100">
+              Recent activity
             </h3>
-
-            <div className="divide-y divide-white/[0.06]">
-              {members.map((member) => {
-                const isSelf = member.email.toLowerCase() === currentUserEmail.toLowerCase();
-                const memberIsOwner = member.role === "owner";
-                const initials = member.name
-                  ? member.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-                  : "TM";
-
-                return (
-                  <div key={member.id} className="flex items-center justify-between py-4 text-xs">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-raised text-xs font-medium text-zinc-200 shrink-0">
-                        {initials}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-zinc-100 truncate">{member.name}</span>
-                          {isSelf && (
-                            <span className="rounded bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-zinc-300">
-                              You
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-zinc-400 truncate block">{member.email}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0 ml-3">
-                      {memberIsOwner ? (
-                        <span className="rounded-md border border-[#4cc38a]/20 bg-[#4cc38a]/10 px-2 py-1 text-xs font-medium text-[#4cc38a]">
-                          Owner
-                        </span>
-                      ) : (
-                        <select
-                          value={member.role}
-                          disabled={busyMemberId === member.id || isSelf || (!isOwner && workspace.role !== "admin")}
-                          onChange={(e) => handleChangeRole(member.id, e.target.value as "admin" | "member" | "viewer")}
-                          className="rounded-md border border-white/10 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 focus:outline-none cursor-pointer"
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="member">Member</option>
-                          <option value="viewer">Viewer</option>
-                        </select>
-                      )}
-
-                      {/* Transfer Ownership button (only visible to current Owner for Admin members) */}
-                      {isOwner && !memberIsOwner && member.role === "admin" && (
-                        <button
-                          type="button"
-                          onClick={() => handleChangeRole(member.id, "owner")}
-                          disabled={busyMemberId === member.id}
-                          className="text-zinc-500 hover:text-zinc-300 transition p-2 rounded-lg hover:bg-white/[0.04]"
-                          title="Transfer Workspace Ownership"
-                        >
-                          <ArrowRightLeft className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-
-                      {/* Remove member (by Admin or Owner) */}
-                      {!memberIsOwner && !isSelf && (isOwner || workspace.role === "admin") && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMember(member.id)}
-                          disabled={busyMemberId === member.id}
-                          className="text-zinc-500 hover:text-[#e5484d] transition p-2 rounded-lg hover:bg-white/[0.04]"
-                          title="Remove member"
-                        >
-                          {busyMemberId === member.id
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                      )}
-
-                      {/* Leave Workspace (Self, Non-owner) */}
-                      {isSelf && !memberIsOwner && (
-                        <button
-                          type="button"
-                          onClick={() => handleLeaveWorkspace(member.id)}
-                          disabled={busyMemberId === member.id}
-                          className="text-zinc-500 hover:text-[#e5484d] transition p-2 rounded-lg hover:bg-white/[0.04] flex items-center gap-1 text-xs"
-                          title="Leave organization"
-                        >
-                          {busyMemberId === member.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <LogOut className="w-3.5 h-3.5" />
-                          )}
-                          <span className="hidden sm:inline">Leave</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Workspace Audit Trail */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-zinc-400" />
-              <h3 className="text-sm font-medium text-zinc-100">Audit Trail</h3>
-            </div>
             <AuditLogViewer logs={auditLogs} />
-          </div>
+          </section>
         </div>
       </div>
     </div>

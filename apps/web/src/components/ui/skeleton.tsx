@@ -37,10 +37,10 @@ export function PageHeaderSkeleton({ controls = true }: { controls?: boolean }) 
 /** Matches StatsCard's footprint (label, figure, change) so the grid does not shift when data arrives. */
 export function StatsCardSkeleton() {
   return (
-    <Card className="flex flex-col gap-4 p-5">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="h-8 w-28" />
-      <Skeleton className="h-4 w-36" />
+    <Card className="grid min-w-0 grid-rows-[20px_36px_16px] content-start gap-y-3 p-5">
+      <Skeleton className="h-4 w-24 self-center" />
+      <Skeleton className="h-8 w-28 self-end" />
+      <Skeleton className="h-3 w-36 self-center" />
     </Card>
   );
 }
@@ -88,7 +88,7 @@ export function RankingListSkeleton({ rows = 6 }: { rows?: number }) {
 
 export function RankingCardSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <Card>
+    <Card className="min-h-[420px]">
       <CardHeaderSkeleton />
       <RankingListSkeleton rows={rows} />
     </Card>
@@ -112,7 +112,7 @@ export function ChartCardSkeleton({ height = 260 }: { height?: number }) {
 
 export function MapCardSkeleton({ height = 320 }: { height?: number }) {
   return (
-    <Card>
+    <Card className="min-h-[420px]">
       <CardHeaderSkeleton />
       <div className="pt-3">
         <Skeleton className="w-full rounded-lg" style={{ height }} />

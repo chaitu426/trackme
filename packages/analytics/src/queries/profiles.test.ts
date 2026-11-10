@@ -111,8 +111,8 @@ test("search adds a case-insensitive match over id, name and email", async () =>
 });
 
 test("stats and single-profile reads", async () => {
-  const stats = fake([{ total: "40", active7d: "9" }]);
-  assert.deepEqual(await profileStats(W, S, stats.client), { total: 40, active7d: 9 });
+  const stats = fake([{ total: "40", active7d: "9", avg_events: "12.4" }]);
+  assert.deepEqual(await profileStats(W, S, stats.client), { total: 40, active7d: 9, avgEvents: 12 });
   const none = fake([]);
   assert.equal(await getProfile(W, S, "ghost", none.client), null);
   assert.equal(none.calls[0]!.params.id, "ghost");

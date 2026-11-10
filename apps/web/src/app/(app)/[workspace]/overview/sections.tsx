@@ -84,7 +84,7 @@ export async function ActiveVisitorsBadge({ siteId }: { siteId: string }) {
   const activeVisitors = await getActiveVisitorCount(siteId);
   return (
     <span className="reveal inline-flex h-8 items-center gap-2 rounded-lg border border-border bg-raised px-3 text-xs text-zinc-200">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" />
+      <span className="h-1.5 w-1.5 rounded-full bg-good pulse-live" />
       <span className="font-mono tabular-nums">{formatNumber(activeVisitors)}</span>
       <span className="text-zinc-400">online now</span>
     </span>
@@ -103,7 +103,7 @@ export async function KpiGrid(props: SectionProps) {
   return (
     <div className="reveal grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatsCard
-        title="Visitors"
+        title={props.range === "24h" ? "Visitors" : "Visitors (daily unique)"}
         value={formatNumber(currentMetrics.visitors)}
         change={formatChange(percentChange(currentMetrics.visitors, previousMetrics.visitors))}
         isPositive={currentMetrics.visitors >= previousMetrics.visitors}
@@ -164,7 +164,7 @@ function MetricCell({
       <p className="text-xs leading-4 text-zinc-500">
         {change ? (
           <>
-            <span className={`font-mono tabular-nums ${isPositive ? "text-[#4cc38a]" : "text-[#e5484d]"}`}>{change}</span>{" "}
+            <span className={`font-mono tabular-nums ${isPositive ? "text-good" : "text-bad"}`}>{change}</span>{" "}
             {compareTo}
           </>
         ) : (
@@ -231,7 +231,7 @@ export async function TrafficChart(props: SectionProps) {
 export async function TopSources(props: SectionProps) {
   const topReferrers = await cachedBreakdown(requests(props).current, "referrer");
   return (
-        <Card className="reveal">
+        <Card className="reveal flex min-h-[420px] flex-col">
           <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
             <div>
               <CardTitle>Top sources</CardTitle>
@@ -239,7 +239,7 @@ export async function TopSources(props: SectionProps) {
             </div>
             <span className="font-mono text-xs text-zinc-500">Visitors · share</span>
           </CardHeader>
-          <div className="pt-2">
+          <div className="flex flex-1 flex-col pt-2">
             <RankingList
               items={topReferrers.items.map((item) => ({
                 name: sourceLabel(item.name),
@@ -255,9 +255,12 @@ export async function TopSources(props: SectionProps) {
 }
 
 export async function TopPages(props: SectionProps) {
-  const topPages = await cachedBreakdown(requests(props).current, "path");
+  const r = requests(props);
+  const [topPages, totals] = await Promise.all([cachedBreakdown(r.current, "path"), cachedOverview(r.current)]);
+  // Rows are ranked by pageviews, so their share is a share of pageviews (the breakdown's own percentage is of visitors).
+  const totalPageviews = Math.max(totals.pageviews, 1);
   return (
-        <Card className="reveal">
+        <Card className="reveal flex min-h-[420px] flex-col">
           <CardHeader className="flex-row items-center justify-between border-b border-white/[0.06] pb-3 text-left">
             <div>
               <CardTitle>Top pages</CardTitle>
@@ -265,12 +268,12 @@ export async function TopPages(props: SectionProps) {
             </div>
             <span className="font-mono text-xs text-zinc-500">Pageviews · share</span>
           </CardHeader>
-          <div className="pt-2">
+          <div className="flex flex-1 flex-col pt-2">
             <RankingList
               items={topPages.items.map((item) => ({
                 name: item.name,
                 value: item.pageviews,
-                percentage: item.percentage,
+                percentage: Math.min(100, (item.pageviews / totalPageviews) * 100),
               }))}
               empty="No pageviews recorded in this range yet."
               valueFormatter={formatNumber}

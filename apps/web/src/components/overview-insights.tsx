@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTabs } from "@/components/motion/primitives";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,22 +22,7 @@ function Tabs<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div role="tablist" className="flex items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={tab.id === value}
-          onClick={() => onChange(tab.id)}
-          className={`rounded-[5px] px-3 py-1 text-xs font-medium transition-colors ${
-            tab.id === value ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <PillTabs kind="tabs" size="sm" label="View" value={value} onChange={onChange} items={tabs} />
   );
 }
 
@@ -57,7 +43,7 @@ export function LocationsCard({
   const countryItems = countries.filter((c) => /^[A-Z]{2}$/.test(c.name));
 
   return (
-    <Card className="reveal">
+    <Card className="reveal flex min-h-[420px] flex-col">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-3 text-left">
         <div>
           <CardTitle>
@@ -72,7 +58,7 @@ export function LocationsCard({
           Geography <ArrowUpRight className="h-4 w-4" />
         </Link>
       </CardHeader>
-      <div className="pt-3">
+      <div className="flex flex-1 flex-col pt-3">
         <GeoGlobe countries={countryItems} range={range} onSelect={() => router.push(href)} height={400} />
       </div>
     </Card>
@@ -87,7 +73,7 @@ export function DevicesCard({ devices, browsers, systems }: { devices: Item[]; b
   const items = { device: devices, browser: browsers, os: systems }[tab];
 
   return (
-    <Card className="reveal">
+    <Card className="reveal flex min-h-[420px] flex-col">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-3 text-left">
         <div>
           <CardTitle>
@@ -105,7 +91,7 @@ export function DevicesCard({ devices, browsers, systems }: { devices: Item[]; b
           ]}
         />
       </CardHeader>
-      <div className="pt-2">
+      <div className="flex flex-1 flex-col pt-2">
         <RankingList
           pageSize={8}
           items={items

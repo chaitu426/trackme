@@ -30,7 +30,7 @@ export function ApiKeysManager({
   const [justCreated, setJustCreated] = useState<string | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  async function generateKey() {
+  async function generateKey(kind: "reporting" | "deploy" = "reporting") {
     setPending(true);
     setError(null);
     try {
@@ -38,8 +38,8 @@ export function ApiKeysManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: `Reporting Key ${keys.length + 1}`,
-          scopes: ["read:analytics"],
+          name: kind === "deploy" ? `Deploy Key ${keys.length + 1}` : `Reporting Key ${keys.length + 1}`,
+          scopes: kind === "deploy" ? ["write:deploys"] : ["read:analytics"],
         }),
       });
       const payload = (await response.json()) as {
@@ -97,18 +97,18 @@ export function ApiKeysManager({
       <div className="space-y-4">
         {/* Just Created Token Banner */}
         {justCreated && (
-          <div className="p-4 rounded-xl bg-[#4cc38a]/10/80 border border-[#4cc38a] text-xs space-y-2 animate-in fade-in-0 duration-200">
+          <div className="p-4 rounded-xl bg-good/10/80 border border-good text-xs space-y-2 animate-fade-in">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-[#4cc38a] font-medium">
-                <CheckCircle2 className="w-4 h-4 text-[#4cc38a]" />
+              <div className="flex items-center space-x-2 text-good font-medium">
+                <CheckCircle2 className="w-4 h-4 text-good" />
                 <span>API Key Generated — Copy it now</span>
               </div>
               <CopyButton text={justCreated} label="Copy Token" />
             </div>
-            <p className="text-xs text-[#4cc38a]">
+            <p className="text-xs text-good">
               For security reasons, this token will never be displayed again.
             </p>
-            <div className="p-3 rounded-lg bg-white/[0.02] border border-[#4cc38a] font-mono text-xs text-zinc-50 break-all select-all">
+            <div className="p-3 rounded-lg bg-white/[0.02] border border-good font-mono text-xs text-zinc-50 break-all select-all">
               {justCreated}
             </div>
           </div>
@@ -116,7 +116,7 @@ export function ApiKeysManager({
 
         {/* List of keys */}
         {keys.length === 0 ? (
-          <div className="text-center py-8 px-4 rounded-xl border border-dashed border-white/10 bg-white/[0.03]/50">
+          <div className="text-center py-8 px-4 rounded-xl border border-dashed border-border bg-white/[0.03]/50">
             <KeyRound className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
             <p className="text-xs font-medium text-zinc-300">No API keys created</p>
             <p className="text-xs text-zinc-400 mt-0.5">
@@ -128,7 +128,7 @@ export function ApiKeysManager({
             {keys.map((key) => (
               <div
                 key={key.id}
-                className="p-4 rounded-xl bg-white/[0.03] border border-white/10 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-white/[0.03]/80"
+                className="p-4 rounded-xl bg-white/[0.03] border border-border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-white/[0.03]/80"
               >
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center space-x-2">
@@ -146,8 +146,8 @@ export function ApiKeysManager({
 
                 {/* Revoke confirmation / action */}
                 {revokingId === key.id ? (
-                  <div className="flex items-center space-x-2 animate-in fade-in-0 duration-150">
-                    <span className="text-xs text-[#e5484d] font-medium">Revoke key?</span>
+                  <div className="flex items-center space-x-2 animate-fade-in">
+                    <span className="text-xs text-bad font-medium">Revoke key?</span>
                     <Button
                       variant="danger"
                       size="sm"
@@ -171,7 +171,7 @@ export function ApiKeysManager({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-zinc-400 hover:text-[#e5484d] hover:bg-[#e5484d]/10 text-xs h-7 px-3 transition shrink-0 self-start sm:self-center"
+                    className="text-zinc-400 hover:text-bad hover:bg-bad/10 text-xs h-7 px-3 transition shrink-0 self-start sm:self-center"
                     disabled={pending}
                     onClick={() => setRevokingId(key.id)}
                   >
@@ -185,7 +185,7 @@ export function ApiKeysManager({
         )}
 
         {error && (
-          <div className="flex items-center space-x-2 text-xs text-[#e5484d] bg-[#e5484d]/10 border border-[#e5484d] rounded-xl p-3">
+          <div className="flex items-center space-x-2 text-xs text-bad bg-bad/10 border border-bad rounded-xl p-3">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -200,6 +200,16 @@ export function ApiKeysManager({
         >
           <Plus className="w-3.5 h-3.5" />
           <span>{pending ? "Generating Key..." : "Generate New API Key"}</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full flex items-center justify-center space-x-2"
+          disabled={pending}
+          onClick={() => void generateKey("deploy")}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Generate Deploy Key (CI: report deploys, upload source maps)</span>
         </Button>
       </div>
     </Card>

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError, type SiteSettings } from "@trackme/contracts";
+import { and, db, eq, goals } from "@trackme/db";
 import { requireSiteAccess, updateSiteSettings } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { jsonError } from "@/lib/http";
@@ -24,6 +25,7 @@ const PatchSchema = z.object({
   requireOriginMatch: z.boolean().optional(),
   requireConsent: z.boolean().optional(),
   signingRequired: z.boolean().optional(),
+  primaryGoalId: z.string().uuid().nullable().optional(),
 });
 
 export async function GET(
@@ -61,6 +63,11 @@ export async function PATCH(
     }
 
     const patch: Partial<SiteSettings> = omitUndefined(parsed.data);
+    if (patch.primaryGoalId) {
+      // A goal id from another site must never be saved here.
+      const [goal] = await db.select({ id: goals.id }).from(goals).where(and(eq(goals.id, patch.primaryGoalId), eq(goals.siteId, siteId))).limit(1);
+      if (!goal) throw new AppError(400, "INVALID_INPUT", "That goal does not belong to this site");
+    }
     if (patch.publicDashboardEnabled && !site.settings.publicDashboardSlug) {
       patch.publicDashboardSlug = randomBytes(6).toString("base64url");
     }

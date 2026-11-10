@@ -41,7 +41,7 @@ export default async function SiteEventsAndGoalsPage({
   const { workspace, site } = context;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Goals & Events" art="pulse" actions={<RangeSwitcher range={range} />}>
         Conversions, custom actions and SDK events on <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>
@@ -111,12 +111,12 @@ async function EventsBody({ workspaceId, siteId, range }: { workspaceId: string;
 
         <div className="space-y-4 pt-3 text-left">
           {customEvents_.length === 0 ? (
-            <div className="space-y-2 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+            <div className="space-y-2 rounded-xl border border-dashed border-border bg-white/[0.02] p-8 text-center">
               <p className="text-sm font-medium text-zinc-300">No custom events recorded yet</p>
               <p className="mx-auto max-w-md text-xs text-zinc-400">
                 Trigger events in your app using the tracker snippet. For example:
               </p>
-              <pre className="mx-auto max-w-md rounded-lg border border-white/10 bg-black/50 p-3 text-left font-mono text-xs text-zinc-300">
+              <pre className="mx-auto max-w-md rounded-lg border border-border bg-black/50 p-3 text-left font-mono text-xs text-zinc-300">
                 {`window.trackme.trackEvent('button_clicked', { plan: 'pro' });`}
               </pre>
             </div>
@@ -165,7 +165,7 @@ async function EventsBody({ workspaceId, siteId, range }: { workspaceId: string;
             <span>
               Emit custom events anytime in client JavaScript:
             </span>
-            <code className="rounded border border-white/10 bg-black/40 px-2 py-1 font-mono text-xs text-zinc-300">
+            <code className="rounded border border-border bg-black/40 px-2 py-1 font-mono text-xs text-zinc-300">
               window.trackme.trackEvent(&apos;event_name&apos;, &#123; prop: &apos;val&apos; &#125;)
             </code>
           </div>

@@ -16,7 +16,7 @@ export function TryChips() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="mr-1 flex items-center gap-2 font-mono text-xs text-zinc-500">
-        <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4cc38a]" />
+        <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
         Try
       </span>
       {CHIPS.map((c) => (

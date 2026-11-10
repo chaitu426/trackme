@@ -1,12 +1,16 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
+import { PillTabs } from "@/components/motion/primitives";
 import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
+import { inputCompactClass } from "@/components/ui/field";
+import { AnimatePresence } from "motion/react";
+import { ModalFrame } from "@/components/ui/dialog";
 import {
   Plus,
   Trash2,
   TrendingDown,
-  Loader2,
   AlertCircle,
   X,
   ArrowUp,
@@ -43,6 +47,8 @@ interface FunnelsClientProps {
   initialAnalysisError?: string | null;
   /** Pages and custom events already seen on the site, for autocompleting step targets. */
   suggestions?: Promise<FunnelSuggestions>;
+  /** Pages to start a new funnel from (e.g. a route picked on the Journeys page). Opens the create dialog. */
+  prefillPaths?: string[];
 }
 
 const MAX_STEPS = 8;
@@ -87,6 +93,9 @@ const TEMPLATES: { id: string; label: string; hint: string; name: string; steps:
   },
 ];
 
+const FUNNEL_WINDOWS = [7, 14, 30] as const;
+const DEFAULT_DAYS = 30;
+
 export function FunnelsClient({
   site,
   initialFunnels,
@@ -94,27 +103,29 @@ export function FunnelsClient({
   initialAnalysis,
   initialAnalysisError = null,
   suggestions,
+  prefillPaths = [],
 }: FunnelsClientProps) {
   const [funnels, setFunnels] = React.useState<FunnelItem[]>(initialFunnels);
   const [activeFunnel, setActiveFunnel] = React.useState<FunnelItem | null>(initialActiveFunnel);
   const [analysis, setAnalysis] = React.useState<FunnelAnalysisResult | null>(initialAnalysis);
   const [analysisError, setAnalysisError] = React.useState<string | null>(initialAnalysisError);
   const [loadingAnalysis, setLoadingAnalysis] = React.useState(false);
-  const [modalOpen, setModalOpen] = React.useState(false);
+  const [modalOpen, setModalOpen] = React.useState(prefillPaths.length >= 2);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [days, setDays] = React.useState<number>(DEFAULT_DAYS);
 
   // Analyses fetched this session, keyed by funnel, so flipping between funnels is instant.
   // Refresh bypasses it (force); deleting a funnel drops its entry.
   const analysisCache = React.useRef(new Map<string, FunnelAnalysisResult>());
   React.useEffect(() => {
-    if (initialActiveFunnel && initialAnalysis) analysisCache.current.set(initialActiveFunnel.id, initialAnalysis);
+    if (initialActiveFunnel && initialAnalysis) analysisCache.current.set(`${initialActiveFunnel.id}:${DEFAULT_DAYS}`, initialAnalysis);
   }, [initialActiveFunnel, initialAnalysis]);
 
-  async function loadFunnel(funnel: FunnelItem, force = false) {
+  async function loadFunnel(funnel: FunnelItem, force = false, windowDays = days) {
     setActiveFunnel(funnel);
     setConfirmDelete(false);
     setAnalysisError(null);
-    const hit = force ? undefined : analysisCache.current.get(funnel.id);
+    const hit = force ? undefined : analysisCache.current.get(`${funnel.id}:${windowDays}`);
     if (hit) {
       setAnalysis(hit);
       setLoadingAnalysis(false);
@@ -122,14 +133,14 @@ export function FunnelsClient({
     }
     setLoadingAnalysis(true);
     try {
-      const res = await fetch(`/api/v1/sites/${site.id}/funnels/${funnel.id}`);
+      const res = await fetch(`/api/v1/sites/${site.id}/funnels/${funnel.id}?days=${windowDays}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setAnalysis(null);
         setAnalysisError(data.detail || data.message || "Analytics is temporarily unavailable. Retry in a moment.");
         return;
       }
-      analysisCache.current.set(funnel.id, data.analysis);
+      analysisCache.current.set(`${funnel.id}:${windowDays}`, data.analysis);
       setAnalysis(data.analysis);
     } catch {
       setAnalysis(null);
@@ -143,7 +154,7 @@ export function FunnelsClient({
     try {
       const res = await fetch(`/api/v1/sites/${site.id}/funnels/${id}`, { method: "DELETE" });
       if (res.ok) {
-        analysisCache.current.delete(id);
+        for (const key of [...analysisCache.current.keys()]) if (key.startsWith(`${id}:`)) analysisCache.current.delete(key);
         const remaining = funnels.filter((f) => f.id !== id);
         setFunnels(remaining);
         setConfirmDelete(false);
@@ -166,7 +177,7 @@ export function FunnelsClient({
   }
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Funnels" art="steps" actions={<button
           type="button"
           onClick={() => setModalOpen(true)}
@@ -180,29 +191,16 @@ export function FunnelsClient({
 
       {/* Funnel selector */}
       {funnels.length > 1 && (
-        <div
-          role="tablist"
-          aria-label="Funnels"
-          className="flex w-full max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 sm:w-fit"
-        >
-          {funnels.map((f) => (
-            <button
-              key={f.id}
-              role="tab"
-              aria-selected={activeFunnel?.id === f.id}
-              type="button"
-              onClick={() => void loadFunnel(f)}
-              className={`flex shrink-0 items-center gap-2 rounded-[5px] px-3 py-2 text-xs font-medium transition-colors ${
-                activeFunnel?.id === f.id
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                  : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-              }`}
-            >
-              {f.name}
-              <span className="font-mono text-xs text-zinc-500">{f.steps.length}</span>
-            </button>
-          ))}
-        </div>
+        <PillTabs
+          kind="tabs"
+          label="Funnels"
+          value={activeFunnel?.id ?? ""}
+          onChange={(id) => {
+            const next = funnels.find((f) => f.id === id);
+            if (next) void loadFunnel(next);
+          }}
+          items={funnels.map((f) => ({ id: f.id, label: <span className="flex items-center gap-2">{f.name}<span className="font-mono text-xs text-zinc-500">{f.steps.length}</span></span> }))}
+        />
       )}
 
       {activeFunnel ? (
@@ -217,6 +215,11 @@ export function FunnelsClient({
           onCancelDelete={() => setConfirmDelete(false)}
           onDelete={() => void handleDeleteFunnel(activeFunnel.id)}
           onRefresh={() => void loadFunnel(activeFunnel, true)}
+          days={days}
+          onDaysChange={(next) => {
+            setDays(next);
+            void loadFunnel(activeFunnel, false, next);
+          }}
         />
       ) : (
         <Card className="px-6 py-12">
@@ -227,7 +230,7 @@ export function FunnelsClient({
             <div className="space-y-1">
               <h3 className="text-sm font-medium text-zinc-200">No funnels yet</h3>
               <p className="text-xs leading-relaxed text-zinc-400">
-                A funnel is an ordered list of pages or events. You will see how many visitors make it through each step, and exactly
+                A funnel is an ordered list of pages or events. You will see how many sessions make it through each step, and exactly
                 where the rest leave.
               </p>
             </div>
@@ -243,14 +246,17 @@ export function FunnelsClient({
         </Card>
       )}
 
-      {modalOpen && (
-        <CreateFunnelDialog
-          siteId={site.id}
-          suggestions={suggestions}
-          onClose={() => setModalOpen(false)}
-          onCreated={handleCreated}
-        />
-      )}
+      <AnimatePresence>
+        {modalOpen && (
+          <CreateFunnelDialog
+            siteId={site.id}
+            suggestions={suggestions}
+            prefillPaths={prefillPaths}
+            onClose={() => setModalOpen(false)}
+            onCreated={handleCreated}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -280,6 +286,8 @@ function FunnelView({
   onCancelDelete,
   onDelete,
   onRefresh,
+  days,
+  onDaysChange,
 }: {
   siteId: string;
   funnel: FunnelItem;
@@ -291,6 +299,8 @@ function FunnelView({
   onCancelDelete: () => void;
   onDelete: () => void;
   onRefresh: () => void;
+  days: number;
+  onDaysChange: (days: number) => void;
 }) {
   const steps = analysis?.steps ?? [];
   const worst = steps.reduce<FunnelStepResult | null>(
@@ -312,7 +322,7 @@ function FunnelView({
           label="Completed"
           value={analysis ? analysis.totalCompleted.toLocaleString() : "–"}
           hint={steps.length ? `Reached “${steps[steps.length - 1]!.name}”` : "Visitors finishing every step"}
-          accent="text-[#4cc38a]"
+          accent="text-good"
         />
         <SummaryTile
           label="Conversion"
@@ -323,8 +333,8 @@ function FunnelView({
         <SummaryTile
           label="Biggest drop-off"
           value={worst ? `${worst.dropOffRate}%` : "–"}
-          hint={worst && worstPrev ? `${worstPrev.name} → ${worst.name}` : hasTraffic ? "No visitors lost" : "Needs traffic"}
-          accent={worst ? "text-[#e5484d]" : undefined}
+          hint={worst && worstPrev ? `${worstPrev.name} → ${worst.name}` : hasTraffic ? "No sessions lost" : "Needs traffic"}
+          accent={worst ? "text-bad" : undefined}
         />
       </div>
 
@@ -333,10 +343,26 @@ function FunnelView({
           <div className="min-w-0">
             <CardTitle className="truncate">{funnel.name}</CardTitle>
             <CardDescription>
-              {funnel.description || `${funnel.steps.length} steps, in order, per visitor`}
+              {funnel.description || `${funnel.steps.length} steps, in order, counted per session over the last ${days} days`}
             </CardDescription>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <div role="group" aria-label="Time window" className="mr-1 flex h-8 items-center gap-0.5 rounded-lg border border-white/[0.08] p-0.5">
+              {FUNNEL_WINDOWS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={days === d}
+                  disabled={loading}
+                  onClick={() => days !== d && onDaysChange(d)}
+                  className={`h-full rounded-md px-2.5 text-xs transition-colors disabled:opacity-60 ${
+                    days === d ? "bg-raised font-medium text-zinc-50" : "text-zinc-400 hover:text-zinc-100"
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={onRefresh}
@@ -348,7 +374,7 @@ function FunnelView({
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
             {confirmDelete ? (
-              <div className="flex items-center gap-1 rounded-md border border-[#e5484d]/25 bg-[#e5484d]/10 pl-2 text-xs text-[#e5484d]">
+              <div className="flex items-center gap-1 rounded-md border border-bad/25 bg-bad/10 pl-2 text-xs text-bad">
                 Delete?
                 <button type="button" onClick={onDelete} className="px-2 py-1 font-medium hover:text-white">
                   Yes
@@ -363,7 +389,7 @@ function FunnelView({
                 onClick={onAskDelete}
                 aria-label="Delete funnel"
                 title="Delete funnel"
-                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
+                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-bad/10 hover:text-bad"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -382,8 +408,8 @@ function FunnelView({
             ))}
           </div>
         ) : error ? (
-          <div className="mt-4 space-y-3 rounded-xl border border-dashed border-[#e5484d]/30 bg-[#e5484d]/5 p-8 text-center">
-            <p className="text-xs text-[#e5484d]">{error}</p>
+          <div className="mt-4 space-y-3 rounded-xl border border-dashed border-bad/30 bg-bad/5 p-8 text-center">
+            <p className="text-xs text-bad">{error}</p>
             <button
               type="button"
               onClick={onRefresh}
@@ -411,13 +437,13 @@ function FunnelView({
 
         {!loading && !error && analysis && !hasTraffic && (
           <p className="mt-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs leading-relaxed text-zinc-500">
-            No visitor has reached step 1 in the last 30 days. Counts appear here as soon as someone does.
+            No session has reached step 1 in the last {days} days. Counts appear here as soon as someone does.
           </p>
         )}
       </Card>
 
       {!loading && !error && analysis && hasTraffic && steps.length >= 2 && (
-        <FunnelInsightsPanel key={funnel.id} siteId={siteId} funnelId={funnel.id} analysis={analysis} />
+        <FunnelInsightsPanel key={funnel.id} siteId={siteId} funnelId={funnel.id} analysis={analysis} days={days} />
       )}
     </div>
   );
@@ -431,7 +457,7 @@ function StepRow({ step, first, last }: { step: FunnelStepResult; first: boolean
       <div
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums ${
           last
-            ? "border-[#4cc38a]/30 bg-[#4cc38a]/10 text-[#4cc38a]"
+            ? "border-good/30 bg-good/10 text-good"
             : "border-white/[0.1] bg-white/[0.04] text-zinc-300"
         }`}
       >
@@ -454,7 +480,7 @@ function StepRow({ step, first, last }: { step: FunnelStepResult; first: boolean
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.05]">
           <div
-            className={`h-full rounded-full ${last ? "bg-[#4cc38a]/70" : "bg-white/[0.07]"}`}
+            className={`h-full rounded-full ${last ? "bg-good/70" : "bg-white/[0.07]"}`}
             style={{ width: `${step.conversions > 0 ? Math.max(pct, 1.5) : 0}%` }}
           />
         </div>
@@ -467,14 +493,14 @@ function Transition({ next, highlight }: { next: FunnelStepResult; highlight: bo
   return (
     <div className="flex items-center gap-4 py-2">
       <div className="flex w-8 shrink-0 justify-center" aria-hidden>
-        <span className={`h-6 w-px ${highlight ? "bg-[#e5484d]/40" : "bg-white/[0.1]"}`} />
+        <span className={`h-6 w-px ${highlight ? "bg-bad/40" : "bg-white/[0.1]"}`} />
       </div>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
         <span className="font-medium text-zinc-400">{next.conversionRateFromPrevious}% continue</span>
         {next.dropOffCount > 0 ? (
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium ${
-              highlight ? "bg-[#e5484d]/15 text-[#e5484d] ring-1 ring-[#e5484d]/30" : "bg-white/[0.04] text-zinc-400"
+              highlight ? "bg-bad/15 text-bad ring-1 ring-bad/30" : "bg-white/[0.04] text-zinc-400"
             }`}
           >
             <TrendingDown className="h-4 w-4" />
@@ -483,7 +509,7 @@ function Transition({ next, highlight }: { next: FunnelStepResult; highlight: bo
         ) : (
           <span className="text-zinc-600">no one left here</span>
         )}
-        {highlight && <span className="text-xs font-medium text-[#e5484d]">Biggest leak</span>}
+        {highlight && <span className="text-xs font-medium text-bad">Biggest leak</span>}
       </div>
     </div>
   );
@@ -518,18 +544,25 @@ function normalizeTarget(type: StepDraft["type"], value: string): string {
 function CreateFunnelDialog({
   siteId,
   suggestions,
+  prefillPaths,
   onClose,
   onCreated,
 }: {
   siteId: string;
   suggestions: Promise<FunnelSuggestions> | undefined;
+  prefillPaths: string[];
   onClose: () => void;
   onCreated: (funnel: FunnelItem) => void;
 }) {
-  const [template, setTemplate] = React.useState("signup");
-  const [name, setName] = React.useState(TEMPLATES[0]!.name);
-  const [description, setDescription] = React.useState("");
-  const [steps, setSteps] = React.useState<StepDraft[]>(TEMPLATES[0]!.steps);
+  const fromRoute = prefillPaths.length >= 2;
+  const [template, setTemplate] = React.useState(fromRoute ? "blank" : "signup");
+  const [name, setName] = React.useState(fromRoute ? "Route funnel" : TEMPLATES[0]!.name);
+  const [description, setDescription] = React.useState(fromRoute ? "Built from a route on the Journeys page" : "");
+  const [steps, setSteps] = React.useState<StepDraft[]>(
+    fromRoute
+      ? prefillPaths.slice(0, MAX_STEPS).map((path) => ({ name: path === "/" ? "Home" : path, type: "pageview" as const, target: path }))
+      : TEMPLATES[0]!.steps
+  );
   const [touched, setTouched] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
@@ -619,22 +652,10 @@ function CreateFunnelDialog({
     }
   }
 
-  const input =
-    "w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-white/[0.25] focus:bg-white/[0.04]";
+  const input = inputCompactClass;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in"
-      onMouseDown={onClose}
-    >
-      <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="funnel-dialog-title"
-        onSubmit={submit}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-white/[0.1] bg-card shadow-2xl animate-slide-down"
-      >
+    <ModalFrame onClose={onClose} labelledBy="funnel-dialog-title" onSubmit={submit} dismissible={!saving}>
         {suggestions && (
           <React.Suspense fallback={null}>
             <SuggestionLists promise={suggestions} />
@@ -696,7 +717,7 @@ function CreateFunnelDialog({
                 className={input}
                 aria-invalid={touched && !!nameError}
               />
-              {touched && nameError && <p className="text-xs text-[#e5484d]">{nameError}</p>}
+              {touched && nameError && <p className="text-xs text-bad">{nameError}</p>}
             </div>
             <div className="space-y-2">
               <label htmlFor="funnel-desc" className="text-xs font-medium text-zinc-400">
@@ -739,7 +760,7 @@ function CreateFunnelDialog({
                     </span>
                     <div
                       className={`flex-1 space-y-2 rounded-xl border p-3 ${
-                        error ? "border-[#e5484d]/30 bg-[#e5484d]/[0.04]" : "border-white/[0.07] bg-white/[0.015]"
+                        error ? "border-bad/30 bg-bad/[0.04]" : "border-white/[0.07] bg-white/[0.015]"
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -751,23 +772,7 @@ function CreateFunnelDialog({
                           placeholder="Step name"
                           className={`${input} flex-1`}
                         />
-                        <div className="flex shrink-0" role="group" aria-label={`Step ${i + 1} type`}>
-                          {(["pageview", "custom_event"] as const).map((type) => (
-                            <button
-                              key={type}
-                              type="button"
-                              aria-pressed={s.type === type}
-                              onClick={() => update(i, { type })}
-                              className={`px-3 py-2 text-xs font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
-                                s.type === type
-                                  ? "bg-zinc-800 text-zinc-100"
-                                  : "border border-white/[0.08] text-zinc-500 hover:text-zinc-300"
-                              }`}
-                            >
-                              {type === "pageview" ? "Page" : "Event"}
-                            </button>
-                          ))}
-                        </div>
+                        <PillTabs kind="radio" size="sm" label={`Step ${i + 1} type`} value={s.type} onChange={(type) => update(i, { type })} items={[{ id: "pageview", label: "Page" }, { id: "custom_event", label: "Event" }]} className="shrink-0" />
                       </div>
                       <div className="flex items-center gap-2">
                         <input
@@ -804,13 +809,26 @@ function CreateFunnelDialog({
                             onClick={() => remove(i)}
                             disabled={steps.length <= 2}
                             aria-label={`Remove step ${i + 1}`}
-                            className="rounded p-2 text-zinc-500 hover:text-[#e5484d] disabled:opacity-25"
+                            className="rounded p-2 text-zinc-500 hover:text-bad disabled:opacity-25"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
-                      {error && <p className="text-xs text-[#e5484d]">{error}</p>}
+                      {!error && s.type === "pageview" && s.target.trim() && (
+                        <p className="text-xs text-zinc-500">
+                          {normalizeTarget(s.type, s.target) === "/"
+                            ? "Matches every page, so this step is reached by any pageview."
+                            : (
+                              <>
+                                Matches <span className="font-mono text-zinc-400">{normalizeTarget(s.type, s.target)}</span> and
+                                every page that starts with it (for example{" "}
+                                <span className="font-mono text-zinc-400">{normalizeTarget(s.type, s.target).replace(/\/$/, "")}/…</span>).
+                              </>
+                            )}
+                        </p>
+                      )}
+                      {error && <p className="text-xs text-bad">{error}</p>}
                     </div>
                   </li>
                 );
@@ -820,14 +838,14 @@ function CreateFunnelDialog({
 
           {/* Plain-language summary */}
           <p className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-xs leading-relaxed text-zinc-500">
-            Counts visitors who{" "}
+            Counts sessions that{" "}
             {steps
               .filter((s) => s.target.trim())
               .map((s, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && " then "}
                   <span className="font-mono text-zinc-300">
-                    {s.type === "pageview" ? "view " : "trigger "}
+                    {s.type === "pageview" ? "view a page starting with " : "trigger "}
                     {normalizeTarget(s.type, s.target)}
                   </span>
                 </React.Fragment>
@@ -837,7 +855,7 @@ function CreateFunnelDialog({
           </p>
 
           {saveError && (
-            <p className="flex items-center gap-2 rounded-lg border border-[#e5484d]/20 bg-[#e5484d]/10 px-3 py-2 text-xs text-[#e5484d]">
+            <p className="flex items-center gap-2 rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-xs text-bad">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {saveError}
             </p>
@@ -857,11 +875,10 @@ function CreateFunnelDialog({
             disabled={saving || (touched && !valid)}
             className="inline-flex h-8 items-center gap-2 rounded-lg bg-zinc-100 px-4 text-xs font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {saving ? <MatrixSpinner /> : <Check className="h-4 w-4" />}
             {saving ? "Creating…" : "Create funnel"}
           </button>
         </div>
-      </form>
-    </div>
+    </ModalFrame>
   );
 }

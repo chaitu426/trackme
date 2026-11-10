@@ -97,7 +97,7 @@ export function PrivacyLedger() {
             <ArrowRight className="hidden h-4 w-4 text-zinc-600 md:block" strokeWidth={1.5} />
 
             <span className="flex items-start gap-3">
-              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[#4cc38a]/40 text-[#4cc38a]">
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-good/40 text-good">
                 <Check className="h-3 w-3" strokeWidth={2} />
               </span>
               <span>

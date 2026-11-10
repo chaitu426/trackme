@@ -2,8 +2,12 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Globe, Plus, Check, Copy, Loader2, X, Shield } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { Field, FieldGroup, TextInput } from "@/components/ui/field";
+import { CopyButton } from "@/components/ui/copy-button";
+import { DrawCheck, Notice, StepPanel } from "@/components/motion/primitives";
 
 interface AddSiteModalProps {
   workspaceId: string;
@@ -13,68 +17,37 @@ interface AddSiteModalProps {
   onSiteAdded?: (site: { id: string; domain: string; displayName: string }) => void;
 }
 
-export function AddSiteModal({
-  workspaceId,
-  workspaceSlug,
-  isOpen,
-  onClose,
-  onSiteAdded,
-}: AddSiteModalProps) {
+/** Adds a website in two steps inside one dialog: the details, then the tag to paste. The dialog cannot be closed while it saves. */
+export function AddSiteModal({ workspaceId, workspaceSlug, isOpen, onClose, onSiteAdded }: AddSiteModalProps) {
   const router = useRouter();
   const [domain, setDomain] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [createdSite, setCreatedSite] = React.useState<{
-    domain: string;
-    snippet: string;
-  } | null>(null);
-  const [copied, setCopied] = React.useState(false);
-
-  if (!isOpen) return null;
+  const [errorNonce, setErrorNonce] = React.useState(0);
+  const [createdSite, setCreatedSite] = React.useState<{ domain: string; snippet: string } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!domain) return;
-
+    if (!domain.trim()) return;
     setLoading(true);
     setError(null);
-
     try {
       const res = await fetch(`/api/v1/workspaces/${workspaceId}/sites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          domain: domain.trim(),
-          displayName: displayName.trim() || undefined,
-        }),
+        body: JSON.stringify({ domain: domain.trim(), displayName: displayName.trim() || undefined }),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || data.message || "Failed to add website.");
-      }
-
-      setCreatedSite({
-        domain: data.site.domain,
-        snippet: data.snippet,
-      });
-
-      if (onSiteAdded) {
-        onSiteAdded(data.site);
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error creating website.");
+      if (!res.ok) throw new Error(data.detail || data.message || "The website could not be added.");
+      setCreatedSite({ domain: data.site.domain, snippet: data.snippet });
+      onSiteAdded?.(data.site);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The website could not be added.");
+      setErrorNonce((n) => n + 1);
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleCopySnippet() {
-    if (!createdSite) return;
-    navigator.clipboard.writeText(createdSite.snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   function handleFinish() {
@@ -86,150 +59,63 @@ export function AddSiteModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-card p-6 shadow-2xl">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-2 text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 transition"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
+    <Dialog
+      open={isOpen}
+      onClose={createdSite ? handleFinish : onClose}
+      dismissible={!loading}
+      title={createdSite ? "Website added" : "Add a website"}
+      description={createdSite ? `${createdSite.domain} is registered. Paste the tag to start collecting.` : "Track another site, subdomain or web app in this organization."}
+      footer={
+        createdSite ? (
+          <Button onClick={handleFinish}>
+            Open analytics <ArrowRight />
+          </Button>
+        ) : (
+          <>
+            <Button variant="outline" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" form="add-site-form" loading={loading} disabled={!domain.trim()}>
+              {!loading && <Plus />}
+              {loading ? "Adding" : "Add website"}
+            </Button>
+          </>
+        )
+      }
+    >
+      <StepPanel stepKey={createdSite ? "snippet" : "form"}>
         {createdSite ? (
-          /* Success & Snippet Step */
-          <div className="space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#4cc38a]/10 text-[#4cc38a] border border-[#4cc38a]/20">
-                <Check className="w-5 h-5" />
+          <div className="flex flex-col items-center gap-5 py-1">
+            <DrawCheck size={44} />
+            <div className="w-full">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-zinc-300">Tracking snippet</span>
+                <CopyButton text={createdSite.snippet} label="Copy" />
               </div>
-              <div>
-                <h3 className="text-base font-medium text-zinc-100">Website Added Successfully!</h3>
-                <p className="text-xs text-zinc-400">
-                  <span className="font-mono text-zinc-200">{createdSite.domain}</span> is now registered in your organization.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-zinc-300">Tracking Code Snippet</label>
-              <div className="relative rounded-xl border border-white/10 bg-zinc-900/90 p-4">
-                <pre className="font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all pr-12">
-                  {createdSite.snippet}
-                </pre>
-                <button
-                  type="button"
-                  onClick={handleCopySnippet}
-                  className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-md bg-white/10 px-3 py-1 text-xs font-medium text-zinc-200 hover:bg-white/20 transition"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3 h-3 text-[#4cc38a]" />
-                      <span>Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <p className="text-xs text-zinc-500">
-                Paste this tag inside the <code className="text-zinc-400">&lt;head&gt;</code> of your website.
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-black/30 p-3 font-mono text-xs leading-5 text-zinc-300">{createdSite.snippet}</pre>
+              <p className="mt-2 text-xs text-zinc-500">
+                Paste it inside the <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-zinc-300">&lt;head&gt;</code> of your site.
               </p>
-            </div>
-
-            <div className="pt-2 flex justify-end gap-2">
-              <Button onClick={handleFinish} className="w-full h-10 text-xs font-medium">
-                Go to Website Analytics →
-              </Button>
             </div>
           </div>
         ) : (
-          /* Add Website Form */
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] text-zinc-300 border border-white/[0.1]">
-                <Globe className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-medium text-zinc-100">Add Website to Organization</h3>
-                <p className="text-xs text-zinc-400">
-                  Track additional websites, subdomains, or web apps under this organization.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-2">
-                  Domain / Hostname <span className="text-[#e5484d]">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    placeholder="app.mycompany.com or store.com"
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-3 text-xs text-zinc-100 placeholder-zinc-500 focus:border-white/[0.1] focus:outline-none transition"
-                  />
-                </div>
-                <p className="text-xs text-zinc-500 mt-1">Do not include https:// or trailing slashes.</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-2">
-                  Display Label (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Production Web App"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-3 text-xs text-zinc-100 placeholder-zinc-500 focus:border-white/[0.1] focus:outline-none transition"
-                />
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-xs text-[#e5484d] bg-[#e5484d]/10 border border-[#e5484d]/20 rounded-xl px-3 py-2">
-                {error}
-              </p>
-            )}
-
-            <div className="flex items-center gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                className="flex-1 h-10 text-xs border-white/10 text-zinc-300 hover:bg-white/[0.04]"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || !domain.trim()} className="flex-1 h-10 text-xs font-medium">
-                {loading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
-                    Adding…
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5 mr-2" />
-                    Add Website
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="pt-1 flex items-center justify-center gap-2 text-xs text-zinc-500">
-              <Shield className="w-3.5 h-3.5 text-[#4cc38a]" />
-              <span>Isolated keys & privacy-preserving telemetry per site</span>
-            </div>
+          <form id="add-site-form" onSubmit={handleSubmit}>
+            <FieldGroup>
+              <Field label="Domain" htmlFor="site-domain" description="Without https:// or a trailing slash">
+                <TextInput id="site-domain" required autoFocus placeholder="app.mycompany.com" value={domain} onChange={(e) => setDomain(e.target.value)} className="font-mono" />
+              </Field>
+              <Field label="Display name (optional)" htmlFor="site-name">
+                <TextInput id="site-name" placeholder="Production web app" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              </Field>
+              {error && (
+                <Notice nonce={errorNonce} className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
+                  {error}
+                </Notice>
+              )}
+            </FieldGroup>
           </form>
         )}
-      </div>
-    </div>
+      </StepPanel>
+    </Dialog>
   );
 }

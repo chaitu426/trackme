@@ -11,7 +11,7 @@ import { getClickHouseClient } from "./client.js";
  * browser, both lose the events recorded under it; that errs on the side of deleting.
  *
  * Every statement is scoped to {workspaceId, siteId} and every value is a bound parameter. The deletes
- * run site_profiles_agg -> web_vitals -> events_v2 -> events_raw. The profile row (email, traits) goes first
+ * run site_profiles_agg -> identity_map -> user_active_day -> user_first_day -> user_event_day -> user_timeline -> payment_events -> order_session -> payment_failure_class -> error_occurrences -> error_events -> web_vitals -> events_v2 -> events_raw. The profile row (email, traits) goes first
  * and is deleted even when no events are found, so it can never be stranded. web_vitals rows carry no
  * visitor, so they are found through events_raw and must go before it; events_raw goes last so that a failure
  * part-way can simply be re-run (the visitors are still discoverable from whatever has not been deleted yet).
@@ -28,6 +28,19 @@ const V2_OF_VISITORS = `visitor_hash IN (SELECT arrayJoin(arrayConcat(
   arrayMap(h -> toUInt64(h), {hashes:Array(String)}))))`;
 
 const PROFILE = `FROM site_profiles_agg WHERE ${TENANT} AND distinct_id = {id:String}`;
+/** The visitor-to-user links (migration 015) for the person, by user id or by any of their visitor hashes. */
+const IDENTITY = `FROM identity_map WHERE ${TENANT} AND (user_id = {id:String} OR ${V2_OF_VISITORS})`;
+/** Per-user activity (migration 017): keyed by the raw user id. */
+const activity = (table: string) => `FROM ${table} WHERE ${TENANT} AND user_id = {id:String}`;
+/** Error tracking (migration 016): events hold hashes of the user and visitor; occurrences hold the raw user id and the event id. */
+const ERROR_EVENTS = `FROM error_events WHERE ${TENANT} AND (user_hash = cityHash64({id:String}) OR ${V2_OF_VISITORS})`;
+const ERROR_OCCURRENCES = `FROM error_occurrences WHERE ${TENANT} AND (user_id = {id:String}
+  OR event_id IN (SELECT event_id FROM events_v2 WHERE ${TENANT} AND type = 'error' AND ${V2_OF_VISITORS}))`;
+
+/** Payments (migration 019): the gateway events and order links carry the merchant's user id when the order metadata supplied one. */
+const PAYMENT_EVENTS = `FROM payment_events WHERE ${TENANT} AND user_ref = {id:String}`;
+const ORDER_SESSION = `FROM order_session WHERE ${TENANT} AND user_id = {id:String}`;
+const FAILURE_CLASS = `FROM payment_failure_class WHERE ${TENANT} AND user_ref = {id:String}`;
 
 export const ERASURE_SQL = {
   findVisitors: `SELECT DISTINCT visitor_pseudonym AS v FROM events_raw WHERE ${TENANT}
@@ -36,12 +49,32 @@ export const ERASURE_SQL = {
     AND (visitor_hash = cityHash64({id:String}) OR JSONExtractString(properties_json, 'distinctId') = {id:String})`,
   count: {
     site_profiles_agg: `SELECT count() AS n ${PROFILE}`,
+    identity_map: `SELECT count() AS n ${IDENTITY}`,
+    user_active_day: `SELECT count() AS n ${activity("user_active_day")}`,
+    user_first_day: `SELECT count() AS n ${activity("user_first_day")}`,
+    user_event_day: `SELECT count() AS n ${activity("user_event_day")}`,
+    user_timeline: `SELECT count() AS n ${activity("user_timeline")}`,
+    payment_events: `SELECT count() AS n ${PAYMENT_EVENTS}`,
+    order_session: `SELECT count() AS n ${ORDER_SESSION}`,
+    payment_failure_class: `SELECT count() AS n ${FAILURE_CLASS}`,
+    error_occurrences: `SELECT count() AS n ${ERROR_OCCURRENCES}`,
+    error_events: `SELECT count() AS n ${ERROR_EVENTS}`,
     web_vitals: `SELECT count() AS n FROM web_vitals WHERE ${TENANT} AND event_id IN (SELECT event_id ${RAW_OF_VISITORS})`,
     events_v2: `SELECT count() AS n FROM events_v2 WHERE ${TENANT} AND ${V2_OF_VISITORS}`,
     events_raw: `SELECT count() AS n ${RAW_OF_VISITORS}`,
   },
   delete: {
     site_profiles_agg: `DELETE ${PROFILE}`,
+    identity_map: `DELETE ${IDENTITY}`,
+    user_active_day: `DELETE ${activity("user_active_day")}`,
+    user_first_day: `DELETE ${activity("user_first_day")}`,
+    user_event_day: `DELETE ${activity("user_event_day")}`,
+    user_timeline: `DELETE ${activity("user_timeline")}`,
+    payment_events: `DELETE ${PAYMENT_EVENTS}`,
+    order_session: `DELETE ${ORDER_SESSION}`,
+    payment_failure_class: `DELETE ${FAILURE_CLASS}`,
+    error_occurrences: `DELETE ${ERROR_OCCURRENCES}`,
+    error_events: `DELETE ${ERROR_EVENTS}`,
     web_vitals: `DELETE FROM web_vitals WHERE ${TENANT} AND event_id IN (SELECT event_id ${RAW_OF_VISITORS})`,
     events_v2: `DELETE FROM events_v2 WHERE ${TENANT} AND ${V2_OF_VISITORS}`,
     events_raw: `DELETE FROM events_raw WHERE ${TENANT} AND visitor_pseudonym IN {visitors:Array(String)}`,
@@ -49,7 +82,7 @@ export const ERASURE_SQL = {
 } as const;
 
 /** Deletion order; see the note above. */
-const ORDER = ["site_profiles_agg", "web_vitals", "events_v2", "events_raw"] as const;
+const ORDER = ["site_profiles_agg", "identity_map", "user_active_day", "user_first_day", "user_event_day", "user_timeline", "payment_events", "order_session", "payment_failure_class", "error_occurrences", "error_events", "web_vitals", "events_v2", "events_raw"] as const;
 
 export interface ErasureTarget {
   workspaceId: string;
@@ -84,11 +117,11 @@ export async function eraseVisitor(
   const hashes = await column(ERASURE_SQL.findHashes, "h");
   const params = { ...tenant, id: target.identifier, visitors, hashes };
 
-  // With no events found only the profile step applies; the event tables would match nothing anyway.
+  // With no events found only the profile and identity steps apply; the event tables would match nothing anyway.
   const found = visitors.length > 0 || hashes.length > 0;
-  const steps = ORDER.filter((table) => found || table === "site_profiles_agg");
+  const steps = ORDER.filter((table) => found || table !== "web_vitals" && table !== "events_v2" && table !== "events_raw");
 
-  const rows = { site_profiles_agg: 0, web_vitals: 0, events_v2: 0, events_raw: 0 };
+  const rows = { site_profiles_agg: 0, identity_map: 0, user_active_day: 0, user_first_day: 0, user_event_day: 0, user_timeline: 0, payment_events: 0, order_session: 0, payment_failure_class: 0, error_occurrences: 0, error_events: 0, web_vitals: 0, events_v2: 0, events_raw: 0 };
   for (const table of steps) {
     const rs = await client.query({ query: ERASURE_SQL.count[table], query_params: params, format: "JSONEachRow" });
     rows[table] = Number((await rs.json<{ n: string }>())[0]?.n ?? 0);

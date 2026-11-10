@@ -1,15 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Clock, RefreshCw, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
+const CHECK_EVERY_MS = 3 * 60 * 1000;
+const WARN_BELOW_MINUTES = 15;
+
+/** Warns when the sign-in is about to end and offers to extend it. Quiet until fifteen minutes remain. */
 export function SessionMonitor() {
   const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null);
-  const [warningDismissed, setWarningDismissed] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    async function checkSession() {
+    async function check() {
       try {
         const res = await fetch("/api/auth/session");
         if (!res.ok) return;
@@ -17,81 +23,68 @@ export function SessionMonitor() {
         if (data.authenticated && typeof data.remainingSeconds === "number") {
           const mins = Math.floor(data.remainingSeconds / 60);
           setRemainingMinutes(mins);
-          // If more than 20 minutes remaining, reset dismissal
-          if (mins > 20) {
-            setWarningDismissed(false);
-          }
+          // A session that was extended elsewhere should be able to warn again later.
+          if (mins > 20) setDismissed(false);
         }
       } catch {
-        // Silent fail
+        // The next check will try again.
       }
     }
-
-    checkSession();
-    // Check every 3 minutes
-    const interval = setInterval(checkSession, 3 * 60 * 1000);
+    void check();
+    const interval = setInterval(check, CHECK_EVERY_MS);
     return () => clearInterval(interval);
   }, []);
 
-  async function handleRefreshSession() {
-    setIsRefreshing(true);
+  async function extend() {
+    setRefreshing(true);
     try {
       const res = await fetch("/api/auth/session", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        const mins = Math.floor((data.remainingSeconds || 86400) / 60);
-        setRemainingMinutes(mins);
-        setWarningDismissed(true);
+        setRemainingMinutes(Math.floor((data.remainingSeconds || 86400) / 60));
+        setDismissed(true);
       }
     } catch {
-      // Ignore
+      // The warning stays, so the person can try again.
     } finally {
-      setIsRefreshing(false);
+      setRefreshing(false);
     }
   }
 
-  // Only show warning if less than 15 minutes remain and not dismissed
-  if (remainingMinutes === null || remainingMinutes > 15 || warningDismissed) {
-    return null;
-  }
+  const show = remainingMinutes !== null && remainingMinutes <= WARN_BELOW_MINUTES && !dismissed;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 backdrop-blur-md rounded-2xl p-4 shadow-xl flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
-        <Clock className="w-4 h-4" />
-      </div>
-      <div className="flex-1 text-xs">
-        <p className="font-medium text-zinc-900 dark:text-zinc-100">Session Expiring Soon</p>
-        <p className="text-zinc-600 dark:text-zinc-400 mt-0.5">
-          Your secure session will expire in{" "}
-          <span className="font-medium text-amber-600 dark:text-amber-400">
-            {remainingMinutes <= 1 ? "less than a minute" : `${remainingMinutes} minutes`}
-          </span>
-          .
-        </p>
-        <div className="flex items-center gap-2 mt-3">
-          <button
-            onClick={handleRefreshSession}
-            disabled={isRefreshing}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium text-xs hover:opacity-90 transition"
-          >
-            <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
-            Extend Session
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          role="status"
+          className="fixed bottom-4 left-4 z-[80] flex w-[min(380px,calc(100vw-2rem))] items-start gap-3 rounded-xl border border-border bg-raised p-4 shadow-float"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Clock className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-zinc-50">Your session is ending</p>
+            <p className="mt-0.5 text-xs leading-5 text-zinc-400">
+              You will be signed out in {remainingMinutes! <= 1 ? "less than a minute" : `${remainingMinutes} minutes`}.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <Button size="sm" onClick={extend} loading={refreshing}>
+                {!refreshing && <RefreshCw />}
+                Stay signed in
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setDismissed(true)}>
+                Dismiss
+              </Button>
+            </div>
+          </div>
+          <button type="button" onClick={() => setDismissed(true)} aria-label="Dismiss" className="press -mr-1 grid size-6 shrink-0 place-items-center rounded-md text-zinc-500 hover:text-zinc-100">
+            <X className="size-3.5" />
           </button>
-          <button
-            onClick={() => setWarningDismissed(true)}
-            className="px-2 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition"
-          >
-            Dismiss
-          </button>
-        </div>
-      </div>
-      <button
-        onClick={() => setWarningDismissed(true)}
-        className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition"
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -39,6 +39,18 @@ export const v2WriteErrors = new client.Counter({
   registers: [registry],
 });
 
+export const errorWriteFailures = new client.Counter({
+  name: "worker_error_write_failures_total",
+  help: "Batches whose error-tracking rows could not be stored (the events themselves were stored)",
+  registers: [registry],
+});
+
+export const errorSamplerFailures = new client.Counter({
+  name: "worker_error_sampler_failures_total",
+  help: "Error batches stored without detail rows because the Redis sampling counter was unreachable",
+  registers: [registry],
+});
+
 export const realtimeErrors = new client.Counter({
   name: "worker_realtime_errors_total",
   help: "Failed realtime Redis updates (non-fatal)",

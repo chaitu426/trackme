@@ -7,7 +7,7 @@ export function VitalsPulse({ vitals, href }: { vitals: WebVitalSummary[]; href:
   const samples = vitals.reduce((total, vital) => total + vital.totalSamples, 0);
   const good = vitals.reduce((total, vital) => total + vital.goodCount, 0);
   const score = samples > 0 ? Math.round((good / samples) * 100) : null;
-  const tone = score === null ? "text-zinc-500" : score >= 90 ? "text-[#4cc38a]" : score >= 75 ? "text-amber-400" : "text-[#e5484d]";
+  const tone = score === null ? "text-zinc-500" : score >= 90 ? "text-good" : score >= 75 ? "text-warn" : "text-bad";
 
   return (
     <Link href={href} className="group flex flex-col gap-4 p-5 transition-colors hover:bg-white/[0.02]">

@@ -1,5 +1,5 @@
 # Prometheus alert rules for the analytics pipeline (optimization plan, section 9.2).
-# Load with: rule_files: ["alerts.yml"]. Every alert links to its runbook in docs/RUNBOOK.md.
+# Load with: rule_files: ["alerts.yml"]. Every alert links to its runbook in docs/operations/RUNBOOK.md.
 #
 # Scrape targets this file assumes:
 #   edge        ingestion-go           :3001/metrics
@@ -18,7 +18,7 @@ groups:
         labels: { severity: page }
         annotations:
           summary: "More than 1 % of event batches fail with 5xx"
-          runbook: "docs/RUNBOOK.md#ingestion-5xx"
+          runbook: "docs/operations/RUNBOOK.md#ingestion-5xx"
 
       - alert: IngestLatencyHigh
         expr: |
@@ -27,7 +27,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "Edge p99 for /v1/batch is above 250 ms"
-          runbook: "docs/RUNBOOK.md#ingestion-5xx"
+          runbook: "docs/operations/RUNBOOK.md#ingestion-5xx"
 
       - alert: EdgeKafkaPublishFailing
         expr: sum(rate(edge_kafka_publish_errors_total{job="edge"}[5m])) > 0
@@ -35,7 +35,7 @@ groups:
         labels: { severity: page }
         annotations:
           summary: "The edge cannot publish to Kafka; senders get 500 and retry"
-          runbook: "docs/RUNBOOK.md#kafka-publish-errors"
+          runbook: "docs/operations/RUNBOOK.md#kafka-publish-errors"
 
       - alert: EdgeAdmissionFailClosed
         expr: sum(rate(edge_admission_fail_closed_total{job="edge"}[5m])) > 0
@@ -43,7 +43,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "Admission cannot be verified (Redis): clients get 503 instead of bypassing limits"
-          runbook: "docs/RUNBOOK.md#admission-fail-closed-redis-outage"
+          runbook: "docs/operations/RUNBOOK.md#admission-fail-closed-redis-outage"
 
   - name: worker
     rules:
@@ -53,7 +53,7 @@ groups:
         labels: { severity: page }
         annotations:
           summary: "The event worker is far behind Kafka (lag in messages; tune the threshold to about 60 s of traffic)"
-          runbook: "docs/RUNBOOK.md#consumer-lag"
+          runbook: "docs/operations/RUNBOOK.md#consumer-lag"
 
       - alert: WorkerInsertSlow
         expr: histogram_quantile(0.95, sum by (le) (rate(worker_insert_duration_seconds_bucket{job="worker"}[5m]))) > 5
@@ -61,7 +61,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "ClickHouse inserts from the worker take more than 5 s at p95"
-          runbook: "docs/RUNBOOK.md#consumer-lag"
+          runbook: "docs/operations/RUNBOOK.md#consumer-lag"
 
       - alert: WorkerDeadLettering
         expr: sum(rate(worker_dlq_total{job="worker"}[15m])) > 0
@@ -69,7 +69,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "Messages are being dead-lettered ({{ $labels.reason }})"
-          runbook: "docs/RUNBOOK.md#dead-letters"
+          runbook: "docs/operations/RUNBOOK.md#dead-letters"
 
       - alert: ShadowWriteFailing
         expr: sum(rate(worker_v2_write_errors_total{job="worker"}[15m])) > 0
@@ -77,7 +77,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "Shadow writes to events_ingest are failing; v2 is falling behind legacy"
-          runbook: "docs/RUNBOOK.md#shadow-write-failing"
+          runbook: "docs/operations/RUNBOOK.md#shadow-write-failing"
 
   - name: clickhouse
     rules:
@@ -88,7 +88,7 @@ groups:
         labels: { severity: page }
         annotations:
           summary: "A partition has more than 200 active parts; inserts will start failing at 300"
-          runbook: "docs/RUNBOOK.md#too-many-parts"
+          runbook: "docs/operations/RUNBOOK.md#too-many-parts"
 
   - name: dashboard
     rules:
@@ -99,7 +99,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "Dashboard route {{ $labels.route }} p95 is above 1.5 s"
-          runbook: "docs/RUNBOOK.md#dashboard-slow"
+          runbook: "docs/operations/RUNBOOK.md#dashboard-slow"
 
       - alert: QueryCacheMostlyMissing
         expr: |
@@ -109,7 +109,7 @@ groups:
         labels: { severity: info }
         annotations:
           summary: "Dashboard cache hit ratio is below 30 %"
-          runbook: "docs/RUNBOOK.md#dashboard-slow"
+          runbook: "docs/operations/RUNBOOK.md#dashboard-slow"
 
       - alert: ShadowReadDiffering
         expr: sum by (query) (increase(analytics_shadow_diff_total{job="web"}[1h])) > 0
@@ -117,7 +117,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "ANALYTICS_READ=shadow: {{ $labels.query }} differs between v1 and v2"
-          runbook: "docs/RUNBOOK.md#shadow-read-differences"
+          runbook: "docs/operations/RUNBOOK.md#shadow-read-differences"
 
   - name: scheduled-jobs
     rules:
@@ -128,7 +128,7 @@ groups:
         labels: { severity: page }
         annotations:
           summary: "Scheduled job {{ $labels.task }} has not succeeded for over an hour"
-          runbook: "docs/RUNBOOK.md#scheduled-job-stale"
+          runbook: "docs/operations/RUNBOOK.md#scheduled-job-stale"
 
       # Retention runs once a day, so the one-hour rule above would page every night. It matters more than most
       # jobs: table TTLs are only a 60-month ceiling (migration 012), so if this stops, data outlives what each
@@ -139,7 +139,7 @@ groups:
         labels: { severity: page }
         annotations:
           summary: "Data retention has not succeeded in 36 hours; sites may be keeping data longer than configured"
-          runbook: "docs/RUNBOOK.md#retention-not-run"
+          runbook: "docs/operations/RUNBOOK.md#retention-not-run"
 
       - alert: ReconciliationNotRun
         expr: time() - scheduled_job_last_success_timestamp_seconds{job="scheduler",task="reconciliation"} > 129600
@@ -147,7 +147,7 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "The nightly reconciliation has not succeeded in 36 hours"
-          runbook: "docs/RUNBOOK.md#reconciliation"
+          runbook: "docs/operations/RUNBOOK.md#reconciliation"
 
       - alert: ReconciliationFindings
         expr: sum(reconciliation_findings{job="scheduler"}) > 0
@@ -155,4 +155,4 @@ groups:
         labels: { severity: warn }
         annotations:
           summary: "Aggregate tables drift from raw events, or event ids are duplicated"
-          runbook: "docs/RUNBOOK.md#reconciliation"
+          runbook: "docs/operations/RUNBOOK.md#reconciliation"

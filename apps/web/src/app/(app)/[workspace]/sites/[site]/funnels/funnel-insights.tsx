@@ -1,5 +1,7 @@
 "use client";
 
+import { PillTabs } from "@/components/motion/primitives";
+import { NativeSelect } from "@/components/ui/field";
 import * as React from "react";
 import { Clock, Layers, SlidersHorizontal } from "lucide-react";
 import type { FunnelAnalysisResult, FunnelInsights, FunnelSegment } from "@trackme/analytics";
@@ -33,10 +35,12 @@ export function FunnelInsightsPanel({
   siteId,
   funnelId,
   analysis,
+  days,
 }: {
   siteId: string;
   funnelId: string;
   analysis: FunnelAnalysisResult;
+  days: number;
 }) {
   const [segment, setSegment] = React.useState<FunnelSegment>("device");
   const [data, setData] = React.useState<FunnelInsights | null>(null);
@@ -45,7 +49,7 @@ export function FunnelInsightsPanel({
   const cache = React.useRef(new Map<string, FunnelInsights>());
 
   React.useEffect(() => {
-    const key = `${funnelId}:${segment}`;
+    const key = `${funnelId}:${segment}:${days}`;
     const hit = cache.current.get(key);
     if (hit) {
       setData(hit);
@@ -56,7 +60,7 @@ export function FunnelInsightsPanel({
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    fetch(`/api/v1/sites/${siteId}/funnels/${funnelId}/insights?segment=${segment}`, { signal: controller.signal })
+    fetch(`/api/v1/sites/${siteId}/funnels/${funnelId}/insights?segment=${segment}&days=${days}`, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as FunnelInsights;
@@ -71,7 +75,7 @@ export function FunnelInsightsPanel({
         setLoading(false);
       });
     return () => controller.abort();
-  }, [siteId, funnelId, segment]);
+  }, [siteId, funnelId, segment, days]);
 
   return (
     <div className="space-y-5">
@@ -136,21 +140,7 @@ function SegmentBreakdown({
           </CardTitle>
           <CardDescription>Share of each group that reaches every step. Red is below the funnel average.</CardDescription>
         </div>
-        <div className="flex items-center gap-0.5 overflow-x-auto rounded-lg border border-white/[0.08] bg-white/[0.02] p-0.5 text-xs font-medium">
-          {SEGMENTS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => onSegment(s.key)}
-              aria-pressed={segment === s.key}
-              className={`shrink-0 rounded-[5px] px-3 py-2 transition-colors ${
-                segment === s.key ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <PillTabs kind="radio" size="sm" label="Segment" value={segment} onChange={onSegment} items={SEGMENTS.map((s) => ({ id: s.key, label: s.label }))} />
       </CardHeader>
 
       {loading ? (
@@ -161,7 +151,7 @@ function SegmentBreakdown({
           ))}
         </div>
       ) : error ? (
-        <p className="py-10 text-center text-xs text-[#e5484d]">The breakdown could not be loaded. Try another tab or refresh.</p>
+        <p className="py-10 text-center text-xs text-bad">The breakdown could not be loaded. Try another tab or refresh.</p>
       ) : rows.length === 0 ? (
         <p className="py-10 text-center text-xs text-zinc-500">No sessions entered this funnel in the period.</p>
       ) : (
@@ -201,7 +191,7 @@ function SegmentBreakdown({
                         <td key={step.order} className="border-t border-white/[0.06] px-3 py-3">
                           <p
                             className={`font-mono text-xs font-medium tabular-nums ${
-                              i === 0 ? "text-zinc-100" : behind ? "text-[#e5484d]" : share > avg + 4 ? "text-[#4cc38a]" : "text-zinc-100"
+                              i === 0 ? "text-zinc-100" : behind ? "text-bad" : share > avg + 4 ? "text-good" : "text-zinc-100"
                             }`}
                           >
                             {share}%
@@ -212,14 +202,14 @@ function SegmentBreakdown({
                     })}
                     <td className="border-t border-white/[0.06] px-4 py-3 text-right">
                       <p className="font-mono text-xs font-medium tabular-nums text-zinc-100">{final}%</p>
-                      {ri === weakest && <p className="text-xs font-medium text-[#e5484d]">weakest</p>}
+                      {ri === weakest && <p className="text-xs font-medium text-bad">weakest</p>}
                     </td>
                   </tr>
                 );
               })}
               <tr>
                 <th className="sticky left-0 z-10 border-t border-white/[0.1] bg-card px-4 py-3 text-xs font-medium text-zinc-400">
-                  All visitors
+                  All sessions
                 </th>
                 {steps.map((step, i) => (
                   <td key={step.order} className="border-t border-white/[0.1] px-3 py-3">
@@ -270,7 +260,7 @@ function TimeBetweenSteps({
           ))}
         </div>
       ) : error || !data ? (
-        <p className="py-10 text-center text-xs text-[#e5484d]">Timings could not be loaded.</p>
+        <p className="py-10 text-center text-xs text-bad">Timings could not be loaded.</p>
       ) : (
         <ul className="divide-y divide-white/[0.06]">
           {data.timing.map((t) => {
@@ -364,18 +354,18 @@ function WhatIf({ analysis }: { analysis: FunnelAnalysisResult }) {
           <label htmlFor="whatif-step" className="text-xs font-medium text-zinc-400">
             Transition
           </label>
-          <select
+          <NativeSelect
             id="whatif-step"
             value={selected}
             onChange={(e) => setSelected(Number(e.target.value))}
-            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs text-zinc-100 outline-none focus:border-white/[0.25]"
+            className="w-full"
           >
             {transitions.map((tr, i) => (
-              <option key={tr.index} value={i} className="bg-zinc-900">
+              <option key={tr.index} value={i}>
                 {tr.from.name} → {tr.to.name} ({Math.round(tr.rate * 1000) / 10}% continue)
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
 
         <div className="space-y-2">
@@ -404,7 +394,7 @@ function WhatIf({ analysis }: { analysis: FunnelAnalysisResult }) {
           <p className="text-xs text-zinc-500">Projected completions</p>
           <p className="mt-1 flex items-baseline gap-2">
             <span className="font-mono text-2xl font-medium tabular-nums text-zinc-50">{projected.toLocaleString()}</span>
-            <span className={`font-mono text-xs font-medium tabular-nums ${extra > 0 ? "text-[#4cc38a]" : "text-zinc-500"}`}>
+            <span className={`font-mono text-xs font-medium tabular-nums ${extra > 0 ? "text-good" : "text-zinc-500"}`}>
               {extra > 0 ? `+${extra.toLocaleString()}` : "no change"}
             </span>
           </p>

@@ -16,7 +16,8 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "test": "node --import tsx --test"
   },
   "dependencies": {
     "@trackme/contracts": "workspace:*"

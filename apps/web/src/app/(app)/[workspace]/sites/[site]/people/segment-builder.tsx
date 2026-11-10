@@ -1,7 +1,11 @@
 "use client";
 
+import { MatrixSpinner } from "@/components/ui/matrix-loader";
+import { PillTabs } from "@/components/motion/primitives";
 import * as React from "react";
-import { AlertCircle, Check, Loader2, Plus, Trash2, X } from "lucide-react";
+import { inputCompactClass, NativeSelect } from "@/components/ui/field";
+import { ModalFrame } from "@/components/ui/dialog";
+import { AlertCircle, Check, Plus, Trash2, X } from "lucide-react";
 import {
   EMPTY_SEGMENT,
   isCompleteCondition,
@@ -48,9 +52,8 @@ function blankCondition(field: ProfileCondition["field"]): ProfileCondition {
   }
 }
 
-const input =
-  "rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-white/[0.25] focus:bg-white/[0.04]";
-const select = `${input} cursor-pointer`;
+const input = inputCompactClass;
+const select = "";
 
 export function SegmentBuilder({
   siteId,
@@ -170,15 +173,7 @@ export function SegmentBuilder({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in" onMouseDown={onClose}>
-      <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="segment-dialog-title"
-        onSubmit={submit}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-white/[0.1] bg-card shadow-2xl animate-slide-down"
-      >
+    <ModalFrame onClose={onClose} labelledBy="segment-dialog-title" onSubmit={submit} dismissible={!saving}>
         <datalist id="segment-trait-keys">
           {traitKeys.map((k) => (
             <option key={k} value={k} />
@@ -211,7 +206,7 @@ export function SegmentBuilder({
               placeholder="Pro users who never checked out"
               className={`${input} w-full`}
             />
-            {touched && !name.trim() && <p className="text-xs text-[#e5484d]">Give the segment a name</p>}
+            {touched && !name.trim() && <p className="text-xs text-bad">Give the segment a name</p>}
           </div>
 
           {/* Who */}
@@ -220,21 +215,7 @@ export function SegmentBuilder({
               <h3 className="text-xs font-medium text-zinc-400">Who</h3>
               <div className="flex items-center gap-2 text-xs text-zinc-500">
                 Match
-                <div className="flex rounded-md border border-white/[0.08] p-0.5" role="group" aria-label="Match mode">
-                  {(["all", "any"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      aria-pressed={definition.match === m}
-                      onClick={() => setDefinition((d) => ({ ...d, match: m }))}
-                      className={`rounded px-2 py-0.5 font-medium transition-colors ${
-                        definition.match === m ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
+                <PillTabs kind="radio" size="sm" label="Match mode" value={definition.match} onChange={(m) => setDefinition((d) => ({ ...d, match: m }))} items={[{ id: "all", label: "all" }, { id: "any", label: "any" }]} />
                 of these
               </div>
             </div>
@@ -267,14 +248,14 @@ export function SegmentBuilder({
             </h3>
             {definition.behavior.map((b, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.015] p-3">
-                <select aria-label="Did or did not" value={b.op} onChange={(e) => setBehavior(i, { op: e.target.value as BehaviorCondition["op"] })} className={select}>
-                  <option value="did" className="bg-zinc-900">Did</option>
-                  <option value="did_not" className="bg-zinc-900">Never did</option>
-                </select>
-                <select aria-label="Page or event" value={b.kind} onChange={(e) => setBehavior(i, { kind: e.target.value as BehaviorCondition["kind"] })} className={select}>
-                  <option value="pageview" className="bg-zinc-900">visit page</option>
-                  <option value="custom_event" className="bg-zinc-900">trigger event</option>
-                </select>
+                <NativeSelect aria-label="Did or did not" value={b.op} onChange={(e) => setBehavior(i, { op: e.target.value as BehaviorCondition["op"] })} className={select}>
+                  <option value="did">Did</option>
+                  <option value="did_not">Never did</option>
+                </NativeSelect>
+                <NativeSelect aria-label="Page or event" value={b.kind} onChange={(e) => setBehavior(i, { kind: e.target.value as BehaviorCondition["kind"] })} className={select}>
+                  <option value="pageview">visit page</option>
+                  <option value="custom_event">trigger event</option>
+                </NativeSelect>
                 <input
                   aria-label="Page path or event name"
                   value={b.target}
@@ -283,18 +264,18 @@ export function SegmentBuilder({
                   className={`${input} min-w-[140px] flex-1 font-mono`}
                 />
                 <span className="text-xs text-zinc-500">in the last</span>
-                <select aria-label="Time window" value={b.days} onChange={(e) => setBehavior(i, { days: Number(e.target.value) })} className={select}>
+                <NativeSelect aria-label="Time window" value={b.days} onChange={(e) => setBehavior(i, { days: Number(e.target.value) })} className={select}>
                   {[7, 30, 90, 365].map((d) => (
-                    <option key={d} value={d} className="bg-zinc-900">
+                    <option key={d} value={d}>
                       {d} days
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
                 <button
                   type="button"
                   aria-label="Remove behaviour rule"
                   onClick={() => setDefinition((d) => ({ ...d, behavior: d.behavior.filter((_, idx) => idx !== i) }))}
-                  className="rounded p-2 text-zinc-500 hover:text-[#e5484d]"
+                  className="rounded p-2 text-zinc-500 hover:text-bad"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -318,7 +299,7 @@ export function SegmentBuilder({
             {!hasRules ? (
               <p className="text-xs text-zinc-500">Add a rule to see who matches.</p>
             ) : previewError ? (
-              <p className="flex items-center gap-2 text-xs text-[#e5484d]">
+              <p className="flex items-center gap-2 text-xs text-bad">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 {previewError}
               </p>
@@ -330,7 +311,7 @@ export function SegmentBuilder({
                       {preview ? `${preview.total.toLocaleString()}${preview.capped ? "+" : ""}` : "–"}
                     </span>
                     <span className="text-xs text-zinc-500">{preview?.total === 1 ? "person matches" : "people match"}</span>
-                    {previewing && <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />}
+                    {previewing && <MatrixSpinner className="text-zinc-500" />}
                   </p>
                   {incomplete && <p className="mt-1 text-xs text-zinc-600">Rules that are not filled in yet are ignored.</p>}
                 </div>
@@ -349,7 +330,7 @@ export function SegmentBuilder({
           </div>
 
           {saveError && (
-            <p className="flex items-center gap-2 rounded-lg border border-[#e5484d]/20 bg-[#e5484d]/10 px-3 py-2 text-xs text-[#e5484d]">
+            <p className="flex items-center gap-2 rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-xs text-bad">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {saveError}
             </p>
@@ -365,12 +346,11 @@ export function SegmentBuilder({
             disabled={saving || (touched && !valid)}
             className="inline-flex h-8 items-center gap-2 rounded-lg bg-zinc-100 px-4 text-xs font-medium text-zinc-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {saving ? <MatrixSpinner /> : <Check className="h-4 w-4" />}
             {saving ? "Saving…" : "Save segment"}
           </button>
         </div>
-      </form>
-    </div>
+    </ModalFrame>
   );
 }
 
@@ -386,19 +366,19 @@ function ConditionRow({
   invalid: boolean;
 }) {
   return (
-    <div className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${invalid ? "border-[#e5484d]/30 bg-[#e5484d]/[0.04]" : "border-white/[0.07] bg-white/[0.015]"}`}>
-      <select
+    <div className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${invalid ? "border-bad/30 bg-bad/[0.04]" : "border-white/[0.07] bg-white/[0.015]"}`}>
+      <NativeSelect
         aria-label="Rule type"
         value={condition.field}
         onChange={(e) => onChange(blankCondition(e.target.value as ProfileCondition["field"]))}
         className={select}
       >
         {FIELDS.map((f) => (
-          <option key={f.key} value={f.key} className="bg-zinc-900">
+          <option key={f.key} value={f.key}>
             {f.label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
 
       {condition.field === "trait" && (
         <>
@@ -410,15 +390,15 @@ function ConditionRow({
             placeholder="plan"
             className={`${input} w-28 font-mono`}
           />
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as typeof condition.op })} className={select}>
-            <option value="eq" className="bg-zinc-900">is</option>
-            <option value="neq" className="bg-zinc-900">is not</option>
-            <option value="contains" className="bg-zinc-900">contains</option>
-            <option value="gt" className="bg-zinc-900">is greater than</option>
-            <option value="lt" className="bg-zinc-900">is less than</option>
-            <option value="exists" className="bg-zinc-900">is set</option>
-            <option value="missing" className="bg-zinc-900">is not set</option>
-          </select>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as typeof condition.op })} className={select}>
+            <option value="eq">is</option>
+            <option value="neq">is not</option>
+            <option value="contains">contains</option>
+            <option value="gt">is greater than</option>
+            <option value="lt">is less than</option>
+            <option value="exists">is set</option>
+            <option value="missing">is not set</option>
+          </NativeSelect>
           {condition.op !== "exists" && condition.op !== "missing" && (
             <input
               aria-label="Value"
@@ -433,10 +413,10 @@ function ConditionRow({
 
       {(condition.field === "lastSeen" || condition.field === "firstSeen") && (
         <>
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "within" | "before" })} className={select}>
-            <option value="within" className="bg-zinc-900">in the last</option>
-            <option value="before" className="bg-zinc-900">more than</option>
-          </select>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "within" | "before" })} className={select}>
+            <option value="within">in the last</option>
+            <option value="before">more than</option>
+          </NativeSelect>
           <input
             aria-label="Days"
             type="number"
@@ -452,10 +432,10 @@ function ConditionRow({
 
       {(condition.field === "sessions" || condition.field === "events") && (
         <>
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "gte" | "lte" })} className={select}>
-            <option value="gte" className="bg-zinc-900">at least</option>
-            <option value="lte" className="bg-zinc-900">at most</option>
-          </select>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "gte" | "lte" })} className={select}>
+            <option value="gte">at least</option>
+            <option value="lte">at most</option>
+          </NativeSelect>
           <input
             aria-label="Count"
             type="number"
@@ -469,11 +449,11 @@ function ConditionRow({
 
       {condition.field === "email" && (
         <>
-          <select aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "exists" | "missing" | "contains" })} className={select}>
-            <option value="exists" className="bg-zinc-900">is set</option>
-            <option value="missing" className="bg-zinc-900">is not set</option>
-            <option value="contains" className="bg-zinc-900">contains</option>
-          </select>
+          <NativeSelect aria-label="Operator" value={condition.op} onChange={(e) => onChange({ ...condition, op: e.target.value as "exists" | "missing" | "contains" })} className={select}>
+            <option value="exists">is set</option>
+            <option value="missing">is not set</option>
+            <option value="contains">contains</option>
+          </NativeSelect>
           {condition.op === "contains" && (
             <input
               aria-label="Value"
@@ -486,7 +466,7 @@ function ConditionRow({
         </>
       )}
 
-      <button type="button" aria-label="Remove rule" onClick={onRemove} className="ml-auto rounded p-2 text-zinc-500 hover:text-[#e5484d]">
+      <button type="button" aria-label="Remove rule" onClick={onRemove} className="ml-auto rounded p-2 text-zinc-500 hover:text-bad">
         <Trash2 className="h-4 w-4" />
       </button>
     </div>

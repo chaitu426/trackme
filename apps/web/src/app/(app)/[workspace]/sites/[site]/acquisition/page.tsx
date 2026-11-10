@@ -36,7 +36,7 @@ export default async function SiteAcquisitionReport({
   const { workspace, site } = context;
 
   return (
-    <div className="w-full space-y-5 text-left">
+    <div className="stagger w-full space-y-5 text-left">
       <PageHeader title="Acquisition" art="ridge" actions={<RangeSwitcher range={range} />}>
         Channels, referrers and campaign links driving traffic to <span className="font-mono text-zinc-300">{site.domain}</span>
       </PageHeader>
@@ -67,7 +67,7 @@ async function AcquisitionBody({ workspaceId, siteId, range }: { workspaceId: st
     cachedCampaigns(request),
   ]);
 
-  const campaignMax = Math.max(...campaigns.items.map((item) => item.visitors), 1);
+  const campaignTotal = Math.max(channels.total, campaigns.items.reduce((sum, item) => sum + item.visitors, 0), 1);
 
   return (
     <div className="space-y-4">
@@ -114,7 +114,7 @@ async function AcquisitionBody({ workspaceId, siteId, range }: { workspaceId: st
               items={campaigns.items.map((utm) => ({
                 name: utm.campaign,
                 value: utm.visitors,
-                percentage: (utm.visitors / campaignMax) * 100,
+                percentage: Math.min(100, (utm.visitors / campaignTotal) * 100),
                 meta: `${utm.source || "organic"} · ${utm.medium || "web"}`,
               }))}
               empty="No tagged campaign traffic in this range yet."

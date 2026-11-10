@@ -4,3 +4,4 @@ export type { LandingLinks, LandingProps, LandingViewer } from "./landing";
 export { GlyphField } from "./glyph-field";
 export type { GlyphVariant } from "./glyph-field";
 export { Reveal, Spot } from "./motion";
+export { LogoMark } from "./logo-mark";

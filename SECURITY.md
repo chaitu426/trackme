@@ -22,7 +22,7 @@ The `security` job in `.github/workflows/ci.yml` runs on every push and pull req
 | gitleaks | Secrets in the working tree or history |
 | Dependabot | Dependencies drifting behind their fixes |
 
-The findings these guard against, and the reasoning, are in `docs/SECURITY_AUDIT.md`.
+The findings these guard against, and the reasoning, are in `docs/operations/SECURITY_AUDIT.md`.
 
 ## Operating the secrets
 

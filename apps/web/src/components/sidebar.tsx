@@ -3,27 +3,25 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
-  Activity,
-  BarChart2,
-  TrendingUp,
-  Target,
-  Gauge,
-  Radio,
-  Settings2,
+  ChevronDown,
   LogOut,
   BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  MapPinned,
+  Settings2,
   Users,
   Globe,
-  UserCheck,
-  Filter,
-  Waypoints,
-  FileText,
+  type LucideIcon,
 } from "lucide-react";
+import { NAV_SUITES, SITE_SETTINGS_ITEM } from "@/lib/nav";
+import { Tooltip } from "@/components/ui/tooltip";
+import { PortalMenu } from "@/components/ui/menu-panel";
+import { LogoMark } from "@/components/brand/logo-mark";
+
+const SUITES_STORAGE_KEY = "trackme_sidebar_closed_suites";
 interface SidebarProps {
   workspace: { id: string; name: string; slug: string };
   sites: { id: string; domain: string; displayName: string }[];
@@ -51,10 +49,15 @@ export function Sidebar({
   const router = useRouter();
   const [profileOpen, setProfileOpen] = React.useState(false);
   const profileMenuRef = React.useRef<HTMLDivElement>(null);
+  const profileButtons = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  // Only the sidebar that is on screen opens the menu; the other is mounted but hidden.
+  const visibleScope = mobileOpen ? "drawer" : "desktop";
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Element;
+      if (target.closest?.("[data-portal-menu]")) return;
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setProfileOpen(false);
       }
     }
@@ -70,28 +73,33 @@ export function Sidebar({
     onMobileClose();
   }, [pathname, onMobileClose]);
 
-  const navGroups = [
+  // With no website yet there is no site to open: send site-scoped items to the page that adds one,
+  // instead of a broken /sites//realtime URL.
+  const siteBase = primarySiteDomain ? `/${workspace.slug}/sites/${primarySiteDomain}` : null;
+  const siteHref = (section: string) => (siteBase ? `${siteBase}/${section}` : `/${workspace.slug}/settings/sites`);
+
+  type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "live" | "new"; scoped?: boolean };
+  type NavGroup = { id: string; title: string; items: NavItem[] };
+
+  const navGroups: NavGroup[] = [
+    ...NAV_SUITES.map((suite) => ({
+      id: suite.id,
+      title: suite.title,
+      items: suite.items.map((item): NavItem => ({
+        href: item.workspace ? `/${workspace.slug}/${item.path}` : siteHref(item.path),
+        label: item.label,
+        icon: item.icon,
+        ...(item.badge ? { badge: item.badge } : {}),
+        ...(item.workspace ? {} : { scoped: true }),
+      })),
+    })),
     {
-      title: "Analytics",
-      items: [
-        { href: `/${workspace.slug}/overview`, label: "Overview", icon: BarChart2, exact: true },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/realtime`, label: "Realtime", icon: Radio, badge: "live" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/people`, label: "User Profiles", icon: UserCheck, badge: "new" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/journeys`, label: "User Journeys", icon: Waypoints, badge: "new" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/funnels`, label: "Funnels", icon: Filter, badge: "new" },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/pages`, label: "Page Performance", icon: FileText },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/acquisition`, label: "Acquisition", icon: TrendingUp },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/geography`, label: "Audience Geography", icon: MapPinned },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/events`, label: "Goals & Events", icon: Target },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/vitals`, label: "Web Vitals", icon: Gauge },
-      ],
-    },
-    {
+      id: "workspace",
       title: "Workspace",
       items: [
         { href: `/${workspace.slug}/settings`, label: "Organization & Team", icon: Users },
         { href: `/${workspace.slug}/settings/sites`, label: `Websites (${sites.length})`, icon: Globe },
-        { href: `/${workspace.slug}/sites/${primarySiteDomain}/settings`, label: "Site Settings", icon: Settings2 },
+        { href: siteHref(SITE_SETTINGS_ITEM.path), label: SITE_SETTINGS_ITEM.label, icon: SITE_SETTINGS_ITEM.icon, scoped: true },
         { href: "/legal/privacy", label: "Privacy Policy", icon: BookOpen },
       ],
     },
@@ -102,6 +110,36 @@ export function Sidebar({
   const allHrefs = navGroups.flatMap((group) => group.items.map((item) => item.href));
   const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const activeHref = allHrefs.filter(matches).sort((a, b) => b.length - a.length)[0];
+  const activeSuiteId = navGroups.find((group) => group.items.some((item) => item.href === activeHref))?.id;
+
+  // Suites the user folded away, remembered across visits. Opening a page inside a folded suite unfolds it.
+  const [closedSuites, setClosedSuites] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SUITES_STORAGE_KEY) ?? "[]");
+      if (Array.isArray(saved)) {
+        setClosedSuites(saved.filter((id): id is string => typeof id === "string" && id !== activeSuiteId));
+      }
+    } catch {
+      // storage unavailable or corrupt: start with everything open
+    }
+  }, []);
+  const persistClosed = (next: string[]) => {
+    setClosedSuites(next);
+    try {
+      localStorage.setItem(SUITES_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // not persisted this time
+    }
+  };
+  React.useEffect(() => {
+    if (activeSuiteId && closedSuites.includes(activeSuiteId)) {
+      persistClosed(closedSuites.filter((id) => id !== activeSuiteId));
+    }
+    // Only a page change should unfold a suite, not the user folding the one they are on.
+  }, [activeHref]);
+  const toggleSuite = (id: string) =>
+    persistClosed(closedSuites.includes(id) ? closedSuites.filter((x) => x !== id) : [...closedSuites, id]);
 
   const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 
@@ -112,102 +150,132 @@ export function Sidebar({
 
   const userInitials = user.email ? user.email.slice(0, 2).toUpperCase() : "TM";
 
-  const renderContent = (collapsed: boolean) => (
+  const renderContent = (collapsed: boolean, scope: "desktop" | "drawer" = "desktop") => (
     <div className="flex h-full flex-col justify-between overflow-hidden border-r border-border bg-sidebar">
       <div>
-        <div className={`flex h-14 items-center justify-between border-b border-border px-3 ${collapsed ? "h-auto flex-col gap-2 py-3" : ""}`}>
-          <div className="flex min-w-0 items-center space-x-3 overflow-hidden">
-            <Link
-              href={`/${workspace.slug}/overview`}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white"
-            >
-              <Activity className="h-4 w-4" />
-            </Link>
-            {!collapsed && (
-              <div className="flex min-w-0 flex-col">
+        <div className={`flex h-14 items-center border-b border-border px-3 ${collapsed ? "justify-center" : "justify-between"}`}>
+          {collapsed ? (
+            // Collapsed, the logo is the only thing in the header. Hover or focus turns it into the expand control.
+            <Tooltip content="Expand sidebar" side="right">
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                aria-label="Expand sidebar"
+                className="group press relative grid size-9 place-items-center rounded-lg hover:bg-white/[0.06] focus-visible:bg-white/[0.06]"
+              >
+                <span className="transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0">
+                  <LogoMark />
+                </span>
+                <PanelLeftOpen className="absolute size-4 text-zinc-200 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
+              </button>
+            </Tooltip>
+          ) : (
+            <>
+              <Link href={`/${workspace.slug}/overview`} aria-label="TrackMe home" className="press flex min-w-0 items-center gap-3 rounded-md">
+                <LogoMark />
                 <span className="text-base font-medium leading-none text-zinc-100">TrackMe</span>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/[0.04] hover:text-zinc-200 lg:flex"
-          >
-            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </button>
+              </Link>
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                aria-label="Collapse sidebar"
+                className="press hidden size-8 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200 lg:flex"
+              >
+                <PanelLeftClose className="size-4" aria-hidden="true" />
+              </button>
+            </>
+          )}
         </div>
 
+        <LayoutGroup id={`sidebar-${scope}-${collapsed ? "rail" : "full"}`}>
         <div className="max-h-[calc(100vh-180px)] space-y-6 overflow-y-auto px-2 py-4">
-          {navGroups.map((group) => (
-            <div key={group.title} className="space-y-2">
+          {navGroups.map((group) => {
+            const open = collapsed || !closedSuites.includes(group.id);
+            return (
+            <div key={group.id} className={collapsed ? "space-y-1 border-t border-white/[0.06] pt-4 first:border-0 first:pt-0" : "space-y-1"}>
               {!collapsed && (
-                <div className="px-3 text-xs text-zinc-500">
-                  {group.title}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSuite(group.id)}
+                  aria-expanded={open}
+                  aria-controls={`suite-${group.id}`}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-1 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+                >
+                  <span>{group.title}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${open ? "" : "-rotate-90"}`} />
+                </button>
               )}
-              <div className="space-y-0.5">
+              <div id={`suite-${group.id}`} hidden={!open} className="space-y-0.5">
                 {group.items.map((item) => {
-                  const isActive = item.href === activeHref;
+                  const isActive = item.href === activeHref && !(item.scoped && !siteBase);
                   const Icon = item.icon;
 
-                  return (
+                  const link = (
                     <Link
-                      key={item.href}
+                      key={item.label}
                       href={item.href}
-                      title={collapsed ? item.label : undefined}
+                      aria-current={isActive ? "page" : undefined}
                       className={`
-                        group relative flex items-center rounded-lg text-sm transition-colors duration-150
+                        group press relative flex items-center rounded-lg text-sm
                         ${collapsed ? "mx-auto h-8 w-8 justify-center" : "h-8 gap-3 px-3"}
-                        ${
-                          isActive
-                            ? "bg-raised font-medium text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                            : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
-                        }
+                        ${isActive ? "font-medium text-zinc-50" : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"}
                       `}
                     >
-                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"}`} />
+                      {isActive && (
+                        <motion.span
+                          layoutId="sidebar-active"
+                          className="absolute inset-0 rounded-lg bg-raised shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                          transition={{ type: "spring", bounce: 0, visualDuration: 0.28 }}
+                        />
+                      )}
+                      <Icon className={`relative h-4 w-4 shrink-0 transition-colors duration-150 ${isActive ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"}`} />
 
-                      {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                      {!collapsed && <span className="relative flex-1 truncate">{item.label}</span>}
 
                       {!collapsed && item.badge === "live" && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" aria-label="Live" />
-                      )}
-
-                      {collapsed && (
-                        <div className="absolute left-full z-50 ml-2 hidden whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-xs text-zinc-100 shadow-float group-hover:block">
-                          {item.label}
-                        </div>
+                        <span className="relative h-1.5 w-1.5 rounded-full bg-good pulse-live" aria-label="Live" />
                       )}
                     </Link>
+                  );
+                  return collapsed ? (
+                    <Tooltip key={item.label} content={item.label} side="right">
+                      {link}
+                    </Tooltip>
+                  ) : (
+                    link
                   );
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
+        </LayoutGroup>
       </div>
 
       <div className="relative border-t border-border p-2" ref={profileMenuRef}>
-        {profileOpen && (
-          <div
-            className={`absolute bottom-full z-50 mb-2 rounded-xl border border-border bg-card p-2 shadow-float ${collapsed ? "left-2 w-56" : "left-2 right-2"}`}
-          >
+        <PortalMenu
+          open={profileOpen && scope === visibleScope}
+          anchor={() => profileButtons.current[scope]}
+          placement={collapsed ? "right-end" : "above-start"}
+          role="menu"
+          aria-label="Account"
+          className="p-2"
+          onEscape={() => setProfileOpen(false)}
+        >
             <div className="border-b border-white/[0.06] px-3 py-2">
               <p className="truncate text-xs font-medium text-zinc-100">{user.email}</p>
-              <div className="mt-1 flex items-center space-x-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a]" />
+              <div className="mt-1 flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-good" />
                 <span className="font-mono text-xs text-zinc-500">{workspace.slug} · {roleLabel}</span>
               </div>
             </div>
 
             <div className="space-y-0.5 py-1 text-xs font-medium">
               <Link
-                href={`/${workspace.slug}/sites/${primarySiteDomain}/settings`}
+                href={`/${workspace.slug}/settings`}
                 onClick={() => setProfileOpen(false)}
-                className="flex items-center space-x-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
+                className="press flex items-center gap-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               >
                 <Settings2 className="h-4 w-4" />
                 <span>Workspace Settings</span>
@@ -215,7 +283,7 @@ export function Sidebar({
               <Link
                 href="/onboarding"
                 onClick={() => setProfileOpen(false)}
-                className="flex items-center space-x-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
+                className="press flex items-center gap-2 rounded-md px-3 py-2 text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               >
                 <Plus className="h-4 w-4" />
                 <span>Create New Workspace</span>
@@ -226,19 +294,23 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex w-full items-center space-x-2 rounded-md px-3 py-2 text-xs font-medium text-[#e5484d] transition hover:bg-[#e5484d]/10"
+                className="press flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-bad hover:bg-bad/10"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Sign Out</span>
               </button>
             </div>
-          </div>
-        )}
+        </PortalMenu>
 
         <button
           type="button"
+          ref={(el) => {
+            profileButtons.current[scope] = el;
+          }}
+          aria-haspopup="menu"
+          aria-expanded={profileOpen && scope === visibleScope}
           onClick={() => setProfileOpen(!profileOpen)}
-          className={`flex w-full items-center rounded-md p-2 text-left transition hover:bg-white/[0.04] ${collapsed ? "justify-center" : "space-x-3"} ${profileOpen ? "bg-white/[0.06]" : ""}`}
+          className={`press flex w-full items-center rounded-md p-2 text-left hover:bg-white/[0.04] ${collapsed ? "justify-center" : "gap-3"} ${profileOpen ? "bg-white/[0.06]" : ""}`}
         >
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-200">
             {userInitials}
@@ -257,19 +329,27 @@ export function Sidebar({
   return (
     <>
       <aside
-        className={`hidden lg:block fixed inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out ${collapsed ? "w-16" : "w-60"}`}
+        className={`hidden lg:block fixed inset-y-0 left-0 z-40 transition-[width] duration-300 ease-in-out ${collapsed ? "w-16" : "w-60"}`}
       >
         {renderContent(collapsed)}
       </aside>
 
-      {mobileOpen && (
-        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex lg:hidden">
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onMobileClose} />
-          <div className="relative h-full w-72 max-w-[85vw] border-r border-white/[0.06] bg-background shadow-float">
-            {renderContent(false)}
+      <AnimatePresence>
+        {mobileOpen && (
+          <div role="dialog" aria-modal="true" aria-label="Navigation" className="fixed inset-0 z-50 flex lg:hidden">
+            <motion.div className="fixed inset-0 bg-black/70" aria-hidden="true" onClick={onMobileClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} />
+            <motion.div
+              className="relative h-full w-72 max-w-[85vw] border-r border-white/[0.06] bg-background shadow-float"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", bounce: 0, visualDuration: 0.3 }}
+            >
+              {renderContent(false, "drawer")}
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </>
   );
 }

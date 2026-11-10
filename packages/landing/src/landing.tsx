@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Activity, ArrowRight, ArrowUpRight, Database, Globe2, Server, ShieldCheck, Workflow, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Database, Globe2, Server, ShieldCheck, Workflow, type LucideIcon } from "lucide-react";
 import { SmartLink } from "./smart-link";
 import { HeroScene } from "./hero-scene";
 import { GlyphField } from "./glyph-field";
@@ -8,6 +8,8 @@ import { DEMO_ANCHOR } from "./demo-bus";
 import { Navbar } from "./navbar";
 import { FeatureStage } from "./feature-stage";
 import { PrivacyLedger } from "./privacy-ledger";
+import { MoneyTrailDemo } from "./money-trail-demo";
+import { LogoMark } from "./logo-mark";
 import { InstallConsole } from "./install-console";
 import { CopySnippet } from "./copy-snippet";
 import { TryChips } from "./try-chips";
@@ -111,11 +113,7 @@ function SectionHead({ index, label, title, lead }: { index: string; label: stri
 }
 
 function Mark() {
-  return (
-    <span className="grid h-6 w-6 place-items-center rounded-md bg-[#ededed] text-[#141415]">
-      <Activity className="h-4 w-4" strokeWidth={1.75} />
-    </span>
-  );
+  return <LogoMark size={24} />;
 }
 
 export function Landing({ product = "TrackMe", links, viewer, snippet }: LandingProps) {
@@ -153,14 +151,14 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
         <Container className="relative z-20 pb-16 pt-36 md:min-h-[640px] md:pt-44">
           <div className="max-w-[720px]">
             <span className="rise inline-flex h-7 items-center gap-2 rounded-lg border border-white/[0.1] px-3 text-[13px] text-zinc-300">
-              <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4cc38a]" />
+              <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
               Realtime, down to the last five minutes
             </span>
             <h1 className="rise mt-6 text-balance text-[44px] font-medium leading-[46px] tracking-[-0.035em] text-zinc-50 [animation-delay:60ms] sm:text-[60px] sm:leading-[62px] lg:text-[68px] lg:leading-[70px]">
               Analytics that counts visits, <span className="text-zinc-500">not people.</span>
             </h1>
             <p className="rise mt-6 max-w-[540px] text-[17px] leading-7 text-zinc-300 [animation-delay:120ms] sm:text-lg sm:leading-[28px]">
-              {product} gives product and engineering teams live traffic, funnels, user journeys and Web Vitals from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.
+              {product} gives product and engineering teams live traffic, funnels, errors, release impact and payments from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.
             </p>
             <div className="rise mt-8 flex flex-wrap gap-3 [animation-delay:180ms]">
               <SmartLink href={primaryHref} className={primaryButton}>
@@ -213,10 +211,34 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
         </Container>
       </section>
 
+      {/* ------------------------------------------------------------- Ask */}
+      <section id="ask" className="pt-28 sm:pt-36">
+        <Container>
+          <SectionHead
+            index="02"
+            label="Ask"
+            title={
+              <>
+                Other tools tell you what broke. <span className="text-zinc-500">{product} tells you what it cost.</span>
+              </>
+            }
+            lead="Errors, releases, gateways, checkout sessions and payments live in one place, so a plain question can follow a problem from its cause to the rupees it cost. Every figure shows the query behind it."
+          />
+          <Reveal className="mt-14" delay={80}>
+            <MoneyTrailDemo />
+          </Reveal>
+          <ul className="mt-8 grid gap-x-10 gap-y-4 text-sm leading-6 text-zinc-400 sm:grid-cols-3">
+            <li><span className="text-zinc-200">Shows its work.</span> The exact query, the rows read and how long it took, for every number.</li>
+            <li><span className="text-zinc-200">Says when it is guessing.</span> Estimates are labelled, and a question it cannot ground is declined, not made up.</li>
+            <li><span className="text-zinc-200">Stays with you.</span> Watch a finding so you hear next time, or copy it as a case file or a ticket.</li>
+          </ul>
+        </Container>
+      </section>
+
       {/* ---------------------------------------------------------- System */}
       <section id="system" className="pt-28 sm:pt-36">
         <Container>
-          <SectionHead index="02" label="How it works" title="From a click in a browser to a number on your dashboard." />
+          <SectionHead index="03" label="How it works" title="From a click in a browser to a number on your dashboard." />
           <Reveal className="mt-14" delay={80}>
             <div className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[#19191b]">
               <div className="relative h-48 border-b border-white/[0.08] bg-[#0f0f10] sm:h-60">
@@ -253,7 +275,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
       {/* --------------------------------------------------------- Privacy */}
       <section id="privacy" className="pt-28 sm:pt-36">
         <Container>
-          <SectionHead index="03" label="Privacy" title="Counts visits without keeping what could identify a person." lead="Most of the privacy work happens at the edge, where the IP address is read once and dropped." />
+          <SectionHead index="04" label="Privacy" title="Counts visits without keeping what could identify a person." lead="Most of the privacy work happens at the edge, where the IP address is read once and dropped." />
           <Reveal className="mt-14" delay={80}>
             <PrivacyLedger />
           </Reveal>
@@ -268,7 +290,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
       {/* ----------------------------------------------------------- Setup */}
       <section id="install" className="pt-28 sm:pt-36">
         <Container>
-          <SectionHead index="04" label="Setup" title="One tag, and your first pageview in minutes." />
+          <SectionHead index="05" label="Setup" title="One tag, and your first pageview in minutes." />
           <div className="mt-14 grid items-start gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-16">
             <Reveal delay={80}>
               <ol className="relative">
@@ -331,7 +353,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
         <Container>
           <div className="grid gap-12 lg:grid-cols-[420px_1fr] lg:gap-16">
             <div className="lg:sticky lg:top-28 lg:self-start">
-              <SectionHead index="05" label="Questions" title="Good to know before you start." />
+              <SectionHead index="06" label="Questions" title="Good to know before you start." />
               <SmartLink href={links.docs} className="mt-8 inline-flex items-center gap-1 text-sm text-zinc-300 transition-colors duration-150 hover:text-white">
                 Read the docs <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
               </SmartLink>
@@ -364,7 +386,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
             </div>
             <div className="relative z-10 grid items-end gap-10 px-6 pb-56 pt-14 sm:px-12 sm:pt-20 lg:grid-cols-[1fr_1fr] lg:gap-14">
               <div>
-                <p className="font-mono text-xs text-zinc-500">06 — Start</p>
+                <p className="font-mono text-xs text-zinc-500">07 — Start</p>
                 <h2 className="mt-5 text-balance text-[36px] font-medium leading-[42px] tracking-[-0.03em] text-zinc-50 sm:text-[52px] sm:leading-[56px]">
                   Your first pageview is one tag away.
                 </h2>
@@ -417,6 +439,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
 
             <FooterColumn title="Product">
               <FooterLink href="#features">What you see</FooterLink>
+              <FooterLink href="#ask">What it cost</FooterLink>
               <FooterLink href="#system">How it works</FooterLink>
               <FooterLink href="#privacy">Privacy</FooterLink>
               <FooterLink href="#faq">FAQ</FooterLink>

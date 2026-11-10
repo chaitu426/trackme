@@ -1,7 +1,7 @@
 /**
  * Re-encrypts every stored secret under the CURRENT key.
  *
- * Rotation runbook (docs/SECURITY_AUDIT.md, M3):
+ * Rotation runbook (docs/operations/SECURITY_AUDIT.md, M3):
  *   1. Generate a new key (32+ random characters).
  *   2. Deploy with SITE_SIGNING_SECRET_KEY=<new> and SITE_SIGNING_SECRET_KEY_PREVIOUS=<old>
  *      (the web app and the ingestion edge both read the ring, so nothing stops working).

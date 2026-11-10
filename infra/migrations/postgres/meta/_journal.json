@@ -50,6 +50,34 @@
       "when": 1794124714127,
       "tag": "0006_mature_omega_flight",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794208095984,
+      "tag": "0007_site_releases",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794211097902,
+      "tag": "0008_site_error_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794221657779,
+      "tag": "0009_site_payment_gateways",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794288948331,
+      "tag": "0010_wooden_rattler",
+      "breakpoints": true
     }
   ]
 }

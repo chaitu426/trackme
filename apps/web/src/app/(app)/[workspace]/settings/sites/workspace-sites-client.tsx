@@ -1,20 +1,17 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
 import * as React from "react";
 import Link from "next/link";
-import {
-  Globe,
-  Plus,
-  Check,
-  Trash2,
-  ExternalLink,
-  Code2,
-  Settings2,
-  Radio,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AnimatePresence, motion } from "motion/react";
+import { ExternalLink, Globe, Plus, Radio, Settings2, Trash2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, IconButton } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { Tooltip } from "@/components/ui/tooltip";
+import { CopyButton } from "@/components/ui/copy-button";
 import { AddSiteModal } from "@/components/add-site-modal";
+import { toast } from "@/lib/toast";
 
 interface SiteItem {
   id: string;
@@ -25,192 +22,140 @@ interface SiteItem {
 }
 
 interface WorkspaceSitesClientProps {
-  workspace: {
-    id: string;
-    name: string;
-    slug: string;
-    role: string;
-  };
+  workspace: { id: string; name: string; slug: string; role: string };
   initialSites: SiteItem[];
   trackerScriptUrl: string;
   trackerScriptIntegrity: string | null;
   ingestionUrl: string;
 }
 
-export function WorkspaceSitesClient({
-  workspace,
-  initialSites,
-  trackerScriptUrl,
-  trackerScriptIntegrity,
-  ingestionUrl,
-}: WorkspaceSitesClientProps) {
+export function WorkspaceSitesClient({ workspace, initialSites, trackerScriptUrl, trackerScriptIntegrity, ingestionUrl }: WorkspaceSitesClientProps) {
   const [sitesList, setSitesList] = React.useState<SiteItem[]>(initialSites);
   const [showAddModal, setShowAddModal] = React.useState(false);
-  const [copiedDomain, setCopiedDomain] = React.useState<string | null>(null);
-  const [busySiteId, setBusySiteId] = React.useState<string | null>(null);
+  const [removing, setRemoving] = React.useState<SiteItem | null>(null);
+  const [busy, setBusy] = React.useState(false);
 
-  function getSnippetForSite(site: SiteItem) {
-    return `<script defer src="${trackerScriptUrl}"${trackerScriptIntegrity ? ` integrity="${trackerScriptIntegrity}" crossorigin="anonymous"` : ""} data-site="${site.publicKey}" data-endpoint="${ingestionUrl}/v1/batch"></script>`;
-  }
+  const snippetFor = (site: SiteItem) =>
+    `<script defer src="${trackerScriptUrl}"${trackerScriptIntegrity ? ` integrity="${trackerScriptIntegrity}" crossorigin="anonymous"` : ""} data-site="${site.publicKey}" data-endpoint="${ingestionUrl}/v1/batch"></script>`;
 
-  function handleCopySnippet(site: SiteItem) {
-    const code = getSnippetForSite(site);
-    navigator.clipboard.writeText(code);
-    setCopiedDomain(site.domain);
-    setTimeout(() => setCopiedDomain(null), 2000);
-  }
-
-  async function handleDeleteSite(siteId: string, domain: string) {
-    if (sitesList.length <= 1) {
-      alert("An organization must have at least one website. You cannot delete the only site.");
-      return;
-    }
-
-    if (
-      !confirm(
-        `Are you sure you want to remove "${domain}" from this organization? Existing historical telemetry will be permanently purged.`
-      )
-    ) {
-      return;
-    }
-
-    setBusySiteId(siteId);
+  async function confirmRemove() {
+    if (!removing) return;
+    setBusy(true);
     try {
-      const res = await fetch(`/api/v1/workspaces/${workspace.id}/sites/${siteId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/v1/workspaces/${workspace.id}/sites/${removing.id}`, { method: "DELETE" });
       if (res.ok) {
-        setSitesList((prev) => prev.filter((s) => s.id !== siteId));
+        setSitesList((prev) => prev.filter((s) => s.id !== removing.id));
+        toast.success(`${removing.domain} removed`);
+        setRemoving(null);
       } else {
-        const data = await res.json();
-        alert(data.detail || data.message || "Failed to remove website.");
+        const data = await res.json().catch(() => ({}));
+        toast.error("The website could not be removed", data.detail || data.message);
       }
     } catch {
-      alert("An error occurred while deleting the site.");
+      toast.error("The website could not be removed", "Check your connection and try again.");
     } finally {
-      setBusySiteId(null);
+      setBusy(false);
     }
   }
 
+  const onlyOne = sitesList.length <= 1;
+
   return (
-    <div className="w-full space-y-8 animate-in fade-in duration-300">
-      <PageHeader title="Websites" art="stream" actions={<Button onClick={() => setShowAddModal(true)} className="h-9 gap-2 text-sm">
-          <Plus className="h-4 w-4" />
-          Add website
-        </Button>}>
+    <div className="stagger w-full space-y-5 text-left">
+      <PageHeader
+        title="Websites"
+        art="stream"
+        actions={
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus />
+            Add website
+          </Button>
+        }
+      >
         Domains and apps tracked under {workspace.name}.
       </PageHeader>
 
-      {/* Sites Grid / Table */}
-      <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-6 space-y-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
-            Tracked Domains ({sitesList.length})
-          </h3>
-        </div>
+      <Card className="px-0 pb-0">
+        <CardHeader className="border-b border-white/[0.06] px-5 pb-3">
+          <CardTitle>
+            Tracked websites
+            <span className="font-mono text-xs text-zinc-500">{sitesList.length}</span>
+          </CardTitle>
+        </CardHeader>
 
-        <div className="divide-y divide-white/[0.06]">
-          {sitesList.map((site) => (
-            <div
-              key={site.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between py-4 gap-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.06] text-zinc-300 mt-0.5">
-                  <Globe className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm text-zinc-100">
-                      {site.displayName || site.domain}
-                    </span>
-                    <a
-                      href={`https://${site.domain}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-zinc-500 hover:text-zinc-300 transition"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+        <ul className="divide-y divide-white/[0.06]">
+          <AnimatePresence initial={false}>
+            {sitesList.map((site) => (
+              <motion.li
+                key={site.id}
+                layout="position"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: 16 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col justify-between gap-4 px-5 py-4 sm:flex-row sm:items-center"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-white/[0.03] text-zinc-400">
+                    <Globe className="size-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-sm text-zinc-100">
+                      <span className="truncate">{site.displayName || site.domain}</span>
+                      <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" aria-label={`Open ${site.domain}`} className="press shrink-0 text-zinc-500 hover:text-zinc-200">
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </p>
+                    <p className="truncate font-mono text-xs text-zinc-500">{site.domain}</p>
                   </div>
-                  <p className="font-mono text-xs text-zinc-400 mt-0.5">{site.domain}</p>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                {/* View Realtime Dashboard */}
-                <Link
-                  href={`/${workspace.slug}/sites/${site.domain}/realtime`}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 font-medium transition"
-                >
-                  <Radio className="w-3.5 h-3.5 text-[#4cc38a]" />
-                  Live View
-                </Link>
-
-                {/* Copy Snippet */}
-                <button
-                  type="button"
-                  onClick={() => handleCopySnippet(site)}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition"
-                >
-                  {copiedDomain === site.domain ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-[#4cc38a]" />
-                      <span className="text-[#4cc38a]">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Code2 className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Copy Snippet</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Site Settings */}
-                <Link
-                  href={`/${workspace.slug}/sites/${site.domain}/settings`}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition"
-                >
-                  <Settings2 className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Configure</span>
-                </Link>
-
-                {/* Delete button (if not only site) */}
-                {sitesList.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSite(site.id, site.domain)}
-                    disabled={busySiteId === site.id}
-                    className="p-2 text-zinc-500 hover:text-[#e5484d] transition rounded-lg hover:bg-[#e5484d]/10"
-                    title="Remove website from organization"
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/${workspace.slug}/sites/${site.domain}/realtime`}
+                    className="press inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-raised px-3 text-xs font-medium text-zinc-100 hover:border-white/[0.18]"
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+                    <Radio className="size-4 text-good" aria-hidden="true" />
+                    Live view
+                  </Link>
+                  <CopyButton text={snippetFor(site)} label="Copy snippet" variant="outline" />
+                  <Link
+                    href={`/${workspace.slug}/sites/${site.domain}/settings`}
+                    className="press inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-zinc-300 hover:border-white/[0.2] hover:text-zinc-50"
+                  >
+                    <Settings2 className="size-4" aria-hidden="true" />
+                    Configure
+                  </Link>
+                  <Tooltip content={onlyOne ? "An organization needs at least one website" : "Remove website"}>
+                    <span>
+                      <IconButton size="sm" variant="ghost" label="Remove website" icon={<Trash2 />} disabled={onlyOne} onClick={() => setRemoving(site)} className="hover:text-bad" />
+                    </span>
+                  </Tooltip>
+                </div>
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ul>
+      </Card>
 
-      {/* Add Site Modal */}
       <AddSiteModal
         workspaceId={workspace.id}
         workspaceSlug={workspace.slug}
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSiteAdded={(newSite) => {
-          setSitesList((prev) => [
-            {
-              id: newSite.id,
-              domain: newSite.domain,
-              displayName: newSite.displayName,
-              publicKey: "",
-              createdAt: new Date().toISOString(),
-            },
-            ...prev,
-          ]);
+          setSitesList((prev) => [{ id: newSite.id, domain: newSite.domain, displayName: newSite.displayName, publicKey: "", createdAt: new Date().toISOString() }, ...prev]);
         }}
+      />
+
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => void confirmRemove()}
+        loading={busy}
+        title={`Remove ${removing?.domain ?? "website"}?`}
+        description="Its collected history is deleted permanently and cannot be recovered. The tracking snippet on the site stops working."
+        confirmLabel="Remove website"
       />
     </div>
   );

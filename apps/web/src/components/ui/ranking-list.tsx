@@ -32,8 +32,8 @@ export function RankingList({
 }) {
   if (!items.length) {
     return (
-      <MatrixArt variant="pulse" className="h-32" strength={0.7}>
-        <p className="rounded-md bg-sidebar/90 px-3 py-1.5 text-xs text-zinc-400">{empty}</p>
+      <MatrixArt variant="pulse" className="h-full min-h-[10rem] flex-1" strength={0.7}>
+        <p className="text-xs text-zinc-400">{empty}</p>
       </MatrixArt>
     );
   }

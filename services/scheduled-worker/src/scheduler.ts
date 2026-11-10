@@ -7,6 +7,14 @@ import { runUsageMetering } from "./jobs/usage-metering.js";
 import { reclaimDeadEdgeQuota } from "./jobs/quota-reclaim.js";
 import { runRetentionCleanup } from "./jobs/retention.js";
 import { runReconciliation } from "./jobs/reconciliation.js";
+import { runErrorRegressions } from "./jobs/error-regressions.js";
+import { runSourceMapRetention } from "./jobs/sourcemap-retention.js";
+import { runPaymentPayloadRetention } from "./jobs/payment-payload-retention.js";
+import { runRevenueLeakRollup } from "./jobs/revenue-leak-rollup.js";
+import { publishAlertEvent } from "./jobs/alert-events.js";
+import { createClickHouseNewGroupFetch, publishNewErrorGroups } from "./jobs/new-error-groups.js";
+import { classifyPending } from "./jobs/payment-failure-classifier.js";
+import { createClickHouseClassifierDeps } from "./jobs/payment-failure-classifier.db.js";
 import { instrumentJob, reconciliationFindings, startMetricsServer } from "./metrics.js";
 import { withDistributedLock } from "./lock.js";
 
@@ -65,6 +73,24 @@ cron.schedule("*/5 * * * *", async () => {
   }
 });
 
+// 2c. Error regressions: every minute, reopen resolved issues that have occurred again. Cheap: one read of the
+// (small) resolved list and one ClickHouse query per 500 issues over the 30-day error_events table.
+cron.schedule("* * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:error_regressions",
+      50,
+      "Error Regressions",
+      instrumentJob("error_regressions", () =>
+        runErrorRegressions((issue, release, now) => publishAlertEvent(redis, { type: "error_regression", siteId: issue.siteId, groupId: issue.groupId, release, at: now.toISOString() })).then(() => undefined)
+      )
+    );
+  } catch (err) {
+    console.error("Failed checking error regressions:", err);
+  }
+});
+
 // 3. Usage Metering Sync: Every 15 minutes
 cron.schedule("*/15 * * * *", async () => {
   try {
@@ -92,6 +118,99 @@ cron.schedule("30 3 * * *", async () => {
     );
   } catch (err) {
     console.error("Failed running retention cleanup:", err);
+  }
+});
+
+// 4b. Source map retention: 03:50 UTC daily. Deletes maps older than 90 days from the object store.
+cron.schedule("50 3 * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:sourcemap_retention",
+      600,
+      "Source Map Retention",
+      instrumentJob("sourcemap_retention", () => runSourceMapRetention().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed running source map retention:", err);
+  }
+});
+
+// Payment Failure Doctor: every minute, classify failed payments that have no classification yet (a failure is picked up
+// one minute after it happens, so the errors and outcomes around it have arrived). A batch is at most 500 payments.
+cron.schedule("* * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:payment_failure_classifier",
+      55,
+      "Payment Failure Classifier",
+      instrumentJob("payment_failure_classifier", () => {
+        const deps = createClickHouseClassifierDeps();
+        // Each classified failure is also published on a Redis stream for the customer's own follow-up tooling (about the last 10,000 kept).
+        deps.emit = async (rows) => {
+          const pipe = redis.pipeline();
+          for (const r of rows) {
+            pipe.xadd("payments:failed", "MAXLEN", "~", 10000, "*", "siteId", r.siteId, "workspaceId", r.workspaceId, "paymentId", r.paymentId, "orderId", r.orderId, "category", r.category, "amountMinor", String(r.amountMinor), "currency", r.currency, "method", r.method, "userRef", r.userRef, "failedAt", new Date(r.failedAtMs).toISOString());
+          }
+          await pipe.exec();
+        };
+        return classifyPending(deps).then(() => undefined);
+      })
+    );
+  } catch (err) {
+    console.error("Failed classifying payment failures:", err);
+  }
+});
+
+// Alert events: every minute, publish a "new error group" event for each issue first seen in the last 15 minutes (once per issue).
+cron.schedule("* * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:new_error_groups",
+      55,
+      "New Error Groups",
+      instrumentJob("new_error_groups", () =>
+        publishNewErrorGroups({
+          fetchRecent: createClickHouseNewGroupFetch(),
+          claim: async (siteId, groupId) => (await redis.set(`alerts:newgroup:${siteId}:${groupId}`, "1", "EX", 7 * 86400, "NX")) === "OK",
+          publish: (event) => publishAlertEvent(redis, event),
+        }).then(() => undefined)
+      )
+    );
+  } catch (err) {
+    console.error("Failed publishing new error groups:", err);
+  }
+});
+
+// Revenue-Leak Detector: hourly at :20, recompute today and yesterday of leak_sessions (one row per checkout session).
+cron.schedule("20 * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:revenue_leak_rollup",
+      900,
+      "Revenue Leak Rollup",
+      instrumentJob("revenue_leak_rollup", () => runRevenueLeakRollup().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed running revenue leak rollup:", err);
+  }
+});
+
+// 4c. Raw payment payload retention: 04:00 UTC daily. Deletes webhook bodies older than 90 days from the object store.
+cron.schedule("0 4 * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:payment_payload_retention",
+      600,
+      "Payment Payload Retention",
+      instrumentJob("payment_payload_retention", () => runPaymentPayloadRetention().then(() => undefined))
+    );
+  } catch (err) {
+    console.error("Failed running payment payload retention:", err);
   }
 });
 

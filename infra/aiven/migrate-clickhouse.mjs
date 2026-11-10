@@ -4,11 +4,14 @@
 //
 //   node infra/aiven/migrate-clickhouse.mjs            apply pending migrations
 //   node infra/aiven/migrate-clickhouse.mjs --dry-run  list what would run, touch nothing
+//   node infra/aiven/migrate-clickhouse.mjs --down     undo the most recently applied migration
+//                                                      (runs down/<same file name>, then forgets it)
 import fs from "node:fs";
 import path from "node:path";
 import { loadEnv, need, repoRoot, requireFrom, splitStatements } from "./lib.mjs";
 
 const dryRun = process.argv.includes("--dry-run");
+const rollback = process.argv.includes("--down");
 const dir = path.join(repoRoot, "infra/migrations/clickhouse");
 const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
 
@@ -45,6 +48,41 @@ try {
       (r) => r.name
     )
   );
+
+  if (rollback) {
+    // Only the newest applied migration can be undone: older ones may have later ones built on them.
+    const latest = files.filter((f) => done.has(f)).pop();
+    if (!latest) {
+      console.log("Nothing to roll back.");
+      process.exit(0);
+    }
+    const downFile = path.join(dir, "down", latest);
+    if (!fs.existsSync(downFile)) {
+      console.error(`${latest} has no down/${latest}; it cannot be rolled back automatically.`);
+      process.exit(1);
+    }
+    const statements = splitStatements(fs.readFileSync(downFile, "utf8"));
+    console.log(`revert ${latest} (${statements.length} statements)`);
+    for (const [i, query] of statements.entries()) {
+      try {
+        await client.command({ query });
+      } catch (err) {
+        console.error(`
+FAILED down/${latest} statement ${i + 1}:
+${query.slice(0, 400)}
+
+${err.message}`);
+        process.exitCode = 1;
+        throw err;
+      }
+    }
+    await client.command({
+      query: `ALTER TABLE ${db}.schema_migrations DELETE WHERE name = {name:String} SETTINGS mutations_sync = 2`,
+      query_params: { name: latest },
+    });
+    console.log(`Rolled back ${latest}.`);
+    process.exit(0);
+  }
 
   for (const f of files) {
     if (done.has(f)) {

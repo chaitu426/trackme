@@ -6,6 +6,8 @@ import { EnrichedEvent } from "@trackme/contracts";
 import { getClickHouseClient } from "@trackme/analytics";
 import { createClickHouseWriter } from "./writers/clickhouse.js";
 import { updateRealtimeState } from "./state/redis-realtime.js";
+import { prepareErrorEvents } from "./errors/prepare.js";
+import { createErrorWriter } from "./errors/writer.js";
 import { sendToDLQ } from "./dlq.js";
 import { clearIntent, pin, readIntent, writeIntent } from "./intent.js";
 import { checkEvent } from "./contract.js";
@@ -25,6 +27,8 @@ import {
   lagAfter,
   stopwatch,
   realtimeErrors,
+  errorWriteFailures,
+  errorSamplerFailures,
   v2WriteErrors,
   startMetricsServer,
   type DeadLetterReason,
@@ -44,6 +48,15 @@ const writeEventsToClickHouse = createClickHouseWriter({
   onV2Error: (error) => {
     v2WriteErrors.inc();
     console.error("⚠️ Shadow write to events_ingest failed:", error);
+  },
+});
+
+const writeErrors = createErrorWriter({
+  client: getClickHouseClient(),
+  redis,
+  onSamplerError: (error) => {
+    errorSamplerFailures.inc();
+    console.error("⚠️ Error sampler unavailable; storing counts without detail:", error);
   },
 });
 
@@ -192,10 +205,13 @@ async function processBatch({
   await heartbeat();
   lap("decode");
 
+  // Error events are scrubbed and grouped first, so the normal insert already carries their group id.
+  const prepared = prepareErrorEvents(good);
+
   let refused: Awaited<ReturnType<typeof writeIsolating<EnrichedEvent>>>;
   const stopInsertTimer = insertDuration.startTimer();
   try {
-    refused = await writeIsolating(good, writeEventsToClickHouse, isDataError);
+    refused = await writeIsolating(prepared.events, writeEventsToClickHouse, isDataError);
   } finally {
     stopInsertTimer();
     lap("insert");
@@ -209,7 +225,16 @@ async function processBatch({
       kind: "clickhouse_rejected",
     });
   }
-  const written = refusedIds.size === 0 ? good : good.filter((e) => !refusedIds.has(e.eventId));
+  const written = refusedIds.size === 0 ? prepared.events : prepared.events.filter((e) => !refusedIds.has(e.eventId));
+
+  // Error-tracking rows are secondary to the events, which are already stored. A failure here is counted and
+  // logged rather than replaying the whole batch, which would write every event in it twice.
+  try {
+    await writeErrors(prepared);
+  } catch (error) {
+    errorWriteFailures.inc();
+    console.error("⚠️ Failed to store error-tracking rows:", error);
+  }
 
   // Edge receipt -> insert completion. receivedAt is stamped before admission,
   // so this measures the full ingestion pipeline, not just the ClickHouse call.

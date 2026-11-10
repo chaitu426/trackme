@@ -28,7 +28,7 @@ export function AuditLogViewer({ logs }: { logs: AuditLogSummary[] }) {
           logs.map((log) => (
             <div
               key={log.id}
-              className="px-3 py-3 rounded-lg bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.04] transition"
+              className="px-3 py-3 rounded-lg bg-white/[0.03] border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.04] transition"
             >
               <div className="flex items-center space-x-3 flex-wrap gap-1">
                 <Badge variant={actionBadgeVariant(log.action)} className="text-xs">

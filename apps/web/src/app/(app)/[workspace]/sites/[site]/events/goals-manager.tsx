@@ -1,5 +1,6 @@
 "use client";
 
+import { inputCompactClass, NativeSelect } from "@/components/ui/field";
 import { useState } from "react";
 import {
   Trash2,
@@ -11,6 +12,8 @@ import {
   Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { toast } from "@/lib/toast";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { GoalMetric } from "@trackme/analytics";
@@ -30,6 +33,7 @@ export function GoalsManager({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirmGoalId, setConfirmGoalId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Form states
@@ -45,12 +49,14 @@ export function GoalsManager({
   const [editTargetValue, setEditTargetValue] = useState("");
 
   // Summary stats
-  const totalConversions = goals.reduce((acc, g) => acc + (g.conversions || 0), 0);
+  // Only goals that are switched on count towards the headline numbers.
+  const activeGoals = goals.filter((g) => g.enabled !== false);
+  const totalConversions = activeGoals.reduce((acc, g) => acc + (g.conversions || 0), 0);
   const avgConvRate =
-    goals.length > 0
-      ? (goals.reduce((acc, g) => acc + (g.conversionRate || 0), 0) / goals.length).toFixed(1)
+    activeGoals.length > 0
+      ? (activeGoals.reduce((acc, g) => acc + (g.conversionRate || 0), 0) / activeGoals.length).toFixed(1)
       : "0.0";
-  const activeCount = goals.filter((g) => g.enabled !== false).length;
+  const activeCount = activeGoals.length;
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -174,10 +180,6 @@ export function GoalsManager({
   }
 
   async function handleDelete(goalId: string) {
-    if (!window.confirm("Are you sure you want to delete this conversion goal?")) {
-      return;
-    }
-
     setPending(true);
     setError(null);
     try {
@@ -191,6 +193,8 @@ export function GoalsManager({
       }
 
       setGoals((prev) => prev.filter((g) => g.id !== goalId));
+      setConfirmGoalId(null);
+      toast.success("Goal deleted");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete conversion goal");
     } finally {
@@ -202,7 +206,7 @@ export function GoalsManager({
     <div className="space-y-6">
       {/* Metric Highlights */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
             <span className="text-xs font-medium">Total Conversions</span>
             <Award className="w-4 h-4 text-zinc-300" />
@@ -210,21 +214,21 @@ export function GoalsManager({
           <div className="text-2xl font-medium text-zinc-100">
             {totalConversions.toLocaleString()}
           </div>
-          <p className="text-xs text-zinc-500 mt-1">Across all active conversion rules</p>
+          <p className="text-xs text-zinc-500 mt-1">Sum across active goals; a visit that hits two goals counts twice</p>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
             <span className="text-xs font-medium">Avg. Conversion Rate</span>
-            <TrendingUp className="w-4 h-4 text-[#4cc38a]" />
+            <TrendingUp className="w-4 h-4 text-good" />
           </div>
-          <div className="text-2xl font-medium text-[#4cc38a]">
+          <div className="text-2xl font-medium text-good">
             {avgConvRate}%
           </div>
-          <p className="text-xs text-zinc-500 mt-1">Weighted conversion efficiency</p>
+          <p className="text-xs text-zinc-500 mt-1">Simple average of active goals</p>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-zinc-950/80 p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
             <span className="text-xs font-medium">Active Goals</span>
             <Zap className="w-4 h-4 text-zinc-300" />
@@ -240,9 +244,9 @@ export function GoalsManager({
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>Conversion Goals & Funnels</CardTitle>
+              <CardTitle>Conversion Goals</CardTitle>
               <CardDescription>
-                Measure high-value visitor milestones, signup completions, and target values.
+                Count the visits that reach a page or fire an event. For multi-step paths, use Funnels.
               </CardDescription>
             </div>
             <Button
@@ -260,7 +264,7 @@ export function GoalsManager({
           {showCreateForm ? (
             <form
               onSubmit={handleCreate}
-              className="space-y-4 rounded-xl border border-white/10 bg-zinc-900/60 p-5 text-xs"
+              className="space-y-4 rounded-xl border border-border bg-card p-5 text-xs"
             >
               <div className="text-sm font-medium text-zinc-200">Define New Conversion Goal</div>
 
@@ -273,20 +277,20 @@ export function GoalsManager({
                     placeholder="e.g. Completed Checkout or Demo Request"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
+                    className="w-full"
                   />
                 </div>
 
                 <div>
                   <label className="mb-1 block text-zinc-400 font-medium">Trigger Type</label>
-                  <select
+                  <NativeSelect
                     value={type}
                     onChange={(e) => setType(e.target.value as "pageview_rule" | "custom_event")}
-                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
+                    className="w-full"
                   >
                     <option value="pageview_rule">Pageview Rule (URL Path)</option>
                     <option value="custom_event">Custom Event (JavaScript Trigger)</option>
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
 
@@ -300,7 +304,7 @@ export function GoalsManager({
                       placeholder="e.g. /pricing, /thank-you, /checkout/*"
                       value={pathPattern}
                       onChange={(e) => setPathPattern(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-card p-3 font-mono text-zinc-200 outline-none focus:border-white/[0.1]"
+                      className={`${inputCompactClass} w-full font-mono`}
                     />
                   </div>
                 ) : (
@@ -312,7 +316,7 @@ export function GoalsManager({
                       placeholder="e.g. signup_clicked, upgrade_plan"
                       value={eventName}
                       onChange={(e) => setEventName(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-card p-3 font-mono text-zinc-200 outline-none focus:border-white/[0.1]"
+                      className={`${inputCompactClass} w-full font-mono`}
                     />
                   </div>
                 )}
@@ -326,12 +330,12 @@ export function GoalsManager({
                     placeholder="e.g. 99.00"
                     value={targetValue}
                     onChange={(e) => setTargetValue(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-card p-3 text-zinc-200 outline-none focus:border-white/[0.1]"
+                    className="w-full"
                   />
                 </div>
               </div>
 
-              {error && <div className="text-[#e5484d] text-xs">{error}</div>}
+              {error && <div className="text-bad text-xs">{error}</div>}
 
               <div className="flex justify-end space-x-2 pt-2">
                 <Button
@@ -351,7 +355,7 @@ export function GoalsManager({
 
           {/* Goals List */}
           {goals.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-xs text-zinc-400">
+            <p className="rounded-xl border border-dashed border-border bg-white/[0.02] p-8 text-center text-xs text-zinc-400">
               No conversion goals defined yet. Create your first goal to measure key business milestones.
             </p>
           ) : (
@@ -365,7 +369,7 @@ export function GoalsManager({
                     key={goal.id}
                     className={`flex flex-col justify-between gap-4 rounded-xl border p-4 text-xs transition-colors md:flex-row md:items-center ${
                       isEnabled
-                        ? "border-white/[0.08] bg-zinc-950/70"
+                        ? "border-border bg-card"
                         : "border-white/[0.04] bg-white/[0.01] opacity-60"
                     }`}
                   >
@@ -378,21 +382,21 @@ export function GoalsManager({
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             placeholder="Goal name"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
+                            className={inputCompactClass}
                           />
                           <input
                             type="text"
                             value={editPattern}
                             onChange={(e) => setEditPattern(e.target.value)}
                             placeholder="Path or event"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs font-mono text-zinc-100"
+                            className={`${inputCompactClass} font-mono`}
                           />
                           <input
                             type="number"
                             value={editTargetValue}
                             onChange={(e) => setEditTargetValue(e.target.value)}
                             placeholder="Target value ($)"
-                            className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-100"
+                            className={inputCompactClass}
                           />
                         </div>
                         <div className="flex items-center gap-2 pt-1">
@@ -420,7 +424,7 @@ export function GoalsManager({
                             title={isEnabled ? "Pause goal" : "Resume goal"}
                             className={`p-1 rounded-md transition ${
                               isEnabled
-                                ? "text-[#4cc38a] hover:bg-[#4cc38a]/10"
+                                ? "text-good hover:bg-good/10"
                                 : "text-zinc-500 hover:bg-white/[0.04]"
                             }`}
                           >
@@ -460,7 +464,7 @@ export function GoalsManager({
                       </div>
 
                       <div className="text-right">
-                        <div className="text-base font-medium text-[#4cc38a]">
+                        <div className="text-base font-medium text-good">
                           {goal.conversionRate || 0}%
                         </div>
                         <div className="text-xs font-medium text-zinc-400">
@@ -482,9 +486,9 @@ export function GoalsManager({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-[#e5484d] hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
+                        className="h-8 px-2 text-bad hover:bg-bad/10 hover:text-bad"
                         disabled={pending}
-                        onClick={() => void handleDelete(goal.id)}
+                        onClick={() => setConfirmGoalId(goal.id)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -496,6 +500,16 @@ export function GoalsManager({
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirmGoalId !== null}
+        onClose={() => setConfirmGoalId(null)}
+        onConfirm={() => confirmGoalId && void handleDelete(confirmGoalId)}
+        loading={pending}
+        title="Delete this goal?"
+        description="Past conversions it counted stay in your data, but the goal stops appearing in reports."
+        confirmLabel="Delete goal"
+      />
     </div>
   );
 }

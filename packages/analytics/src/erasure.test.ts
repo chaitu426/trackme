@@ -28,11 +28,21 @@ test("deletes web_vitals, then events_v2, then events_raw, and reports what it r
   const deletes = calls.filter((c) => c.kind === "command").map((c) => c.query);
   assert.deepEqual(deletes, [
     ERASURE_SQL.delete.site_profiles_agg,
+    ERASURE_SQL.delete.identity_map,
+    ERASURE_SQL.delete.user_active_day,
+    ERASURE_SQL.delete.user_first_day,
+    ERASURE_SQL.delete.user_event_day,
+    ERASURE_SQL.delete.user_timeline,
+    ERASURE_SQL.delete.payment_events,
+    ERASURE_SQL.delete.order_session,
+    ERASURE_SQL.delete.payment_failure_class,
+    ERASURE_SQL.delete.error_occurrences,
+    ERASURE_SQL.delete.error_events,
     ERASURE_SQL.delete.web_vitals,
     ERASURE_SQL.delete.events_v2,
     ERASURE_SQL.delete.events_raw,
   ]);
-  assert.deepEqual(result, { visitors: 2, rows: { site_profiles_agg: 7, web_vitals: 7, events_v2: 7, events_raw: 7 }, dryRun: false });
+  assert.deepEqual(result, { visitors: 2, rows: { site_profiles_agg: 7, identity_map: 7, user_active_day: 7, user_first_day: 7, user_event_day: 7, user_timeline: 7, payment_events: 7, order_session: 7, payment_failure_class: 7, error_occurrences: 7, error_events: 7, web_vitals: 7, events_v2: 7, events_raw: 7 }, dryRun: false });
 });
 
 test("without confirmation (dry run) nothing is deleted", async () => {
@@ -43,13 +53,25 @@ test("without confirmation (dry run) nothing is deleted", async () => {
   assert.equal(result.dryRun, true);
 });
 
-test("a person with no events still has their profile removed, and no event table is touched", async () => {
+test("a person with no events still has their profile and identity link removed, and no event table is touched", async () => {
   const { client, calls } = fake({ visitors: [], hashes: [] });
   const result = await eraseVisitor(target, { dryRun: false }, client);
   assert.equal(result.visitors, 0);
   assert.deepEqual(
     calls.filter((c) => c.kind === "command").map((c) => c.query),
-    [ERASURE_SQL.delete.site_profiles_agg]
+    [
+      ERASURE_SQL.delete.site_profiles_agg,
+      ERASURE_SQL.delete.identity_map,
+      ERASURE_SQL.delete.user_active_day,
+      ERASURE_SQL.delete.user_first_day,
+      ERASURE_SQL.delete.user_event_day,
+      ERASURE_SQL.delete.user_timeline,
+      ERASURE_SQL.delete.payment_events,
+      ERASURE_SQL.delete.order_session,
+      ERASURE_SQL.delete.payment_failure_class,
+      ERASURE_SQL.delete.error_occurrences,
+      ERASURE_SQL.delete.error_events,
+    ]
   );
   assert.equal(result.rows.events_raw, 0);
 });

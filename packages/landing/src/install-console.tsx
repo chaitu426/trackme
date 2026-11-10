@@ -60,7 +60,7 @@ export function InstallConsole({ snippet, lines, compact = false }: { snippet: s
     <div className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0f0f10] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.9)]">
       <div className="flex h-11 items-center justify-between border-b border-white/[0.08] pl-4 pr-2">
         <span className="flex items-center gap-2 font-mono text-xs text-zinc-500">
-          <i className={`h-1.5 w-1.5 rounded-full ${done ? "bg-[#4cc38a]" : "animate-pulse bg-zinc-500"}`} />
+          <i className={`h-1.5 w-1.5 rounded-full ${done ? "bg-good" : "animate-pulse bg-zinc-500"}`} />
           {done ? "first event received" : "waiting for the first event"}
         </span>
         <button
@@ -68,7 +68,7 @@ export function InstallConsole({ snippet, lines, compact = false }: { snippet: s
           onClick={copy}
           className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs text-zinc-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-zinc-50"
         >
-          {copied ? <Check className="h-4 w-4 text-[#4cc38a]" strokeWidth={1.5} /> : <Copy className="h-4 w-4" strokeWidth={1.5} />}
+          {copied ? <Check className="h-4 w-4 text-good" strokeWidth={1.5} /> : <Copy className="h-4 w-4" strokeWidth={1.5} />}
           <span aria-live="polite">{copied ? "Copied" : "Copy tag"}</span>
         </button>
       </div>
@@ -81,7 +81,7 @@ export function InstallConsole({ snippet, lines, compact = false }: { snippet: s
           {LOG.slice(0, shown).map((line, i) => (
             <p
               key={i}
-              className={line.tone === "ok" ? "text-[#4cc38a]" : line.tone === "text" ? "text-zinc-200" : "text-zinc-500"}
+              className={line.tone === "ok" ? "text-good" : line.tone === "text" ? "text-zinc-200" : "text-zinc-500"}
               style={{ animation: "stageIn 0.35s cubic-bezier(0.22,1,0.36,1) both" }}
             >
               {line.tone === "ok" ? "✓ " : "› "}

@@ -6,6 +6,7 @@ export type WorkspaceRole = z.infer<typeof WorkspaceRoleSchema>;
 export const ApiKeyScopeSchema = z.enum([
   "read:analytics",
   "write:events",
+  "write:deploys",
   "admin:workspace",
 ]);
 export type ApiKeyScope = z.infer<typeof ApiKeyScopeSchema>;
@@ -42,6 +43,8 @@ export const SiteSettingsSchema = z.object({
    * Prefer injecting the secret via a first-party proxy — never ship it on a public CDN page.
    */
   signingRequired: z.boolean().default(false),
+  /** The goal Release Impact reports conversion on. Unset means the first enabled goal. */
+  primaryGoalId: z.string().uuid().nullable().optional(),
   /** Server-only ingest HMAC secret (stripped from client-facing API responses). */
   signingSecret: z.string().min(16).max(128).optional(),
   /** SHA-256 hex of signingSecret for audit / "is configured" checks. */

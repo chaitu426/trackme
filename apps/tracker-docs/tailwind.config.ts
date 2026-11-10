@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { PALETTE_COLORS } from "../../packages/landing/src/palette";
 
 // Same design tokens as apps/web so the docs read as part of the product.
 const config: Config = {
@@ -12,7 +13,7 @@ const config: Config = {
       },
       colors: {
         // Muted text and icons reach 4.5:1 on the page and card surfaces.
-        zinc: { 500: "#85858b", 600: "#6e6e74" },
+        ...PALETTE_COLORS,
         sidebar: "var(--sidebar)",
         raised: "var(--raised)",
         background: "var(--background)",
