@@ -97,7 +97,7 @@ function seconds(value: number | null): string {
 
 /** Bounce above 70% on a page people land on, or exit above 60%, is worth a look. */
 const tone = (value: number | null, warn: number) =>
-  value !== null && value >= warn ? "text-[#e5484d]" : "text-zinc-300";
+  value !== null && value >= warn ? "text-bad" : "text-zinc-300";
 
 function EngagementTable({ rows }: { rows: PageEngagementRow[] }) {
   const totalViews = Math.max(rows.reduce((sum, r) => sum + r.pageviews, 0), 1);

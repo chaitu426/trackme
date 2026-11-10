@@ -356,7 +356,7 @@ export function MoneyTrailDemo() {
                     const last = i === sc.trail.length - 1;
                     return (
                       <li key={n.title} className="mt-in relative" style={{ animation: `mtIn 0.3s cubic-bezier(0.22,1,0.36,1) ${i * 0.18}s both` }}>
-                        <span className={`absolute -left-8 top-0 grid size-[23px] place-items-center rounded-full ${last ? "bg-[#e5484d]/15 text-[#e5484d]" : "bg-white/[0.08] text-zinc-300"}`}>
+                        <span className={`absolute -left-8 top-0 grid size-[23px] place-items-center rounded-full ${last ? "bg-bad/15 text-bad" : "bg-white/[0.08] text-zinc-300"}`}>
                           <Icon className="size-3" />
                         </span>
                         <p className={`text-sm leading-5 ${last ? "text-zinc-50" : "text-zinc-200"}`}>{n.title}</p>

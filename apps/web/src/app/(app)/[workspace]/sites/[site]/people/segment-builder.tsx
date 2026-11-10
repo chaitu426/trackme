@@ -206,7 +206,7 @@ export function SegmentBuilder({
               placeholder="Pro users who never checked out"
               className={`${input} w-full`}
             />
-            {touched && !name.trim() && <p className="text-xs text-[#e5484d]">Give the segment a name</p>}
+            {touched && !name.trim() && <p className="text-xs text-bad">Give the segment a name</p>}
           </div>
 
           {/* Who */}
@@ -275,7 +275,7 @@ export function SegmentBuilder({
                   type="button"
                   aria-label="Remove behaviour rule"
                   onClick={() => setDefinition((d) => ({ ...d, behavior: d.behavior.filter((_, idx) => idx !== i) }))}
-                  className="rounded p-2 text-zinc-500 hover:text-[#e5484d]"
+                  className="rounded p-2 text-zinc-500 hover:text-bad"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -299,7 +299,7 @@ export function SegmentBuilder({
             {!hasRules ? (
               <p className="text-xs text-zinc-500">Add a rule to see who matches.</p>
             ) : previewError ? (
-              <p className="flex items-center gap-2 text-xs text-[#e5484d]">
+              <p className="flex items-center gap-2 text-xs text-bad">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 {previewError}
               </p>
@@ -330,7 +330,7 @@ export function SegmentBuilder({
           </div>
 
           {saveError && (
-            <p className="flex items-center gap-2 rounded-lg border border-[#e5484d]/20 bg-[#e5484d]/10 px-3 py-2 text-xs text-[#e5484d]">
+            <p className="flex items-center gap-2 rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-xs text-bad">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {saveError}
             </p>
@@ -366,7 +366,7 @@ function ConditionRow({
   invalid: boolean;
 }) {
   return (
-    <div className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${invalid ? "border-[#e5484d]/30 bg-[#e5484d]/[0.04]" : "border-white/[0.07] bg-white/[0.015]"}`}>
+    <div className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 ${invalid ? "border-bad/30 bg-bad/[0.04]" : "border-white/[0.07] bg-white/[0.015]"}`}>
       <NativeSelect
         aria-label="Rule type"
         value={condition.field}
@@ -466,7 +466,7 @@ function ConditionRow({
         </>
       )}
 
-      <button type="button" aria-label="Remove rule" onClick={onRemove} className="ml-auto rounded p-2 text-zinc-500 hover:text-[#e5484d]">
+      <button type="button" aria-label="Remove rule" onClick={onRemove} className="ml-auto rounded p-2 text-zinc-500 hover:text-bad">
         <Trash2 className="h-4 w-4" />
       </button>
     </div>

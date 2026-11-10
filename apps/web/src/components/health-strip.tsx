@@ -16,7 +16,7 @@ export function bucketTone(b: StripBucket): "empty" | "ok" | "warn" | "bad" {
   return "ok";
 }
 
-const TONE_CLASS = { empty: "bg-white/[0.05]", ok: "bg-zinc-400", warn: "bg-amber-400", bad: "bg-[#e5484d]" } as const;
+const TONE_CLASS = { empty: "bg-white/[0.05]", ok: "bg-zinc-400", warn: "bg-warn", bad: "bg-bad" } as const;
 const time = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 /**

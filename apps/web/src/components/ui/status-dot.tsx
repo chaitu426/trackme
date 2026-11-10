@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-const TONES = { ok: "bg-[#4cc38a]", warn: "bg-amber-400", bad: "bg-[#e5484d]", idle: "bg-zinc-600" } as const;
+const TONES = { ok: "bg-good", warn: "bg-warn", bad: "bg-bad", idle: "bg-zinc-600" } as const;
 
 /** A small status mark with its word. Only `live` pulses, and only because the thing it marks is happening now. */
 export function StatusDot({ tone, label, live = false, className }: { tone: keyof typeof TONES; label: string; live?: boolean; className?: string }) {

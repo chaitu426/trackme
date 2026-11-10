@@ -151,7 +151,7 @@ function SegmentBreakdown({
           ))}
         </div>
       ) : error ? (
-        <p className="py-10 text-center text-xs text-[#e5484d]">The breakdown could not be loaded. Try another tab or refresh.</p>
+        <p className="py-10 text-center text-xs text-bad">The breakdown could not be loaded. Try another tab or refresh.</p>
       ) : rows.length === 0 ? (
         <p className="py-10 text-center text-xs text-zinc-500">No sessions entered this funnel in the period.</p>
       ) : (
@@ -191,7 +191,7 @@ function SegmentBreakdown({
                         <td key={step.order} className="border-t border-white/[0.06] px-3 py-3">
                           <p
                             className={`font-mono text-xs font-medium tabular-nums ${
-                              i === 0 ? "text-zinc-100" : behind ? "text-[#e5484d]" : share > avg + 4 ? "text-[#4cc38a]" : "text-zinc-100"
+                              i === 0 ? "text-zinc-100" : behind ? "text-bad" : share > avg + 4 ? "text-good" : "text-zinc-100"
                             }`}
                           >
                             {share}%
@@ -202,7 +202,7 @@ function SegmentBreakdown({
                     })}
                     <td className="border-t border-white/[0.06] px-4 py-3 text-right">
                       <p className="font-mono text-xs font-medium tabular-nums text-zinc-100">{final}%</p>
-                      {ri === weakest && <p className="text-xs font-medium text-[#e5484d]">weakest</p>}
+                      {ri === weakest && <p className="text-xs font-medium text-bad">weakest</p>}
                     </td>
                   </tr>
                 );
@@ -260,7 +260,7 @@ function TimeBetweenSteps({
           ))}
         </div>
       ) : error || !data ? (
-        <p className="py-10 text-center text-xs text-[#e5484d]">Timings could not be loaded.</p>
+        <p className="py-10 text-center text-xs text-bad">Timings could not be loaded.</p>
       ) : (
         <ul className="divide-y divide-white/[0.06]">
           {data.timing.map((t) => {
@@ -394,7 +394,7 @@ function WhatIf({ analysis }: { analysis: FunnelAnalysisResult }) {
           <p className="text-xs text-zinc-500">Projected completions</p>
           <p className="mt-1 flex items-baseline gap-2">
             <span className="font-mono text-2xl font-medium tabular-nums text-zinc-50">{projected.toLocaleString()}</span>
-            <span className={`font-mono text-xs font-medium tabular-nums ${extra > 0 ? "text-[#4cc38a]" : "text-zinc-500"}`}>
+            <span className={`font-mono text-xs font-medium tabular-nums ${extra > 0 ? "text-good" : "text-zinc-500"}`}>
               {extra > 0 ? `+${extra.toLocaleString()}` : "no change"}
             </span>
           </p>

@@ -35,7 +35,7 @@ export function RankedBars({ rows }: { rows: RankedRow[] }) {
                 <p className="truncate text-sm leading-5 text-zinc-200">{r.label}</p>
                 {r.meta && <p className="truncate text-xs leading-4 text-zinc-500">{r.meta}</p>}
               </div>
-              <p className={cn("shrink-0 text-right font-mono text-sm leading-5 tabular-nums", r.bad ? "text-[#e5484d]" : "text-zinc-50")}>{r.value}</p>
+              <p className={cn("shrink-0 text-right font-mono text-sm leading-5 tabular-nums", r.bad ? "text-bad" : "text-zinc-50")}>{r.value}</p>
             </div>
             <div className="mt-2 h-1 rounded-full bg-white/[0.06]" aria-hidden="true">
               <div

@@ -97,18 +97,18 @@ export function ApiKeysManager({
       <div className="space-y-4">
         {/* Just Created Token Banner */}
         {justCreated && (
-          <div className="p-4 rounded-xl bg-[#4cc38a]/10/80 border border-[#4cc38a] text-xs space-y-2 animate-fade-in">
+          <div className="p-4 rounded-xl bg-good/10/80 border border-good text-xs space-y-2 animate-fade-in">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-[#4cc38a] font-medium">
-                <CheckCircle2 className="w-4 h-4 text-[#4cc38a]" />
+              <div className="flex items-center space-x-2 text-good font-medium">
+                <CheckCircle2 className="w-4 h-4 text-good" />
                 <span>API Key Generated — Copy it now</span>
               </div>
               <CopyButton text={justCreated} label="Copy Token" />
             </div>
-            <p className="text-xs text-[#4cc38a]">
+            <p className="text-xs text-good">
               For security reasons, this token will never be displayed again.
             </p>
-            <div className="p-3 rounded-lg bg-white/[0.02] border border-[#4cc38a] font-mono text-xs text-zinc-50 break-all select-all">
+            <div className="p-3 rounded-lg bg-white/[0.02] border border-good font-mono text-xs text-zinc-50 break-all select-all">
               {justCreated}
             </div>
           </div>
@@ -147,7 +147,7 @@ export function ApiKeysManager({
                 {/* Revoke confirmation / action */}
                 {revokingId === key.id ? (
                   <div className="flex items-center space-x-2 animate-fade-in">
-                    <span className="text-xs text-[#e5484d] font-medium">Revoke key?</span>
+                    <span className="text-xs text-bad font-medium">Revoke key?</span>
                     <Button
                       variant="danger"
                       size="sm"
@@ -171,7 +171,7 @@ export function ApiKeysManager({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-zinc-400 hover:text-[#e5484d] hover:bg-[#e5484d]/10 text-xs h-7 px-3 transition shrink-0 self-start sm:self-center"
+                    className="text-zinc-400 hover:text-bad hover:bg-bad/10 text-xs h-7 px-3 transition shrink-0 self-start sm:self-center"
                     disabled={pending}
                     onClick={() => setRevokingId(key.id)}
                   >
@@ -185,7 +185,7 @@ export function ApiKeysManager({
         )}
 
         {error && (
-          <div className="flex items-center space-x-2 text-xs text-[#e5484d] bg-[#e5484d]/10 border border-[#e5484d] rounded-xl p-3">
+          <div className="flex items-center space-x-2 text-xs text-bad bg-bad/10 border border-bad rounded-xl p-3">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>

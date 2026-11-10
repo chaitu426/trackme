@@ -11,9 +11,9 @@ import { loadReleaseReport, parseWindowHours, WINDOW_CHOICES } from "@/lib/relea
 import { formatNumber, formatRelativeTime } from "@/lib/format";
 
 const VERDICT: Record<ReleaseReport["verdict"], { label: string; tone: string; summary: string }> = {
-  healthy: { label: "Healthy", tone: "border-[#4cc38a]/30 bg-[#4cc38a]/[0.07] text-[#4cc38a]", summary: "No measured metric got meaningfully worse." },
-  watch: { label: "Watch", tone: "border-amber-500/30 bg-amber-500/[0.07] text-amber-400", summary: "Something moved the wrong way, but not by much. Look before you act." },
-  regressed: { label: "Regressed", tone: "border-[#e5484d]/30 bg-[#e5484d]/[0.07] text-[#e5484d]", summary: "A metric got clearly and measurably worse after this release." },
+  healthy: { label: "Healthy", tone: "border-good/30 bg-good/[0.07] text-good", summary: "No measured metric got meaningfully worse." },
+  watch: { label: "Watch", tone: "border-warn/30 bg-warn/[0.07] text-warn", summary: "Something moved the wrong way, but not by much. Look before you act." },
+  regressed: { label: "Regressed", tone: "border-bad/30 bg-bad/[0.07] text-bad", summary: "A metric got clearly and measurably worse after this release." },
   collecting: { label: "Collecting data", tone: "border-border bg-white/[0.03] text-zinc-300", summary: "" },
 };
 
@@ -160,7 +160,7 @@ export default async function ReleaseReportPage({
                     <th scope="row" className="px-5 py-3 text-left font-normal text-zinc-200">{metric.label}</th>
                     <td className="px-3 py-3 text-right font-mono tabular-nums text-zinc-400">{value(metric.unit, metric.before)}</td>
                     <td className="px-3 py-3 text-right font-mono tabular-nums text-zinc-100">{value(metric.unit, metric.after)}</td>
-                    <td className={`px-3 py-3 text-right font-mono tabular-nums ${metric.worseBy !== null && metric.worseBy > 0.005 ? "text-[#e5484d]" : "text-zinc-300"}`}>
+                    <td className={`px-3 py-3 text-right font-mono tabular-nums ${metric.worseBy !== null && metric.worseBy > 0.005 ? "text-bad" : "text-zinc-300"}`}>
                       {change(metric)}
                     </td>
                     <td className="px-5 py-3 text-right text-zinc-400" title={metric.p === null ? undefined : `p = ${metric.p.toExponential(1)}, n = ${metric.n}`}>

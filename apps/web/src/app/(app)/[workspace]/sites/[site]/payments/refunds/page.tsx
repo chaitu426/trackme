@@ -108,7 +108,7 @@ async function Body({ siteId, base, range, currency }: { siteId: string; base: s
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="font-mono text-sm tabular-nums text-zinc-50">{formatMoney(row.amountMinor, row.currency)}</p>
-                    <p className={cn("text-xs", days < 0 ? "text-[#e5484d]" : days <= URGENT_DAYS ? "text-amber-400" : "text-zinc-500")}>
+                    <p className={cn("text-xs", days < 0 ? "text-bad" : days <= URGENT_DAYS ? "text-warn" : "text-zinc-500")}>
                       {days < 0 ? `${-days} ${-days === 1 ? "day" : "days"} overdue` : days === 0 ? "Due today" : `${days} ${days === 1 ? "day" : "days"} left`}
                     </p>
                   </div>
@@ -161,7 +161,7 @@ async function Body({ siteId, base, range, currency }: { siteId: string; base: s
               {rows.map((r: RefundDisputeRow) => (
                 <tr key={`${r.kind}:${r.paymentId}:${r.at}`} className="border-t border-white/[0.04]">
                   <td className="whitespace-nowrap px-5 py-2.5 text-xs text-zinc-400">{formatRelativeTime(r.at)}</td>
-                  <td className={cn("px-2 py-2.5 text-xs", r.kind === "disputed" ? "text-amber-400" : "text-zinc-300")}>{r.kind === "disputed" ? "Dispute" : "Refund"}</td>
+                  <td className={cn("px-2 py-2.5 text-xs", r.kind === "disputed" ? "text-warn" : "text-zinc-300")}>{r.kind === "disputed" ? "Dispute" : "Refund"}</td>
                   <td className="px-2 py-2.5 text-xs capitalize text-zinc-400">{words(r.reason)}</td>
                   <td className="px-2 py-2.5 text-xs capitalize text-zinc-400">
                     {r.method} · {r.gateway}

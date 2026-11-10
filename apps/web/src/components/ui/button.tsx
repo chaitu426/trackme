@@ -11,7 +11,7 @@ export const buttonVariants: Record<Variant, string> = {
   secondary: "border border-border bg-raised text-zinc-100 hover:border-white/[0.18] hover:bg-[#2a2a2d]",
   outline: "border border-border bg-transparent text-zinc-300 hover:border-white/[0.2] hover:text-zinc-50",
   ghost: "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100",
-  danger: "bg-[#e5484d]/[0.12] text-[#e5484d] hover:bg-[#e5484d]/[0.22]",
+  danger: "bg-bad/[0.12] text-bad hover:bg-bad/[0.22]",
 };
 
 export const buttonSizes: Record<Size, string> = {

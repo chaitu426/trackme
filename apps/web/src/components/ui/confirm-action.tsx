@@ -60,7 +60,7 @@ export function ConfirmAction({
                 setArmed(false);
                 onConfirm();
               }}
-              className={cn("press h-8 rounded-md px-2.5 text-xs font-medium", tone === "danger" ? "bg-[#e5484d]/15 text-[#e5484d] hover:bg-[#e5484d]/25" : "bg-white/[0.08] text-zinc-100 hover:bg-white/[0.14]")}
+              className={cn("press h-8 rounded-md px-2.5 text-xs font-medium", tone === "danger" ? "bg-bad/15 text-bad hover:bg-bad/25" : "bg-white/[0.08] text-zinc-100 hover:bg-white/[0.14]")}
             >
               {confirmLabel}
             </button>
@@ -73,7 +73,7 @@ export function ConfirmAction({
             aria-label={title}
             disabled={disabled || busy}
             onClick={() => setArmed(true)}
-            className={cn("press grid size-8 place-items-center rounded-md text-zinc-500 hover:bg-white/[0.06] disabled:opacity-40", tone === "danger" ? "hover:text-[#e5484d]" : "hover:text-zinc-100")}
+            className={cn("press grid size-8 place-items-center rounded-md text-zinc-500 hover:bg-white/[0.06] disabled:opacity-40", tone === "danger" ? "hover:text-bad" : "hover:text-zinc-100")}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

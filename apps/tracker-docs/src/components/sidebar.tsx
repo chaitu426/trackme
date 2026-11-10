@@ -85,7 +85,7 @@ export function Sidebar({ mobileOpen, onMobileClose, collapsed, onToggleCollapse
                         className={cn("h-4 w-4 shrink-0", isActive ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300")}
                       />
                       {!compact && <span className="flex-1 truncate">{item.title}</span>}
-                      {!compact && item.badge === "new" && <span className="font-mono text-xs text-[#4cc38a]">new</span>}
+                      {!compact && item.badge === "new" && <span className="font-mono text-xs text-good">new</span>}
                     </Link>
                   );
                 })}

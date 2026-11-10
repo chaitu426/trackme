@@ -122,7 +122,7 @@ export function SessionReplay({ events }: { events: UserTimelineEvent[] }) {
       {/* Frame: what the visitor was doing at this moment */}
       <div className="rounded-md border border-white/[0.07] bg-card">
         <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-2">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: action ? (goal ? "#f59e0b" : "#22c55e") : color }} />
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: action ? (goal ? "#fbbf24" : "#4cc38a") : color }} />
           <p key={event.eventId} className="reveal min-w-0 flex-1 truncate font-mono text-xs text-zinc-200" title={event.url || event.path}>
             {label}
           </p>
@@ -136,7 +136,7 @@ export function SessionReplay({ events }: { events: UserTimelineEvent[] }) {
               {action ? (
                 <span
                   className={`inline-flex items-center gap-1 rounded px-2 py-px text-xs font-medium ${
-                    goal ? "bg-white/[0.06] text-zinc-300" : "bg-[#4cc38a]/10 text-[#4cc38a]"
+                    goal ? "bg-white/[0.06] text-zinc-300" : "bg-good/10 text-good"
                   }`}
                 >
                   {goal && <Zap className="h-4 w-4" />}
@@ -190,7 +190,7 @@ export function SessionReplay({ events }: { events: UserTimelineEvent[] }) {
                   i === current ? "scale-150" : ""
                 }`}
                 style={{
-                  background: done ? (isAction ? (isGoal(s.event) ? "#f59e0b" : "#22c55e") : pageColor(s.event.path || s.event.url)) : "#3f3f46",
+                  background: done ? (isAction ? (isGoal(s.event) ? "#fbbf24" : "#4cc38a") : pageColor(s.event.path || s.event.url)) : "#3f3f46",
                 }}
               />
             </button>

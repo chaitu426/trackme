@@ -84,7 +84,7 @@ export async function ActiveVisitorsBadge({ siteId }: { siteId: string }) {
   const activeVisitors = await getActiveVisitorCount(siteId);
   return (
     <span className="reveal inline-flex h-8 items-center gap-2 rounded-lg border border-border bg-raised px-3 text-xs text-zinc-200">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" />
+      <span className="h-1.5 w-1.5 rounded-full bg-good pulse-live" />
       <span className="font-mono tabular-nums">{formatNumber(activeVisitors)}</span>
       <span className="text-zinc-400">online now</span>
     </span>
@@ -164,7 +164,7 @@ function MetricCell({
       <p className="text-xs leading-4 text-zinc-500">
         {change ? (
           <>
-            <span className={`font-mono tabular-nums ${isPositive ? "text-[#4cc38a]" : "text-[#e5484d]"}`}>{change}</span>{" "}
+            <span className={`font-mono tabular-nums ${isPositive ? "text-good" : "text-bad"}`}>{change}</span>{" "}
             {compareTo}
           </>
         ) : (

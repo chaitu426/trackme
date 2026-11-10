@@ -1,9 +1,9 @@
 import type { ErrorStatus } from "@trackme/contracts";
 
 const LEVEL_STYLE: Record<string, string> = {
-  fatal: "border-[#e5484d]/40 bg-[#e5484d]/15 text-[#e5484d]",
-  error: "border-[#e5484d]/25 bg-[#e5484d]/10 text-[#e5484d]",
-  warning: "border-amber-500/25 bg-amber-500/10 text-amber-400",
+  fatal: "border-bad/40 bg-bad/15 text-bad",
+  error: "border-bad/25 bg-bad/10 text-bad",
+  warning: "border-warn/25 bg-warn/10 text-warn",
   info: "border-border bg-white/[0.04] text-zinc-300",
 };
 
@@ -20,13 +20,13 @@ export function LevelBadge({ level }: { level: string }) {
 export function ErrorStatusChip({ status, regressedIn }: { status: ErrorStatus; regressedIn: string | null }) {
   if (regressedIn !== null) {
     return (
-      <span className="rounded-md border border-[#e5484d]/30 bg-[#e5484d]/10 px-1.5 py-px text-[11px] font-medium text-[#e5484d]">
+      <span className="rounded-md border border-bad/30 bg-bad/10 px-1.5 py-px text-[11px] font-medium text-bad">
         Regressed{regressedIn ? ` in ${regressedIn}` : ""}
       </span>
     );
   }
   if (status === "resolved") {
-    return <span className="rounded-md border border-[#4cc38a]/25 bg-[#4cc38a]/10 px-1.5 py-px text-[11px] font-medium text-[#4cc38a]">Resolved</span>;
+    return <span className="rounded-md border border-good/25 bg-good/10 px-1.5 py-px text-[11px] font-medium text-good">Resolved</span>;
   }
   if (status === "ignored") {
     return <span className="rounded-md border border-border bg-white/[0.04] px-1.5 py-px text-[11px] font-medium text-zinc-400">Ignored</span>;

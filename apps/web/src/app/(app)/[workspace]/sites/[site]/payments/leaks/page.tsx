@@ -122,7 +122,7 @@ async function Body({ siteId, base, range }: { siteId: string; base: string; ran
                     </td>
                     <td className="px-2 py-3 text-right font-mono tabular-nums text-zinc-300">{formatNumber(i.affected)}</td>
                     <td className="px-2 py-3 text-right font-mono text-xs tabular-nums text-zinc-400">
-                      <span className="text-[#e5484d]">{formatPercent(i.affectedConversion * 100)}</span> / {formatPercent(i.controlConversion * 100)}
+                      <span className="text-bad">{formatPercent(i.affectedConversion * 100)}</span> / {formatPercent(i.controlConversion * 100)}
                     </td>
                     <td className="px-2 py-3 text-right font-mono tabular-nums text-zinc-300">{money(i.associatedLossMinor ?? 0)}</td>
                     <td className="px-5 py-3 text-right font-mono tabular-nums text-zinc-50">{i.incrementalLossMinor ? money(i.incrementalLossMinor) : "None found"}</td>

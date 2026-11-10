@@ -11,6 +11,24 @@ One look for the whole app. Quiet graphite surfaces, the data carries the colour
 4. **Numbers line up.** Figures are tabular and right-aligned in a fixed column; cards in a row share row heights.
 5. **Motion is feedback.** Short (120 to 320 ms), springs without bounce, only opacity and transform move, nothing loops. People who ask for reduced motion get fades only.
 
+## The palette: Graphite and Signal
+
+One palette for the whole product, the dashboard, the docs and the landing page. Source of truth: `packages/landing/src/palette.ts`. Both Tailwind configs read it, `globals.css` repeats the values as CSS variables, and `palette.test.ts` fails if they disagree.
+
+| Role | Colour | Class |
+| --- | --- | --- |
+| Ink: sidebar, hero, footer, inset behind cards | `#0f0f10` | `bg-sidebar`, `bg-ink` |
+| Page | `#141415` | `bg-background` |
+| Card, menu, dialog | `#19191b` | `bg-card` |
+| Raised: active tab, secondary button | `#232325` | `bg-raised` |
+| Text, strong / body / muted / faint | `#ededed` `#a1a1aa` `#85858b` `#6e6e74` | `text-zinc-50`, `400`, `500`, `600` |
+| Good | `#4cc38a` | `text-good`, `bg-good/10`, `border-good/30` |
+| Warning | `#fbbf24` | `text-warn`, `bg-warn/10`, `border-warn/30` |
+| Wrong | `#e5484d` | `text-bad`, `bg-bad/10`, `border-bad/30` |
+| Chart: the one bright mark / the dim mark | `#ededed` / `#3f3f46` | `var(--chart)`, `var(--chart-muted)` |
+
+Rules: there is no brand hue; green, amber and red mean good, warning and wrong and are never decoration; a chart has one bright mark; signal tints are 10% fill, 30% border. `design-system.test.ts` rejects signal colours written as hex, any other green, red, amber or grey family, and the old signal hex values. Emails and canvas drawings that cannot use a class use the hex values above.
+
 ## Tokens
 
 | Token | Use |

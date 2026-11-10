@@ -20,7 +20,10 @@ const RULES: Array<{ name: string; pattern: RegExp; use: string; allow?: string[
   { name: "heavy shadows", pattern: /\bshadow-(?:lg|xl|2xl)\b/, use: "shadow-float on a floating surface, nothing on a card" },
   { name: "borders off the token", pattern: /border-white\/10(?![\d\[])/, use: "border-border" },
   { name: "a raw select", pattern: /<select\b/, use: "NativeSelect from ui/field, or SelectDropdown", allow: ["ui/field.tsx"] },
-  { name: "hue colours (the palette is graphite plus the success, warning and danger greens, ambers and reds)", pattern: /\b(?:bg|text|border|ring|from|to)-(?:violet|indigo|purple|fuchsia|pink|rose|emerald|teal|cyan|sky|blue)-\d{2,3}/, use: "text-[#4cc38a], text-amber-400, text-[#e5484d] or neutral zinc" },
+  { name: "hue colours (the palette is graphite plus the success, warning and danger greens, ambers and reds)", pattern: /\b(?:bg|text|border|ring|from|to)-(?:violet|indigo|purple|fuchsia|pink|rose|emerald|teal|cyan|sky|blue)-\d{2,3}/, use: "text-good, text-warn, text-bad or neutral zinc" },
+  { name: "signal colours written as hex (the palette has classes for them)", pattern: /\b(?:bg|text|border|ring|fill|stroke|from|to|via)-\[#(?:4cc38a|e5484d|fbbf24)\]/i, use: "text-good, bg-bad/10, border-warn/30 and the other palette classes" },
+  { name: "colours outside the palette (greens, reds and ambers other than good, bad and warn)", pattern: /\b(?:bg|text|border|ring|from|to|via)-(?:green|red|yellow|orange|lime|stone|gray|slate|amber)-\d{2,3}/, use: "text-good, text-bad, text-warn or neutral zinc" },
+  { name: "old signal hex values", pattern: /#(?:22c55e|ef4444|eab308|f59e0b)\b/i, use: "the palette values in packages/landing/src/palette.ts" },
   { name: "colour gradients", pattern: /\bbg-gradient-to-[a-z]+\b[^"'`]*\b(?:from|via|to)-(?!transparent|background|\[#0f0f10\])/, use: "flat surfaces; a gradient only fades a neutral to transparent" },
 ];
 

@@ -115,7 +115,7 @@ export function WorkspaceSitesClient({ workspace, initialSites, trackerScriptUrl
                     href={`/${workspace.slug}/sites/${site.domain}/realtime`}
                     className="press inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-raised px-3 text-xs font-medium text-zinc-100 hover:border-white/[0.18]"
                   >
-                    <Radio className="size-4 text-[#4cc38a]" aria-hidden="true" />
+                    <Radio className="size-4 text-good" aria-hidden="true" />
                     Live view
                   </Link>
                   <CopyButton text={snippetFor(site)} label="Copy snippet" variant="outline" />
@@ -128,7 +128,7 @@ export function WorkspaceSitesClient({ workspace, initialSites, trackerScriptUrl
                   </Link>
                   <Tooltip content={onlyOne ? "An organization needs at least one website" : "Remove website"}>
                     <span>
-                      <IconButton size="sm" variant="ghost" label="Remove website" icon={<Trash2 />} disabled={onlyOne} onClick={() => setRemoving(site)} className="hover:text-[#e5484d]" />
+                      <IconButton size="sm" variant="ghost" label="Remove website" icon={<Trash2 />} disabled={onlyOne} onClick={() => setRemoving(site)} className="hover:text-bad" />
                     </span>
                   </Tooltip>
                 </div>

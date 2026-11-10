@@ -115,7 +115,7 @@ export function Field({ id, label, icon: Icon, aside, trailing, hint, className 
 
 export function FormError({ children }: { children: React.ReactNode }) {
   return (
-    <Notice nonce={typeof children === "string" ? children : "error"} className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+    <Notice nonce={typeof children === "string" ? children : "error"} className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
       {children}
     </Notice>
   );

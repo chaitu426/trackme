@@ -53,9 +53,9 @@ export function H3({ children, id }: { children: React.ReactNode; id?: string })
 // Every callout sits on the same card surface; only the icon and its label change tone.
 const CALLOUTS = {
   note: { icon: Info, label: "Note", iconColor: "text-zinc-400", rule: "bg-zinc-600" },
-  tip: { icon: Lightbulb, label: "Tip", iconColor: "text-[#4cc38a]", rule: "bg-[#4cc38a]" },
-  warning: { icon: AlertTriangle, label: "Heads up", iconColor: "text-amber-400", rule: "bg-amber-400" },
-  danger: { icon: ShieldAlert, label: "Important", iconColor: "text-[#e5484d]", rule: "bg-[#e5484d]" },
+  tip: { icon: Lightbulb, label: "Tip", iconColor: "text-good", rule: "bg-good" },
+  warning: { icon: AlertTriangle, label: "Heads up", iconColor: "text-warn", rule: "bg-warn" },
+  danger: { icon: ShieldAlert, label: "Important", iconColor: "text-bad", rule: "bg-bad" },
 } as const;
 
 export function Callout({
@@ -135,7 +135,7 @@ export function ParamTable({ params, nameLabel = "Name" }: { params: Param[]; na
             <tr key={param.name}>
               <td className="whitespace-nowrap align-top">
                 <code>{param.name}</code>
-                {param.required && <span className="ml-2 font-mono text-[11px] text-[#e5484d]">required</span>}
+                {param.required && <span className="ml-2 font-mono text-[11px] text-bad">required</span>}
               </td>
               <td className="whitespace-nowrap align-top font-mono text-[12px] text-zinc-400">{param.type ?? ""}</td>
               <td className="whitespace-nowrap align-top font-mono text-[12px] text-zinc-500">{param.default ?? "—"}</td>
@@ -253,9 +253,9 @@ export function Pill({
 }) {
   const tones = {
     default: "border-white/[0.1] text-zinc-300",
-    success: "border-white/[0.1] text-[#4cc38a]",
-    warning: "border-white/[0.1] text-amber-400",
-    danger: "border-white/[0.1] text-[#e5484d]",
+    success: "border-white/[0.1] text-good",
+    warning: "border-white/[0.1] text-warn",
+    danger: "border-white/[0.1] text-bad",
   };
   return (
     <span className={cn("inline-flex items-center rounded-md border bg-[#19191b] px-2 py-0.5 font-mono text-[12px]", tones[tone])}>

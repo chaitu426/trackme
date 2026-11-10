@@ -73,7 +73,7 @@ function initialsOf(label: string): string {
 /** Green when seen in the last 5 minutes, blue within a day, grey otherwise. */
 function activityOf(lastSeenAt: string): { label: string; dot: string } {
   const age = Date.now() - new Date(lastSeenAt).getTime();
-  if (age < 5 * 60_000) return { label: "Active now", dot: "bg-[#4cc38a]" };
+  if (age < 5 * 60_000) return { label: "Active now", dot: "bg-good" };
   if (age < 24 * 3_600_000) return { label: "Active today", dot: "bg-zinc-300" };
   return { label: "Inactive", dot: "bg-zinc-600" };
 }
@@ -324,7 +324,7 @@ export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSear
           className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/[0.1] bg-[#232325]/80 px-3 font-mono text-xs text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors hover:border-white/[0.2]"
           title="Copy the identify() snippet"
         >
-          {copiedSnippet ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Code className="h-4 w-4 text-zinc-400" />}
+          {copiedSnippet ? <Check className="h-4 w-4 text-good" /> : <Code className="h-4 w-4 text-zinc-400" />}
           {copiedSnippet ? "Copied" : "trackme.identify()"}
         </button>}>
         Who your customers are, and the path each one took through <span className="font-mono text-zinc-300">{site.domain}</span>
@@ -421,7 +421,7 @@ export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSear
               )}
             </div>
             {confirmDelete ? (
-              <span className="flex items-center gap-1 rounded-md border border-[#e5484d]/25 bg-[#e5484d]/10 pl-2 text-xs text-[#e5484d]">
+              <span className="flex items-center gap-1 rounded-md border border-bad/25 bg-bad/10 pl-2 text-xs text-bad">
                 Delete segment?
                 <button type="button" onClick={() => void deleteSegment(activeSegment)} className="px-2 py-1 font-medium hover:text-white">
                   Yes
@@ -436,7 +436,7 @@ export function PeopleClient({ site, workspaceSlug, initialProfiles, initialSear
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Delete segment"
                 title="Delete segment"
-                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
+                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-bad/10 hover:text-bad"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -626,7 +626,7 @@ function EmptyState({ searching, onCopy, copied }: { searching: boolean; onCopy:
         <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-black/40 text-left">
           <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-zinc-300">{IDENTIFY_SNIPPET}</pre>
           <Button type="button" variant="secondary" size="sm" onClick={onCopy} className="absolute right-2 top-2">
-            {copied ? <Check className="text-[#4cc38a]" /> : <Copy />}
+            {copied ? <Check className="text-good" /> : <Copy />}
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
@@ -725,7 +725,7 @@ function ProfileDrawer({
                 title="Copy distinct ID"
               >
                 {user.distinctId}
-                {copiedId ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+                {copiedId ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
               </button>
             </div>
           </div>
@@ -814,8 +814,8 @@ function ProfileDrawer({
                 ))}
               </div>
             ) : error ? (
-              <div className="rounded-xl border border-dashed border-[#e5484d]/30 bg-[#e5484d]/5 p-6 text-center">
-                <p className="text-xs text-[#e5484d]">The activity stream could not be loaded.</p>
+              <div className="rounded-xl border border-dashed border-bad/30 bg-bad/5 p-6 text-center">
+                <p className="text-xs text-bad">The activity stream could not be loaded.</p>
                 <button
                   type="button"
                   onClick={onRetry}
@@ -931,7 +931,7 @@ function SessionCard({ session, defaultOpen }: { session: SessionGroup; defaultO
                 <li key={event.eventId} className="relative">
                   <span
                     className={`absolute -left-[17px] top-1.5 h-[7px] w-[7px] rounded-full ring-2 ring-[#19191b] ${
-                      goal ? "bg-white/[0.06]" : action ? "bg-[#4cc38a]" : "bg-zinc-500"
+                      goal ? "bg-white/[0.06]" : action ? "bg-good" : "bg-zinc-500"
                     }`}
                   />
                   <div className="flex items-baseline justify-between gap-3">
@@ -939,7 +939,7 @@ function SessionCard({ session, defaultOpen }: { session: SessionGroup; defaultO
                       {action && (
                         <span
                           className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-px text-xs font-medium ${
-                            goal ? "bg-white/[0.06] text-zinc-300" : "bg-[#4cc38a]/10 text-[#4cc38a]"
+                            goal ? "bg-white/[0.06] text-zinc-300" : "bg-good/10 text-good"
                           }`}
                         >
                           {goal && <Zap className="h-4 w-4" />}

@@ -111,8 +111,8 @@ function BlockView({ block, onOpen }: { block: Block; onOpen: (n: number) => voi
                 {s.cite && <Cite n={s.cite} onOpen={onOpen} />}
               </dt>
               <dd className="mt-0.5 flex items-baseline gap-2">
-                <span className={cn("font-mono text-xl tabular-nums", s.tone === "down" ? "text-[#e5484d]" : "text-zinc-50")}>{s.value}</span>
-                {s.delta && <span className={cn("font-mono text-xs tabular-nums", s.tone === "up" ? "text-[#4cc38a]" : "text-zinc-500")}>{s.delta}</span>}
+                <span className={cn("font-mono text-xl tabular-nums", s.tone === "down" ? "text-bad" : "text-zinc-50")}>{s.value}</span>
+                {s.delta && <span className={cn("font-mono text-xs tabular-nums", s.tone === "up" ? "text-good" : "text-zinc-500")}>{s.delta}</span>}
               </dd>
             </div>
           ))}
@@ -196,7 +196,7 @@ function BlockView({ block, onOpen }: { block: Block; onOpen: (n: number) => voi
     }
     case "callout":
       return (
-        <p className={cn("border-l-2 pl-3 text-xs leading-5", block.tone === "warn" ? "border-amber-400/60 text-amber-200/90" : "border-white/[0.14] text-zinc-400")}>
+        <p className={cn("border-l-2 pl-3 text-xs leading-5", block.tone === "warn" ? "border-warn/60 text-warn/90" : "border-white/[0.14] text-zinc-400")}>
           <CitedText text={block.text} onOpen={onOpen} />
         </p>
       );
@@ -309,7 +309,7 @@ function Working({ steps, shown }: { steps: Step[]; shown: number }) {
       {steps.length > 0 && (
         <span className="ml-auto flex shrink-0 items-center gap-1" aria-label={`${finished} of ${steps.length} steps done`}>
           {steps.map((s, i) => (
-            <span key={s.id} className={cn("size-1 rounded-full transition-colors duration-200", i < finished ? "bg-[#4cc38a]" : i === finished ? "bg-zinc-300" : "bg-white/[0.14]")} />
+            <span key={s.id} className={cn("size-1 rounded-full transition-colors duration-200", i < finished ? "bg-good" : i === finished ? "bg-zinc-300" : "bg-white/[0.14]")} />
           ))}
         </span>
       )}
@@ -407,7 +407,7 @@ export function TurnView({ turn, onFollow, site = "", range = "" }: { turn: Turn
                 <motion.div {...rise(a.blocks.length + 2)} className="flex flex-col gap-2">
                   <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className={cn("size-1.5 rounded-full", a.confidence === "high" ? "bg-[#4cc38a]" : a.confidence === "medium" ? "bg-amber-400" : "bg-zinc-500")} aria-hidden="true" />
+                      <span className={cn("size-1.5 rounded-full", a.confidence === "high" ? "bg-good" : a.confidence === "medium" ? "bg-warn" : "bg-zinc-500")} aria-hidden="true" />
                       {a.confidence === "high" ? "High" : a.confidence === "medium" ? "Medium" : "Low"} confidence
                     </span>
                     {a.assumptions.length > 0 && (
@@ -431,7 +431,7 @@ export function TurnView({ turn, onFollow, site = "", range = "" }: { turn: Turn
                       <motion.ol key="steps" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }} style={{ overflow: "hidden" }} className="flex flex-col gap-1.5">
                         {a.steps.map((s) => (
                           <li key={s.id} className="flex items-baseline gap-2 text-xs text-zinc-400">
-                            <Check className="size-3 shrink-0 translate-y-0.5 text-[#4cc38a]" aria-hidden="true" />
+                            <Check className="size-3 shrink-0 translate-y-0.5 text-good" aria-hidden="true" />
                             <span>{s.label}</span>
                             {s.tool && <span className="font-mono text-[11px] text-zinc-600">{s.tool.table} · {s.tool.rows.toLocaleString()} rows</span>}
                           </li>

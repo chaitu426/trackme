@@ -118,7 +118,7 @@ async function Body({ siteId, base }: { siteId: string; base: string }) {
                       <span className="text-zinc-100">
                         {when(i.startMs)} to {i.ongoing ? "now" : when(i.endMs)}
                       </span>
-                      <span className="font-mono text-xs tabular-nums text-[#e5484d]">
+                      <span className="font-mono text-xs tabular-nums text-bad">
                         {formatNumber(i.failed)} of {formatNumber(i.outcomes)} failed
                       </span>
                       {i.topFailure && <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-xs text-zinc-300">{i.topFailure}</code>}

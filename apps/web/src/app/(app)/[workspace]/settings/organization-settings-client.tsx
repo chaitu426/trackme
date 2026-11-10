@@ -249,7 +249,7 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
               </form>
 
               {inviteError && (
-                <Notice nonce={inviteNonce} className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+                <Notice nonce={inviteNonce} className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
                   {inviteError}
                 </Notice>
               )}
@@ -286,7 +286,7 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
                               <span className="block truncate text-zinc-100">{invite.email}</span>
                               <span className="flex items-center gap-2 text-xs">
                                 <span className="capitalize text-zinc-500">{invite.role}</span>
-                                <span className={cn(expiry.expired ? "text-[#e5484d]" : expiry.urgent ? "text-amber-400" : "text-zinc-500")}>{expiry.label}</span>
+                                <span className={cn(expiry.expired ? "text-bad" : expiry.urgent ? "text-warn" : "text-zinc-500")}>{expiry.label}</span>
                               </span>
                             </div>
                             <div className="flex shrink-0 items-center gap-1">

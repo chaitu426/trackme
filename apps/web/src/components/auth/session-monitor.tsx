@@ -64,7 +64,7 @@ export function SessionMonitor() {
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
         >
-          <Clock className="mt-0.5 size-4 shrink-0 text-amber-400" aria-hidden="true" />
+          <Clock className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-zinc-50">Your session is ending</p>
             <p className="mt-0.5 text-xs leading-5 text-zinc-400">

@@ -260,8 +260,8 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
               </Tooltip>
             </>
           ) : state.unseen ? (
-            <span className="mb-[7px] mr-2 inline-flex shrink-0 items-center gap-1.5 text-xs text-[#4cc38a]" role="status">
-              <span className="size-1.5 rounded-full bg-[#4cc38a]" aria-hidden="true" /> Ready
+            <span className="mb-[7px] mr-2 inline-flex shrink-0 items-center gap-1.5 text-xs text-good" role="status">
+              <span className="size-1.5 rounded-full bg-good" aria-hidden="true" /> Ready
             </span>
           ) : (
             !hasDraft && (

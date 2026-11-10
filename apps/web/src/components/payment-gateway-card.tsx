@@ -95,7 +95,7 @@ export function PaymentGatewayCard({ siteId, g }: { siteId: string; g: GatewaySt
             </button>
           </form>
           {state === "error" && (
-            <Notice nonce={nonce} className="mt-3 rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+            <Notice nonce={nonce} className="mt-3 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
               Could not save. Check the secret and try again.
             </Notice>
           )}

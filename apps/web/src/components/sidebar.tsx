@@ -233,7 +233,7 @@ export function Sidebar({
                       {!collapsed && <span className="relative flex-1 truncate">{item.label}</span>}
 
                       {!collapsed && item.badge === "live" && (
-                        <span className="relative h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" aria-label="Live" />
+                        <span className="relative h-1.5 w-1.5 rounded-full bg-good pulse-live" aria-label="Live" />
                       )}
                     </Link>
                   );
@@ -266,7 +266,7 @@ export function Sidebar({
             <div className="border-b border-white/[0.06] px-3 py-2">
               <p className="truncate text-xs font-medium text-zinc-100">{user.email}</p>
               <div className="mt-1 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-good" />
                 <span className="font-mono text-xs text-zinc-500">{workspace.slug} · {roleLabel}</span>
               </div>
             </div>
@@ -294,7 +294,7 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="press flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-[#e5484d] hover:bg-[#e5484d]/10"
+                className="press flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-bad hover:bg-bad/10"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Sign Out</span>

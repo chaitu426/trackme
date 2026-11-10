@@ -40,7 +40,7 @@ export async function OnlineNow({ siteId }: { siteId: string }) {
   const active = await getActiveVisitorCount(siteId);
   return (
     <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.08] bg-raised px-3 text-xs text-zinc-200">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#4cc38a] pulse-live" />
+      <span className="h-1.5 w-1.5 rounded-full bg-good pulse-live" />
       <span className="font-mono tabular-nums">{formatNumber(active)}</span>
       <span className="text-zinc-400">online now</span>
     </span>

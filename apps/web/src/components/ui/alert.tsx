@@ -7,9 +7,9 @@ type Tone = "info" | "success" | "warning" | "danger";
 
 const TONES: Record<Tone, { icon: LucideIcon; text: string }> = {
   info: { icon: Info, text: "text-zinc-400" },
-  success: { icon: CircleCheck, text: "text-[#4cc38a]" },
-  warning: { icon: AlertTriangle, text: "text-amber-400" },
-  danger: { icon: OctagonAlert, text: "text-[#e5484d]" },
+  success: { icon: CircleCheck, text: "text-good" },
+  warning: { icon: AlertTriangle, text: "text-warn" },
+  danger: { icon: OctagonAlert, text: "text-bad" },
 };
 
 /** A callout. Colour lives in the icon only; the surface stays neutral so it never competes with the data. */

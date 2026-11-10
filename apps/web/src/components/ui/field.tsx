@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export const inputClass =
   "h-10 w-full rounded-lg border border-border bg-white/[0.03] px-3 text-sm text-zinc-100 placeholder:text-zinc-600 " +
   "transition-colors duration-[120ms] hover:border-white/[0.14] focus:border-white/[0.28] focus:bg-white/[0.05] focus:outline-none " +
-  "disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-[#e5484d]/70";
+  "disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-bad/70";
 
 /** The same input at the height used inside dense forms (filter rows, step editors, modals). */
 export const inputCompactClass = inputClass.replace("h-10", "h-9");
@@ -54,7 +54,7 @@ export function Field({
       </label>
       {children}
       {error ? (
-        <p id={`${htmlFor}-error`} role="alert" className="text-xs text-[#e5484d]">
+        <p id={`${htmlFor}-error`} role="alert" className="text-xs text-bad">
           {error}
         </p>
       ) : (

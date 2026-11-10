@@ -60,7 +60,7 @@ export function ErrorStatusActions({
       ) : (
         <>
           <button type="button" className={BUTTON} disabled={busy !== null} onClick={() => void run("resolve")}>
-            {spinner("resolve") ?? <Check className="h-3.5 w-3.5 text-[#4cc38a]" />}
+            {spinner("resolve") ?? <Check className="h-3.5 w-3.5 text-good" />}
             Resolve
           </button>
           <button
@@ -80,7 +80,7 @@ export function ErrorStatusActions({
         </>
       )}
       {error && (
-        <span role="alert" className="text-xs text-[#e5484d]">
+        <span role="alert" className="text-xs text-bad">
           {error}
         </span>
       )}

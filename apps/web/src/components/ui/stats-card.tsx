@@ -44,7 +44,7 @@ export function StatsCard({ title, value, change, isPositive, compareTo = "vs pr
       <p className="flex min-w-0 items-baseline gap-x-2 whitespace-nowrap text-xs leading-4 text-zinc-500">
         {change ? (
           <>
-            <span className={cn("shrink-0 font-mono tabular-nums", isPositive ? "text-[#4cc38a]" : "text-[#e5484d]")}>{change}</span>
+            <span className={cn("shrink-0 font-mono tabular-nums", isPositive ? "text-good" : "text-bad")}>{change}</span>
             <span className="truncate">{compareTo}</span>
           </>
         ) : (

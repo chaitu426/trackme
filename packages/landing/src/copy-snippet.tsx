@@ -30,7 +30,7 @@ export function CopySnippet({ lines, text, label }: { lines: React.ReactNode; te
           onClick={copy}
           className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs text-zinc-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-zinc-50"
         >
-          {copied ? <Check className="h-4 w-4 text-[#4cc38a]" strokeWidth={1.5} /> : <Copy className="h-4 w-4" strokeWidth={1.5} />}
+          {copied ? <Check className="h-4 w-4 text-good" strokeWidth={1.5} /> : <Copy className="h-4 w-4" strokeWidth={1.5} />}
           <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
         </button>
       </div>

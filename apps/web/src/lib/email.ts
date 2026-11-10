@@ -359,7 +359,7 @@ export async function sendInviteEmail({
   const roleLabel =
     role === "admin" ? "Admin" : role === "viewer" ? "Viewer" : "Member";
   const roleBadgeColor =
-    role === "admin" ? "#f59e0b" : role === "viewer" ? "#adadad" : "#bcbcbc";
+    role === "admin" ? "#fbbf24" : role === "viewer" ? "#adadad" : "#bcbcbc";
 
   // Workspace and inviter names are chosen by users and can say anything. Text copies are single-line for the
   // subject and plain-text body; HTML copies are escaped, so a name cannot add links, markup or headers.

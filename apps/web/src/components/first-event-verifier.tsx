@@ -69,10 +69,10 @@ export function FirstEventVerifier({ siteId }: { siteId: string }) {
         }}
       >
         <div className="flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-[#4cc38a] shrink-0" />
+          <CheckCircle2 className="w-5 h-5 text-good shrink-0" />
           <div>
-            <div className="text-sm font-medium text-[#4cc38a]">First event received!</div>
-            <div className="text-xs text-[#4cc38a] mt-0.5">Your tracker is installed correctly.</div>
+            <div className="text-sm font-medium text-good">First event received!</div>
+            <div className="text-xs text-good mt-0.5">Your tracker is installed correctly.</div>
           </div>
         </div>
         <Badge variant="success">Verified</Badge>

@@ -151,7 +151,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
         <Container className="relative z-20 pb-16 pt-36 md:min-h-[640px] md:pt-44">
           <div className="max-w-[720px]">
             <span className="rise inline-flex h-7 items-center gap-2 rounded-lg border border-white/[0.1] px-3 text-[13px] text-zinc-300">
-              <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4cc38a]" />
+              <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
               Realtime, down to the last five minutes
             </span>
             <h1 className="rise mt-6 text-balance text-[44px] font-medium leading-[46px] tracking-[-0.035em] text-zinc-50 [animation-delay:60ms] sm:text-[60px] sm:leading-[62px] lg:text-[68px] lg:leading-[70px]">

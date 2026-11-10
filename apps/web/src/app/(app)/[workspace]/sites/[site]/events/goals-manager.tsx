@@ -220,9 +220,9 @@ export function GoalsManager({
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
             <span className="text-xs font-medium">Avg. Conversion Rate</span>
-            <TrendingUp className="w-4 h-4 text-[#4cc38a]" />
+            <TrendingUp className="w-4 h-4 text-good" />
           </div>
-          <div className="text-2xl font-medium text-[#4cc38a]">
+          <div className="text-2xl font-medium text-good">
             {avgConvRate}%
           </div>
           <p className="text-xs text-zinc-500 mt-1">Simple average of active goals</p>
@@ -335,7 +335,7 @@ export function GoalsManager({
                 </div>
               </div>
 
-              {error && <div className="text-[#e5484d] text-xs">{error}</div>}
+              {error && <div className="text-bad text-xs">{error}</div>}
 
               <div className="flex justify-end space-x-2 pt-2">
                 <Button
@@ -424,7 +424,7 @@ export function GoalsManager({
                             title={isEnabled ? "Pause goal" : "Resume goal"}
                             className={`p-1 rounded-md transition ${
                               isEnabled
-                                ? "text-[#4cc38a] hover:bg-[#4cc38a]/10"
+                                ? "text-good hover:bg-good/10"
                                 : "text-zinc-500 hover:bg-white/[0.04]"
                             }`}
                           >
@@ -464,7 +464,7 @@ export function GoalsManager({
                       </div>
 
                       <div className="text-right">
-                        <div className="text-base font-medium text-[#4cc38a]">
+                        <div className="text-base font-medium text-good">
                           {goal.conversionRate || 0}%
                         </div>
                         <div className="text-xs font-medium text-zinc-400">
@@ -486,7 +486,7 @@ export function GoalsManager({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-[#e5484d] hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
+                        className="h-8 px-2 text-bad hover:bg-bad/10 hover:text-bad"
                         disabled={pending}
                         onClick={() => setConfirmGoalId(goal.id)}
                       >

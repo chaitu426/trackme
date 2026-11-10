@@ -11,8 +11,8 @@ export function Badge({
 }) {
   const variantStyles: Record<string, string> = {
     default: "border border-border bg-white/[0.04] text-zinc-300",
-    success: "border border-border bg-white/[0.04] text-[#4cc38a]",
-    warning: "border border-border bg-white/[0.04] text-amber-400",
+    success: "border border-border bg-white/[0.04] text-good",
+    warning: "border border-border bg-white/[0.04] text-warn",
     outline: "border border-border bg-transparent text-zinc-400",
     live: "border border-border bg-white/[0.04] font-mono text-zinc-200",
   };

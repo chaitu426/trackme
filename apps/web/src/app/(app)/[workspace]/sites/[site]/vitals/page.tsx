@@ -75,18 +75,18 @@ const METRIC_CONFIGS: Record<string, MetricConfig> = {
 
 const ratingStyles = {
   good: {
-    badge: "bg-[#4cc38a]/10 text-[#4cc38a] border-[#4cc38a]/20",
-    bar: "bg-[#4cc38a]",
+    badge: "bg-good/10 text-good border-good/20",
+    bar: "bg-good",
     label: "Good",
   },
   "needs-improvement": {
-    badge: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    bar: "bg-amber-400",
+    badge: "bg-warn/10 text-warn border-warn/20",
+    bar: "bg-warn",
     label: "Needs Work",
   },
   poor: {
-    badge: "bg-[#e5484d]/10 text-[#e5484d] border-[#e5484d]/20",
-    bar: "bg-[#e5484d]",
+    badge: "bg-bad/10 text-bad border-bad/20",
+    bar: "bg-bad",
     label: "Poor",
   },
 };
@@ -236,12 +236,12 @@ async function VitalsGrid({ workspaceId, siteId, range }: { workspaceId: string;
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs text-zinc-400">
                     <span>Performance Distribution</span>
-                    <span className="font-medium text-[#4cc38a]">{goodPct}% Good</span>
+                    <span className="font-medium text-good">{goodPct}% Good</span>
                   </div>
                   <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                    <div style={{ width: `${goodPct}%` }} className="bg-[#4cc38a] h-full transition-colors" />
-                    <div style={{ width: `${needsPct}%` }} className="bg-amber-400 h-full transition-colors" />
-                    <div style={{ width: `${poorPct}%` }} className="bg-[#e5484d] h-full transition-colors" />
+                    <div style={{ width: `${goodPct}%` }} className="bg-good h-full transition-colors" />
+                    <div style={{ width: `${needsPct}%` }} className="bg-warn h-full transition-colors" />
+                    <div style={{ width: `${poorPct}%` }} className="bg-bad h-full transition-colors" />
                   </div>
                   <div className="flex justify-between font-mono text-xs text-zinc-500">
                     <span>Target: {config.goodThreshold}</span>

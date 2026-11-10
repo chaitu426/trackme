@@ -128,7 +128,7 @@ export function RealtimeLive({ siteId, initial, initialEvents }: Props) {
         art="pulse"
         actions={
           <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.08] bg-raised px-3 text-xs text-zinc-200">
-            <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-[#4cc38a] pulse-live" : "bg-zinc-500"}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-good pulse-live" : "bg-zinc-500"}`} />
             {connected ? "Live" : "Connecting"}
           </span>
         }
@@ -155,7 +155,7 @@ export function RealtimeLive({ siteId, initial, initialEvents }: Props) {
                     ? "New visitors since the previous update"
                     : `Visitors ${visitorTrend.direction === "up" ? "increased" : "decreased"} ${formatTrendPercent(visitorTrend.percent)} percent since the previous update`
                 }
-                className={`font-mono text-xs tabular-nums ${visitorTrend.direction === "up" ? "text-[#4cc38a]" : "text-[#e5484d]"}`}
+                className={`font-mono text-xs tabular-nums ${visitorTrend.direction === "up" ? "text-good" : "text-bad"}`}
               >
                 {visitorTrend.direction === "up" ? "↑" : "↓"} {isNewVisitorTrend ? "New" : `${formatTrendPercent(visitorTrend.percent)}%`}
               </span>
@@ -169,7 +169,7 @@ export function RealtimeLive({ siteId, initial, initialEvents }: Props) {
 
           <div className="relative flex items-center justify-between rounded-lg border border-white/[0.08] bg-sidebar px-3 py-2 text-xs text-zinc-400">
             <span className="flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-[#4cc38a]" : "bg-zinc-500"}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-good" : "bg-zinc-500"}`} />
               Event stream
             </span>
             <span className="font-mono text-xs text-zinc-300">{connected ? "connected" : "reconnecting…"}</span>

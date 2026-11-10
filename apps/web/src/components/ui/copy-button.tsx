@@ -54,8 +54,8 @@ export function CopyButton({ text, label, className, variant = "secondary" }: Co
         <motion.span key={copied ? "done" : "idle"} className="inline-flex items-center gap-1.5" initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -3 }} transition={{ duration: 0.12 }}>
           {copied ? (
             <>
-              <Check className="text-[#4cc38a]" aria-hidden="true" />
-              <span className="text-[#4cc38a]">Copied</span>
+              <Check className="text-good" aria-hidden="true" />
+              <span className="text-good">Copied</span>
             </>
           ) : (
             <>

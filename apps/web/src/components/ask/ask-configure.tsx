@@ -111,7 +111,7 @@ export function AskConfigure({ scope, sites, onChange }: { scope: AskScope; site
         <h4 className="mb-2 text-xs font-medium text-zinc-400">What I can and cannot do</h4>
         <ul className="flex flex-col gap-1.5 text-xs leading-5">
           <li className="flex items-start gap-2 text-zinc-300">
-            <Check className="mt-0.5 size-3.5 shrink-0 text-[#4cc38a]" aria-hidden="true" /> Read the data above and run read-only queries on it
+            <Check className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /> Read the data above and run read-only queries on it
           </li>
           <li className="flex items-start gap-2 text-zinc-300">
             <Eye className="mt-0.5 size-3.5 shrink-0 text-zinc-400" aria-hidden="true" /> Show you every query and every source behind every number

@@ -322,7 +322,7 @@ function FunnelView({
           label="Completed"
           value={analysis ? analysis.totalCompleted.toLocaleString() : "–"}
           hint={steps.length ? `Reached “${steps[steps.length - 1]!.name}”` : "Visitors finishing every step"}
-          accent="text-[#4cc38a]"
+          accent="text-good"
         />
         <SummaryTile
           label="Conversion"
@@ -334,7 +334,7 @@ function FunnelView({
           label="Biggest drop-off"
           value={worst ? `${worst.dropOffRate}%` : "–"}
           hint={worst && worstPrev ? `${worstPrev.name} → ${worst.name}` : hasTraffic ? "No sessions lost" : "Needs traffic"}
-          accent={worst ? "text-[#e5484d]" : undefined}
+          accent={worst ? "text-bad" : undefined}
         />
       </div>
 
@@ -374,7 +374,7 @@ function FunnelView({
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
             {confirmDelete ? (
-              <div className="flex items-center gap-1 rounded-md border border-[#e5484d]/25 bg-[#e5484d]/10 pl-2 text-xs text-[#e5484d]">
+              <div className="flex items-center gap-1 rounded-md border border-bad/25 bg-bad/10 pl-2 text-xs text-bad">
                 Delete?
                 <button type="button" onClick={onDelete} className="px-2 py-1 font-medium hover:text-white">
                   Yes
@@ -389,7 +389,7 @@ function FunnelView({
                 onClick={onAskDelete}
                 aria-label="Delete funnel"
                 title="Delete funnel"
-                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
+                className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-bad/10 hover:text-bad"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -408,8 +408,8 @@ function FunnelView({
             ))}
           </div>
         ) : error ? (
-          <div className="mt-4 space-y-3 rounded-xl border border-dashed border-[#e5484d]/30 bg-[#e5484d]/5 p-8 text-center">
-            <p className="text-xs text-[#e5484d]">{error}</p>
+          <div className="mt-4 space-y-3 rounded-xl border border-dashed border-bad/30 bg-bad/5 p-8 text-center">
+            <p className="text-xs text-bad">{error}</p>
             <button
               type="button"
               onClick={onRefresh}
@@ -457,7 +457,7 @@ function StepRow({ step, first, last }: { step: FunnelStepResult; first: boolean
       <div
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums ${
           last
-            ? "border-[#4cc38a]/30 bg-[#4cc38a]/10 text-[#4cc38a]"
+            ? "border-good/30 bg-good/10 text-good"
             : "border-white/[0.1] bg-white/[0.04] text-zinc-300"
         }`}
       >
@@ -480,7 +480,7 @@ function StepRow({ step, first, last }: { step: FunnelStepResult; first: boolean
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.05]">
           <div
-            className={`h-full rounded-full ${last ? "bg-[#4cc38a]/70" : "bg-white/[0.07]"}`}
+            className={`h-full rounded-full ${last ? "bg-good/70" : "bg-white/[0.07]"}`}
             style={{ width: `${step.conversions > 0 ? Math.max(pct, 1.5) : 0}%` }}
           />
         </div>
@@ -493,14 +493,14 @@ function Transition({ next, highlight }: { next: FunnelStepResult; highlight: bo
   return (
     <div className="flex items-center gap-4 py-2">
       <div className="flex w-8 shrink-0 justify-center" aria-hidden>
-        <span className={`h-6 w-px ${highlight ? "bg-[#e5484d]/40" : "bg-white/[0.1]"}`} />
+        <span className={`h-6 w-px ${highlight ? "bg-bad/40" : "bg-white/[0.1]"}`} />
       </div>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
         <span className="font-medium text-zinc-400">{next.conversionRateFromPrevious}% continue</span>
         {next.dropOffCount > 0 ? (
           <span
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium ${
-              highlight ? "bg-[#e5484d]/15 text-[#e5484d] ring-1 ring-[#e5484d]/30" : "bg-white/[0.04] text-zinc-400"
+              highlight ? "bg-bad/15 text-bad ring-1 ring-bad/30" : "bg-white/[0.04] text-zinc-400"
             }`}
           >
             <TrendingDown className="h-4 w-4" />
@@ -509,7 +509,7 @@ function Transition({ next, highlight }: { next: FunnelStepResult; highlight: bo
         ) : (
           <span className="text-zinc-600">no one left here</span>
         )}
-        {highlight && <span className="text-xs font-medium text-[#e5484d]">Biggest leak</span>}
+        {highlight && <span className="text-xs font-medium text-bad">Biggest leak</span>}
       </div>
     </div>
   );
@@ -717,7 +717,7 @@ function CreateFunnelDialog({
                 className={input}
                 aria-invalid={touched && !!nameError}
               />
-              {touched && nameError && <p className="text-xs text-[#e5484d]">{nameError}</p>}
+              {touched && nameError && <p className="text-xs text-bad">{nameError}</p>}
             </div>
             <div className="space-y-2">
               <label htmlFor="funnel-desc" className="text-xs font-medium text-zinc-400">
@@ -760,7 +760,7 @@ function CreateFunnelDialog({
                     </span>
                     <div
                       className={`flex-1 space-y-2 rounded-xl border p-3 ${
-                        error ? "border-[#e5484d]/30 bg-[#e5484d]/[0.04]" : "border-white/[0.07] bg-white/[0.015]"
+                        error ? "border-bad/30 bg-bad/[0.04]" : "border-white/[0.07] bg-white/[0.015]"
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -809,7 +809,7 @@ function CreateFunnelDialog({
                             onClick={() => remove(i)}
                             disabled={steps.length <= 2}
                             aria-label={`Remove step ${i + 1}`}
-                            className="rounded p-2 text-zinc-500 hover:text-[#e5484d] disabled:opacity-25"
+                            className="rounded p-2 text-zinc-500 hover:text-bad disabled:opacity-25"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -828,7 +828,7 @@ function CreateFunnelDialog({
                             )}
                         </p>
                       )}
-                      {error && <p className="text-xs text-[#e5484d]">{error}</p>}
+                      {error && <p className="text-xs text-bad">{error}</p>}
                     </div>
                   </li>
                 );
@@ -855,7 +855,7 @@ function CreateFunnelDialog({
           </p>
 
           {saveError && (
-            <p className="flex items-center gap-2 rounded-lg border border-[#e5484d]/20 bg-[#e5484d]/10 px-3 py-2 text-xs text-[#e5484d]">
+            <p className="flex items-center gap-2 rounded-lg border border-bad/20 bg-bad/10 px-3 py-2 text-xs text-bad">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {saveError}
             </p>

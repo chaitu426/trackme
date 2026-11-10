@@ -194,7 +194,7 @@ export function UserTimeline({
           className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] px-2.5 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-white/[0.05]"
           title="Copy a link that opens this person"
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-[#4cc38a]" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-3.5 w-3.5 text-good" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? "Copied" : "Copy link"}
         </button>
       </div>
@@ -207,8 +207,8 @@ export function UserTimeline({
           ))}
         </div>
       ) : failed && items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[#e5484d]/30 bg-[#e5484d]/5 p-6 text-center">
-          <p className="text-xs text-[#e5484d]">The timeline could not be loaded.</p>
+        <div className="rounded-xl border border-dashed border-bad/30 bg-bad/5 p-6 text-center">
+          <p className="text-xs text-bad">The timeline could not be loaded.</p>
           <button type="button" onClick={() => void load()} className="mt-2 rounded-md border border-white/[0.1] px-3 py-1 text-xs text-zinc-200 hover:bg-white/[0.05]">
             Retry
           </button>
@@ -238,7 +238,7 @@ export function UserTimeline({
                     {group.items.map((item) => (
                       <li key={item.eventId} className="flex items-start gap-3 px-3 py-2 text-xs">
                         <span
-                          className={`mt-0.5 flex shrink-0 items-center gap-1 ${item.severity === "error" ? "text-[#e5484d]" : item.severity === "warning" ? "text-amber-400" : "text-zinc-500"}`}
+                          className={`mt-0.5 flex shrink-0 items-center gap-1 ${item.severity === "error" ? "text-bad" : item.severity === "warning" ? "text-warn" : "text-zinc-500"}`}
                           title={KIND_LABEL[item.kind] ?? item.kind}
                         >
                           {KIND_ICON[item.kind] ?? null}

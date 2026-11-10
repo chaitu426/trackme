@@ -28,7 +28,7 @@ export function MoneyTrail({ trail, onOpen, fresh }: { trail: Trail; onOpen: (n:
           const last = i === trail.nodes.length - 1;
           return (
             <motion.li key={i} className="relative" initial={animate ? { opacity: 0, x: -6 } : false} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.28, delay: animate ? 0.18 * i : 0, ease: EASE }}>
-              <span className={cn("absolute -left-8 top-0 grid size-[23px] place-items-center rounded-full", last ? "bg-[#e5484d]/15 text-[#e5484d]" : "bg-white/[0.08] text-zinc-300")}>
+              <span className={cn("absolute -left-8 top-0 grid size-[23px] place-items-center rounded-full", last ? "bg-bad/15 text-bad" : "bg-white/[0.08] text-zinc-300")}>
                 <Icon className="size-3" />
               </span>
               <p className={cn("text-sm leading-5", last ? "text-zinc-50" : "text-zinc-200")}>
@@ -103,7 +103,7 @@ function Watch({ spec }: { spec: WatchSpec }) {
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {armed ? (
-          <button type="button" onClick={disarm} className="press inline-flex items-center gap-1.5 rounded-full bg-[#4cc38a]/10 px-3 py-1.5 text-xs text-[#4cc38a] hover:bg-[#4cc38a]/15" aria-label="Stop watching">
+          <button type="button" onClick={disarm} className="press inline-flex items-center gap-1.5 rounded-full bg-good/10 px-3 py-1.5 text-xs text-good hover:bg-good/15" aria-label="Stop watching">
             <BellRing className="size-3.5" aria-hidden="true" /> Watching · {armed.join(", ")}
           </button>
         ) : (
@@ -153,7 +153,7 @@ function CopyAction({ label, done, icon: Icon, text }: { label: string; done: st
   };
   return (
     <button type="button" onClick={run} className="press inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1.5 text-xs text-zinc-400 hover:bg-white/[0.1] hover:text-zinc-100">
-      {copied ? <Check className="size-3.5 text-[#4cc38a]" aria-hidden="true" /> : <Icon className="size-3.5" />}
+      {copied ? <Check className="size-3.5 text-good" aria-hidden="true" /> : <Icon className="size-3.5" />}
       <span role="status">{copied ? done : label}</span>
     </button>
   );

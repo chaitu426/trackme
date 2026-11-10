@@ -303,7 +303,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
 
   const ErrorNote = () =>
     error ? (
-      <Notice nonce={errorNonce} className="rounded-lg border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-sm text-[#e5484d]">
+      <Notice nonce={errorNonce} className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
         {error}
       </Notice>
     ) : null;
@@ -454,7 +454,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                   <div className="flex h-11 items-center justify-between border-b border-white/[0.08] pl-4 pr-2">
                     <span className="font-mono text-xs text-zinc-500">{created.site.domain}</span>
                     <button type="button" onClick={handleCopySnippet} className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs text-zinc-300 transition-colors duration-150 hover:bg-white/[0.06] hover:text-zinc-50">
-                      {copiedSnippet ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Copy className="h-4 w-4" />}
+                      {copiedSnippet ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
                       <span aria-live="polite">{copiedSnippet ? "Copied" : "Copy"}</span>
                     </button>
                   </div>
@@ -491,7 +491,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                   <div className="mt-5 flex flex-col items-start justify-between gap-3 border-t border-white/[0.08] pt-4 text-sm sm:flex-row sm:items-center">
                     <span className="text-zinc-400">Not deployed yet?</span>
                     <button type="button" onClick={handleSendTestEvent} disabled={sendingTestEvent} className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.12] bg-raised px-3 text-xs text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors duration-150 hover:border-white/[0.24] disabled:opacity-60">
-                      {sendingTestEvent ? <MatrixSpinner /> : testEventSent ? <Check className="h-4 w-4 text-[#4cc38a]" /> : <Zap className="h-4 w-4" />}
+                      {sendingTestEvent ? <MatrixSpinner /> : testEventSent ? <Check className="h-4 w-4 text-good" /> : <Zap className="h-4 w-4" />}
                       {testEventSent ? "Test event sent" : "Send a test event"}
                     </button>
                   </div>
@@ -551,10 +551,10 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                           <div className="flex min-w-0 items-center gap-3">
                             {s.state === "sending" && <MatrixSpinner className="shrink-0 text-zinc-400" />}
                             {s.state === "sent" && <DrawCheck size={16} className="shrink-0" />}
-                            {s.state === "error" && <XCircle className="h-4 w-4 shrink-0 text-[#e5484d]" />}
+                            {s.state === "error" && <XCircle className="h-4 w-4 shrink-0 text-bad" />}
                             <div className="min-w-0">
                               <span className="block truncate text-zinc-100">{s.email}</span>
-                              {s.state === "error" && <span className="text-xs text-[#e5484d]">{s.error}</span>}
+                              {s.state === "error" && <span className="text-xs text-bad">{s.error}</span>}
                               {s.state === "sent" && expiry && (
                                 <span className={`mt-0.5 flex items-center gap-1 text-xs ${expiry.urgent ? "text-zinc-200" : "text-zinc-500"}`}>
                                   <Clock className="h-3 w-3" />
@@ -570,7 +570,7 @@ export function OnboardingForm({ existing }: { existing: { id: string; name: str
                                 <RefreshCw className="h-4 w-4" />
                               </button>
                             )}
-                            <button type="button" onClick={() => handleRemoveInviteStatus(s.email)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-[#e5484d]" title="Remove" aria-label="Remove">
+                            <button type="button" onClick={() => handleRemoveInviteStatus(s.email)} className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-bad" title="Remove" aria-label="Remove">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>

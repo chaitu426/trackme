@@ -7,7 +7,7 @@ export function UsageQuotaCard({ usage }: { usage: WorkspaceUsage }) {
 
   const barColor =
     status === "exceeded"
-      ? "bg-[#e5484d]"
+      ? "bg-bad"
       : status === "warning"
       ? "bg-white/[0.06]"
       : "bg-zinc-100";

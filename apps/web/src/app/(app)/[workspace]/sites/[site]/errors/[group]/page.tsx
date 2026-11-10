@@ -131,7 +131,7 @@ export default async function ErrorIssuePage({
       </PageHeader>
 
       {status?.regressedAt && (
-        <p role="status" className="rounded-xl border border-[#e5484d]/25 bg-[#e5484d]/[0.06] px-4 py-3 text-xs text-zinc-200">
+        <p role="status" className="rounded-xl border border-bad/25 bg-bad/[0.06] px-4 py-3 text-xs text-zinc-200">
           This issue was resolved and came back {formatRelativeTime(status.regressedAt.toISOString())}
           {status.regressedIn ? <> in <span className="font-mono">{status.regressedIn}</span></> : null}. It is open again.
         </p>

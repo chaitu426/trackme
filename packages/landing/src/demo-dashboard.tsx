@@ -545,7 +545,7 @@ function Overview({ onOpen, filters }: { onOpen: (view: DemoViewId) => void; fil
             </button>
           )}
           <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/[0.08] bg-[#232325] px-3 text-xs text-zinc-200">
-            <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4cc38a]" />
+            <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
             <span className="font-mono tabular-nums">{online}</span>
             <span className="text-zinc-400">online now</span>
           </span>
@@ -754,7 +754,7 @@ export function DemoDashboard({ getStarted = "/signup", startLabel = "Create wor
       >
         <Icon className={`h-4 w-4 shrink-0 ${active ? "text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"}`} strokeWidth={1.5} />
         {!collapsed && <span className="flex-1 truncate text-left">{item.label}</span>}
-        {!collapsed && item.live && <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4cc38a]" aria-label="Live" />}
+        {!collapsed && item.live && <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" aria-label="Live" />}
       </button>
     );
   };
