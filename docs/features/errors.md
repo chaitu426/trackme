@@ -1,6 +1,6 @@
 # Error Tracking: as built (Phase 1A, backend)
 
-Plan: [`phase1-plan.md`](phase1-plan.md). Foundation: [`suite-foundation.md`](suite-foundation.md).
+Plan: [`docs/plans/phase1-plan.md`](../plans/phase1-plan.md). Foundation: [`docs/architecture/suite-foundation.md`](../architecture/suite-foundation.md).
 **Status:** the SDK, the pipeline from the edge to storage and the storage are built and verified. Issue status,
 source maps are **not** built yet.
 
@@ -56,7 +56,7 @@ a bot error and a pageview: one issue, 4 distinct users, per-release daily count
 in storage; test rows removed. **Not verified:** the full Kafka path, load, and tenant isolation tests.
 
 ## SDK
-Built and verified in a real browser: see [`sdk.md`](sdk.md) (options, API, what is collected, sizes).
+Built and verified in a real browser: see [`docs/features/sdk.md`](sdk.md) (options, API, what is collected, sizes).
 
 ## Dashboard (Errors & Reliability > Error Tracking)
 In the sidebar under Errors & Reliability.

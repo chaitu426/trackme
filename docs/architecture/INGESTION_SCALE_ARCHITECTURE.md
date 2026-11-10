@@ -3,9 +3,9 @@
 Status: proposal, 2026-11-08. Branch `fet/tracer-doc-update`, read from the working copy
 (including the uncommitted async-queue and fused-gate work).
 
-Builds on, and where noted corrects: [`ARCHITECTURE_OPTIMIZATION_PLAN.md`](ARCHITECTURE_OPTIMIZATION_PLAN.md),
-[`INGESTION_FAILURE_ANALYSIS.md`](INGESTION_FAILURE_ANALYSIS.md) and
-[`INGESTION_FIX_PLAN.md`](INGESTION_FIX_PLAN.md). Those documents fixed the load-test incident. This one asks
+Builds on, and where noted corrects: [`docs/architecture/ARCHITECTURE_OPTIMIZATION_PLAN.md`](ARCHITECTURE_OPTIMIZATION_PLAN.md),
+[`docs/operations/INGESTION_FAILURE_ANALYSIS.md`](../operations/INGESTION_FAILURE_ANALYSIS.md) and
+[`docs/operations/INGESTION_FIX_PLAN.md`](../operations/INGESTION_FIX_PLAN.md). Those documents fixed the load-test incident. This one asks
 the next question: **what breaks when 1,000+ sites each send thousands of requests, and what do the
 companies that run this at planetary scale do about it?**
 
@@ -132,8 +132,8 @@ protection or the rate-limit and quota counters sharing that instance (see F12).
 - Fixed windows (`ratelimit.WindowKey`) allow up to 2x the limit across a boundary.
 
 ### F5. Fail-closed turns a Redis blip into a global outage (S1, confidence medium)
-`admit.go:79-83` returns 503 for every site on any Redis error. `INGESTION_FIX_PLAN.md` chose this deliberately
-(and `ARCHITECTURE_REVIEW.md` P2-1 had chosen the opposite earlier), so the policy has flipped once. Both ends are
+`admit.go:79-83` returns 503 for every site on any Redis error. `docs/operations/INGESTION_FIX_PLAN.md` chose this deliberately
+(and `docs/architecture/ARCHITECTURE_REVIEW.md` P2-1 had chosen the opposite earlier), so the policy has flipped once. Both ends are
 wrong for an ingestion path: fail-open loses enforcement; fail-closed makes rate-limit infrastructure a
 single point of failure for revenue-bearing data. The Doorman answer (section 5, C1) is a third option.
 
@@ -194,13 +194,13 @@ overload shows up as rising latency and then timeouts, which the SDK treats as `
 
 ### F12. One failure domain for everything stateful in Redis (S2)
 Rate limits, quota, dedupe, realtime, sessions, locks and pub/sub can share one instance in a simple deployment
-(`ARCHITECTURE_REVIEW.md` P2-10 is still open). `config/src/index.ts` defines separate role URLs, which is the right
+(`docs/architecture/ARCHITECTURE_REVIEW.md` P2-10 is still open). `config/src/index.ts` defines separate role URLs, which is the right
 shape; production must actually split them and use `maxmemory-policy noeviction` on the counters.
 
 ### F13. Retention and cost (S2)
 `events_v2` keeps raw events 24 months (`008_events_v2.sql`, `TTL ... INTERVAL 24 MONTH`) with
 `ttl_only_drop_parts = 1`, while the site settings contain `retentionMonths`. Per-site retention
-(`ARCHITECTURE_REVIEW.md` P2-6) cannot be implemented with whole-part drops. Cloudflare stores aggregates long
+(`docs/architecture/ARCHITECTURE_REVIEW.md` P2-6) cannot be implemented with whole-part drops. Cloudflare stores aggregates long
 and raw data briefly because "we just cannot afford yet to store non-aggregated data for that long" [src].
 
 ### F14. Read-side leftovers (S3)

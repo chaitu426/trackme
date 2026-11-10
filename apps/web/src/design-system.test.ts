@@ -7,7 +7,7 @@ import path from "node:path";
  * The design system's guard rails. Each rule is a way the app used to drift (a one-off colour, a browser dialog, an animation
  * class that does nothing here). The test reads every component and page and fails with the file and line, so a mismatch is
  * caught in review instead of discovered on screen. Charts and illustrations that draw their own pixels are exempt, by name.
- * See docs/design-system.md for what to use instead.
+ * See docs/design/design-system.md for what to use instead.
  */
 const SRC = path.resolve(import.meta.dirname, ".");
 const EXEMPT = ["geo-globe.tsx", "journey-sankey.tsx", "ui/sparkline.tsx", "audience-map.tsx", "route-flow.tsx", "time-series-chart.tsx", "vitals-pulse.tsx", "globe-demo.tsx"];

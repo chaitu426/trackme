@@ -8,7 +8,7 @@ retention). Names follow the repo, not the brief: `project` = `site` (inside `wo
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | Rollups are ClickHouse materialized views off `events_v2`, not worker counters | Matches principle 1 of `ARCHITECTURE_OPTIMIZATION_PLAN.md`; no new worker state to keep exactly-once |
+| D1 | Rollups are ClickHouse materialized views off `events_v2`, not worker counters | Matches principle 1 of `docs/architecture/ARCHITECTURE_OPTIMIZATION_PLAN.md`; no new worker state to keep exactly-once |
 | D2 | Workers do only what MVs cannot: identity stitching, error fingerprinting, source-map de-minify, PII re-scrub | Keeps the hot path and MVs simple |
 | D3 | New tables get the brief's retention defaults; `events_v2` keeps its per-site 12/24/36-month promise | Cutting raw to 30 days would break shipped Journeys, Funnels, Profiles |
 | D4 | Core SDK stays within the CI budget (10,500 B gzip, 448 B free). Errors and breadcrumbs are a lazy module; `web-vitals` moves out of core to buy headroom | The +1.5 KB core allowance does not fit |
@@ -68,7 +68,7 @@ No feature flags: a finished page goes straight into the sidebar (`apps/web/src/
 ## 8. Risks
 
 - The v2 pipeline is still in shadow rollout (`ANALYTICS_READ=v1`). Rollups built on it need `WORKER_WRITE_V2` set to `shadow` or `only` first.
-- ClickHouse part pressure (F6 in `INGESTION_SCALE_ARCHITECTURE.md`): each new MV adds insert-time work. I will count MV targets per insert before adding any and stop at the agreed budget.
+- ClickHouse part pressure (F6 in `docs/architecture/INGESTION_SCALE_ARCHITECTURE.md`): each new MV adds insert-time work. I will count MV targets per insert before adding any and stop at the agreed budget.
 - I could not run ClickHouse or the load test here, so benchmark evidence needs your environment.
 
 ## 9. Done so far

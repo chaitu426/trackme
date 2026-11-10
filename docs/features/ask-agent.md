@@ -3,8 +3,9 @@
 Ask is a floating pill at the bottom of every signed-in page. Focus it (click, or press `/`) and the conversation appears in the air above it: no solid panel, each turn a frosted sheet over the page, fading out at the top. The page stays
 usable behind it. Fold it (`Esc`, or the chevron) and it is a bar again. There is no separate chat window, no route to open and nothing to close.
 
-**Status: interface only.** The panel runs on a demo engine (`apps/web/src/lib/ask/demo-engine.ts`) that answers five kinds of question from the demo dataset and
-declines anything else, and a "Preview" tag says so. The backend phase replaces `answerFor` and leaves the interface alone.
+**Status: live.** The question goes to the Ask worker, which plans over the workspace's own ClickHouse data with an OpenAI model, and the steps and answer stream back over SSE. No answer is ever canned: if a run fails, the panel says why and shows nothing else. See **Backend** below.
+
+The interface is the same in both modes; clicking **Try again** on a live run that found nothing is the only visible difference from the demo's canned answers.
 
 ## What it is not
 
@@ -48,19 +49,61 @@ workspace in the browser), and a mark on the folded bar when an answer arrives w
 `/` focus Ask from anywhere (not while typing in a field) · `Enter` ask · `Shift+Enter` new line · `↑` in an empty box recalls the last question · `Esc` fold.
 `Ctrl/Cmd+K` is still the command palette; Ask never takes it.
 
-## Decisions for the backend phase (not made here)
+## Backend (Phase 1: planner + query runner)
 
-These are the architecture questions the interface deliberately leaves open:
+```
+AskDock ─POST /api/v1/ask/runs─▶ web route: auth + tenant, clamp scope, budget pre-check,
+                                  INSERT ask_runs(queued), XADD ask:runs, 202 { runId }
+                                          │
+ask-worker (services/ask-worker, stateless, N replicas)
+   XREADGROUP ask-workers → mark running + heartbeat → OpenAI tool loop → run_query(template)
+     · template wraps an existing analytics query fn (tenant condition + filters bound inside)
+     · ClickHouse max_execution_time / max_result_rows set by the dashboard client
+     · Redis per-workspace LLM concurrency + global RPM token bucket
+   → grounding gate → UPDATE ask_runs(done, answer) → XADD ask:stream:<runId> → XACK
+                                          │
+AskDock ─GET /api/v1/ask/runs/:id/events─▶ SSE: replay + live steps, terminal `done`
+```
 
-1. **How data is gathered.** A planner that picks sources and builds queries from the scope, versus a fixed set of vetted query templates the model fills in. Templates are safer and
-   cheaper; free-form SQL is more flexible and needs a sandbox.
-2. **Where queries run.** Read-only credentials, a row and time limit from the scope, per-workspace concurrency (the dashboard's gate already does this), and the tenant condition on
-   every statement added by the system, never by the model.
-3. **What the model sees.** Schemas and descriptions of the allowed sources, the scope, the instructions, and result rows after masking. Never raw personal data when masking is on.
-4. **Grounding check.** Reject or flag any figure in a draft answer that is not in a query result, before it reaches the person. The citation contract makes this mechanical.
-5. **The query builder.** "Edit query" becomes a structured editor over the same evidence item, re-run through the same limits.
-6. **Cost and abuse.** Per-workspace budgets and rate limits, with the remaining allowance shown in the panel.
-7. **Audit.** Each run (question, scope, queries, answer) in the workspace audit log.
+It scales on the web side by returning immediately (the work is not in the request) and on the worker side by adding replicas: the Redis Streams consumer group shares the
+queue, the budget in Redis is shared by every node, and run state lives in Postgres so an SSE reconnect or a web restart loses nothing.
+
+### How the seven questions are answered
+
+1. **How data is gathered.** A hybrid: the model picks a **vetted template id and typed parameters** (zod-validated), never SQL (`packages/ask/src/templates.ts`). A template calls
+   an existing analytics function, which already binds the tenant condition and filters. A free-form SQL sandbox can be added later as a second tool without changing `Answer`.
+2. **Where queries run.** The read-only dashboard ClickHouse client, with `max_execution_time` and `max_result_rows` set on every query, the per-tenant gate reused, and the
+   `workspace_id`/`site_id` condition supplied by the system, never the model.
+3. **What the model sees.** Only the templates whose source is on (id, source, description, parameter shape), the clamped scope and range, the instructions, and result rows
+   (first 8, for the evidence sample). The planner is a tool loop with `run_query` and `finish`.
+4. **Grounding check.** `packages/ask/src/grounding.ts`, run in the worker before the answer is stored: every citation must name an existing evidence item, and every number in a text
+   block must appear in the sample of the evidence it cites. Ungrounded blocks are dropped and logged; a trail with fewer than two grounded links is dropped.
+5. **The query builder.** Not yet. "Edit query" stays shown-but-disabled until the structured editor exists.
+6. **Cost and abuse.** Redis budget: global completions-per-minute (`ASK_LLM_RPM`) and per-workspace in-flight runs (`ASK_WORKSPACE_CONCURRENCY`). The web route pre-checks it and
+   returns 429 with `Retry-After` before a row is written; the worker takes a slot for the whole run.
+7. **Audit.** Every accepted run writes an `ask:run` audit record (question truncated, sources, range) and an `ask_runs` row that keeps the full `Answer` JSON.
+
+### Configuration
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `ASK_ENABLED` | `false` | Turns the API and worker on. In production it requires `OPENAI_API_KEY`. |
+| `OPENAI_API_KEY` | — | Provider key; required when `ASK_ENABLED`. |
+| `ASK_MODEL` | `gpt-4.1` | Model id for the planner. |
+| `ASK_MAX_TOKENS` | `8192` | Per-completion output cap. |
+| `ASK_MAX_STEPS` | `6` | Most tool-loop iterations before a run fails. |
+| `ASK_WORKSPACE_CONCURRENCY` | `2` | Runs a single workspace may have in flight. |
+| `ASK_LLM_RPM` | `120` | Shared planner completions per minute across the fleet. |
+| `ASK_RUN_TIMEOUT_MS` | `120000` | A run with a heartbeat older than this is re-queued by the sweeper. |
+| `ASK_METRICS_PORT` | `9466` | Worker `/health` and `/metrics` port. |
+
+To run locally: `ASK_ENABLED=true OPENAI_API_KEY=… pnpm dev`, plus `pnpm start:ask` (or it runs under `pnpm start:all`). The `ask_runs` table comes from
+migration `0010`.
+
+### Phase 2 (not built)
+
+The money-trail builder and `rank_causes`, watches (`ask_watches` + scheduled-worker evaluation), server-side case-file persistence, ticket push, the SQL sandbox, and the query
+builder editor. The notes below describe them.
 
 ## Working states
 

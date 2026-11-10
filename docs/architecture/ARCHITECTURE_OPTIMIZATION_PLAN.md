@@ -1,6 +1,6 @@
 # Architecture Optimization Plan: Accuracy, Time and Space
 
-Companion to `ARCHITECTURE_REVIEW.md` (which tracks the P0–P3 fixes already landed). This file covers
+Companion to `docs/architecture/ARCHITECTURE_REVIEW.md` (which tracks the P0–P3 fixes already landed). This file covers
 what is still structurally wrong or wasteful after those fixes, the decision for each item, the exact
 change, how to migrate to it, and how to prove it worked.
 
@@ -65,7 +65,7 @@ Targets (the acceptance bar for the whole plan):
 | S4 | Kafka payload repeats tenant fields per event; gzip | Space | WS6 | S |
 | S5 | Two unused rollup tables are still computed and stored | Space/Time | WS3 | S |
 | O1 [~] | `/metrics` serves expvar JSON under a Prometheus content type; no histograms | Ops | WS9 | M |
-| O2 [x] | `ARCHITECTURE_REVIEW.md` P2-9 is stale (Kafka key is already `siteId:sessionId`) | Docs | WS9 | S |
+| O2 [x] | `docs/architecture/ARCHITECTURE_REVIEW.md` P2-9 is stale (Kafka key is already `siteId:sessionId`) | Docs | WS9 | S |
 
 ---
 
@@ -806,7 +806,7 @@ events > 0 for 5 min · nightly duplicate rate > 0.01 % · reconciliation diff o
 target · scheduled job heartbeat stale (already recorded in Redis by P2-8; export it as a gauge).
 
 ### 9.3 Documentation (O2)
-- Update `ARCHITECTURE_REVIEW.md` P2-9: Kafka key is already `siteId:sessionId`; mark it `[~]` (partition and
+- Update `docs/architecture/ARCHITECTURE_REVIEW.md` P2-9: Kafka key is already `siteId:sessionId`; mark it `[~]` (partition and
   replication decision remains, covered by §6.4).
 - Add a runbook section per alert: what it means, first query to run, safe mitigation.
 
@@ -940,7 +940,7 @@ before/after number.
 - [x] Query cache (overview, breakdown, funnel), authz cache, read-only ClickHouse user (WS4; 4.5 raw-scan guard still open)
 - [ ] Nightly reconciliation and duplicate-rate jobs (WS1, WS3)
 - [ ] Cutover, decommission legacy tables and rollup jobs (§11 phases 8–10)
-- [~] Update `ARCHITECTURE_REVIEW.md` (O2 done: P2-9 key is `siteId:sessionId`) and add runbooks (WS9.3)
+- [~] Update `docs/architecture/ARCHITECTURE_REVIEW.md` (O2 done: P2-9 key is `siteId:sessionId`) and add runbooks (WS9.3)
 
 ## Managed services (Aiven)
 
@@ -980,7 +980,7 @@ before/after number.
 - **Reconciliation + duplicate rate:** `services/scheduled-worker/src/jobs/reconciliation.ts`, nightly at 04:20 UTC when
   `WORKER_WRITE_V2` is not `off`; a finding fails the run and sets `reconciliation_findings`.
 - **WS9:** scheduled-job heartbeat (`scheduled_job_last_success_timestamp_seconds{task}` on `SCHEDULER_METRICS_PORT`,
-  default 9465), `infra/observability/alerts.yml`, `infra/observability/grafana-dashboard.json`, `docs/RUNBOOK.md`,
+  default 9465), `infra/observability/alerts.yml`, `infra/observability/grafana-dashboard.json`, `docs/operations/RUNBOOK.md`,
   `infra/ops/baselines.sql`. Pages and the remaining dashboard routes use `lib/cached-analytics.ts` and `timedRoute`.
 - **Test infra:** the web `pnpm test` hang is fixed (explicit glob; Node 21+ for the glob argument).
 - **Still to do:** run shadow write and shadow read against real traffic for the go/no-go windows, record the section 12

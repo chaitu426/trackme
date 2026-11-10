@@ -30,7 +30,7 @@ async function handlePost(request: NextRequest) {
 
     const parsed = BodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
-      throw new AppError(400, "INVALID_INPUT", "siteKey, release, file and map are required; see docs/sourcemaps.md");
+      throw new AppError(400, "INVALID_INPUT", "siteKey, release, file and map are required; see docs/features/sourcemaps.md");
     }
     const { siteKey, release, file, map } = parsed.data;
 

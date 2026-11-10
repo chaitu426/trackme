@@ -1,6 +1,6 @@
 /**
  * Phase 0 probe: snapshot the system before and after a load run and report the numbers
- * docs/INGESTION_SCALE_ARCHITECTURE.md marks [est]. Counters are diffed, so nothing here
+ * docs/architecture/INGESTION_SCALE_ARCHITECTURE.md marks [est]. Counters are diffed, so nothing here
  * needs resetting and nothing needs a Prometheus server.
  *
  *   Redis       commands and EVAL calls per request, key growth per event (F1, F2)

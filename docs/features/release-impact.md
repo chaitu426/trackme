@@ -5,7 +5,7 @@ the site better or worse?
 
 ## Needs
 Tag builds with `data-release="web@1.4.2"` in the tracker snippet. Optionally report each deploy from CI
-(`POST /api/v1/deploys`, see [`releases.md`](releases.md)) so the start time is exact; otherwise the first session seen on
+(`POST /api/v1/deploys`, see [`docs/features/releases.md`](releases.md)) so the start time is exact; otherwise the first session seen on
 the release is used. A site without release tags has no reports.
 
 ## What is compared

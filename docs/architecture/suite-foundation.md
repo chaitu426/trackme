@@ -1,12 +1,12 @@
 # Suite foundation: what shipped
 
-Plan and reasoning: [`suite-foundation-plan.md`](suite-foundation-plan.md). This file is the as-built state.
+Plan and reasoning: [`docs/plans/suite-foundation-plan.md`](../plans/suite-foundation-plan.md). This file is the as-built state.
 
 ## Event envelope
 - New kinds on `type`: `error`, `api_call`, `payment`, `flag_exposure`, `feedback`, `heartbeat`, `deploy`
   (`EVENT_TYPES` in `packages/contracts/src/events.ts`; mirrored in the Go edge validator and checked by the
   shared fixtures in `packages/contracts/fixtures/tracker-events.json`, which both test suites run).
-- New optional fields `release` and `environment` on every event. See [`releases.md`](releases.md).
+- New optional fields `release` and `environment` on every event. See [`docs/features/releases.md`](../features/releases.md).
 - Properties stay scalar-only; typed payloads for each new kind arrive with the feature that sends it.
 - Hot path: the edge adds two string checks per event (a regex on `release`, a map lookup on `environment`).
   No lookup, no I/O.

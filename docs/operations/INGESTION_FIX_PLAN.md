@@ -3,7 +3,7 @@
 Companion to the architecture diagram
 [`ingestion-fix.html`](../.archify/architecture-ingest-fixed-20261101-205225/ingestion-fix.html)
 (source: `.archify/architecture-ingest-fixed-20261101-205225/fix.json`) and to
-[`INGESTION_FAILURE_ANALYSIS.md`](INGESTION_FAILURE_ANALYSIS.md), which documents the measured
+[`docs/operations/INGESTION_FAILURE_ANALYSIS.md`](INGESTION_FAILURE_ANALYSIS.md), which documents the measured
 failure. Sections 2-4 describe the target; the code-level changes there are implemented (async queue,
 fused admission, fail-closed policy, worker lag/e2e metrics, shadow writes). Same-region topology,
 partition count and rollout remain operational work.
@@ -144,7 +144,7 @@ Re-run the same 1,000-site load test and require:
 
 | Metric | Target |
 |---|---|
-| Edge server-side latency | p50 ≤ 15 ms, p99 ≤ 50 ms (matches `ARCHITECTURE_OPTIMIZATION_PLAN.md`) |
+| Edge server-side latency | p50 ≤ 15 ms, p99 ≤ 50 ms (matches `docs/architecture/ARCHITECTURE_OPTIMIZATION_PLAN.md`) |
 | Admission fail-open | 0; every Redis failure returns `503` and increments `edge_admission_fail_closed_total` |
 | Acked vs landed vs inserted | acked = inserted within dedupe tolerance; no unexplained gap |
 | Throughput | ≥ 500 events/s sustained at the tested concurrency |

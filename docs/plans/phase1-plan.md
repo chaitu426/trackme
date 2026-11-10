@@ -1,6 +1,6 @@
 # Phase 1 plan: Error Tracking, Retention & Cohorts, Segments (for review, no code yet)
 
-Builds on [`suite-foundation.md`](suite-foundation.md) (migrations 014 and 015 are live and verified).
+Builds on [`docs/architecture/suite-foundation.md`](../architecture/suite-foundation.md) (migrations 014 and 015 are live and verified).
 
 ## 0. Conflict to decide first: anonymous visitors cannot be followed across days
 
@@ -61,7 +61,7 @@ Hot path: the edge adds a bounded structural check on one optional field; no loo
 - Caps: 50 segments per site, bounded condition count (already enforced by the schema, confirm in review).
 
 ## 5. Tests, flags, docs
-Per sub-feature: unit tests (fingerprint stability, scrubbing, caps), a worker-to-ClickHouse integration test run against the Aiven database like the foundation check, a tenant-isolation test (two sites, zero rows across), docs in `docs/errors.md`, `docs/retention.md`, `docs/segments.md`, flags `errors`, `retention`, `segments` (already in `nav.ts`).
+Per sub-feature: unit tests (fingerprint stability, scrubbing, caps), a worker-to-ClickHouse integration test run against the Aiven database like the foundation check, a tenant-isolation test (two sites, zero rows across), docs in `docs/features/errors.md`, `docs/features/retention.md`, `docs/features/segments.md`, flags `errors`, `retention`, `segments` (already in `nav.ts`).
 
 ## 6. Questions
 1. Retention on identified users only (recommended), or do you want a consent-gated persistent id?

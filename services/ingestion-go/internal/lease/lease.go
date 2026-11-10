@@ -326,7 +326,7 @@ func (a *Admitter) allowIP(ip string, limit float64, now time.Time) bool {
 // Drain returns every workspace's unspent quota to Redis. Without it each restart would strand
 // up to one chunk per workspace per edge, and because usage metering only ever raises the Redis
 // counter (max(redis, clickhouse)), stranded units would count against customers until month end.
-// A crash still strands them; see docs/INGESTION_SCALE_ARCHITECTURE.md section 13.
+// A crash still strands them; see docs/architecture/INGESTION_SCALE_ARCHITECTURE.md section 13.
 func (a *Admitter) Drain(ctx context.Context) error {
 	a.qmu.Lock()
 	owed := a.balance

@@ -11,7 +11,7 @@ the numbers below come from the running metrics plus post-hoc probes against the
 
 Defaults referenced here (`QUOTA_FAIL_OPEN=true`, the synchronous producer, `WORKER_WRITE_V2=off`)
 describe the code as it was during the run. The target changes, including their current defaults,
-are in [`INGESTION_FIX_PLAN.md`](./INGESTION_FIX_PLAN.md).
+are in [`docs/operations/INGESTION_FIX_PLAN.md`](INGESTION_FIX_PLAN.md).
 
 ---
 
@@ -205,5 +205,5 @@ than drawing a broken edge. It is a configuration gap, not a runtime error.
 | events_v2 | Write mode off, 0 rows | `packages/config/src/index.ts:93` |
 | Metrics | Lag only set per batch, reads 0 | `worker.ts:176`, `metrics.ts:48` |
 
-Fix proposal: [`INGESTION_FIX_PLAN.md`](INGESTION_FIX_PLAN.md) and
+Fix proposal: [`docs/operations/INGESTION_FIX_PLAN.md`](INGESTION_FIX_PLAN.md) and
 [`ingestion-fix.html`](../.archify/architecture-ingest-fixed-20261101-205225/ingestion-fix.html).

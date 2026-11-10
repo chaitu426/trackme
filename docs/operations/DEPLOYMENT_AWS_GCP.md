@@ -200,7 +200,7 @@ Rollback: redeploy the previous image tag. Migrations are additive; destructive 
 
 ## 8. Cost and sizing starting point
 
-A small production footprint (a few million events a month) is roughly: 2 web tasks, 2 edge tasks, 1 to 2 event-worker tasks, 1 scheduler, a small Multi-AZ Postgres, a 1 to 2 GB Valkey, a 3-broker small Kafka, and ClickHouse Cloud at its smallest paid tier. The two expensive items are **Kafka** and **ClickHouse**; if cost matters, start with a single self-run Redpanda/Kafka node and ClickHouse on one VM (see `docs/FREE_TEST_HOSTING.md` for the low-memory tuning) and move to managed services when traffic or uptime demands it.
+A small production footprint (a few million events a month) is roughly: 2 web tasks, 2 edge tasks, 1 to 2 event-worker tasks, 1 scheduler, a small Multi-AZ Postgres, a 1 to 2 GB Valkey, a 3-broker small Kafka, and ClickHouse Cloud at its smallest paid tier. The two expensive items are **Kafka** and **ClickHouse**; if cost matters, start with a single self-run Redpanda/Kafka node and ClickHouse on one VM (see `docs/operations/FREE_TEST_HOSTING.md` for the low-memory tuning) and move to managed services when traffic or uptime demands it.
 
 ## 9. Before going live
 

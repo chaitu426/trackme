@@ -31,7 +31,7 @@ async function handlePost(request: NextRequest) {
 
     const parsed = DeploySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
-      throw new AppError(400, "INVALID_INPUT", "siteKey and version are required; see docs/releases.md for the body");
+      throw new AppError(400, "INVALID_INPUT", "siteKey and version are required; see docs/features/releases.md for the body");
     }
     const { siteKey, version, commit, environment, deployedAt } = parsed.data;
 

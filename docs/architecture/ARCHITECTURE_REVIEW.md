@@ -142,7 +142,7 @@ Severity: **P0** can stall the pipeline or leak access · **P1** loses or corrup
 
 ### P2-9 Kafka key and production topology `[~]`
 - **Key is already `siteId:sessionId`** (`services/ingestion-go/internal/queue/kafka.go`), so a session's events stay ordered on one partition while a large site can still spread across partitions.
-- Remaining: production topic should use ≥ 12 partitions (≈ 3× peak worker replicas), replication factor 3, `min.insync.replicas=2`, `auto.create.topics.enable=false`. Compose stays single-broker for local development. Covered by `ARCHITECTURE_OPTIMIZATION_PLAN.md` §6.4.
+- Remaining: production topic should use ≥ 12 partitions (≈ 3× peak worker replicas), replication factor 3, `min.insync.replicas=2`, `auto.create.topics.enable=false`. Compose stays single-broker for local development. Covered by `docs/architecture/ARCHITECTURE_OPTIMIZATION_PLAN.md` §6.4.
 
 ### P2-10 Single Redis for everything `[?]`
 - Rate limit, quota, sessions, realtime, locks and pub/sub share one failure domain. **Decision needed:** split into separate instances or logical groups.

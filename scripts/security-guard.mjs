@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Fails the build when code reintroduces a pattern that caused a real vulnerability here (docs/SECURITY_AUDIT.md).
+ * Fails the build when code reintroduces a pattern that caused a real vulnerability here (docs/operations/SECURITY_AUDIT.md).
  * It is deliberately simple text matching, fast enough to run on every push. Each rule names the finding it
  * guards, says why, and has an explicit allowlist: adding to a list is a reviewable decision, not an accident.
  *
