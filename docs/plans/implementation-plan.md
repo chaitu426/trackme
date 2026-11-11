@@ -1,4 +1,4 @@
-# Growth Intelligence Platform Implementation Plan
+# TrackMe implementation plan
 
 ## 1. Product strategy
 

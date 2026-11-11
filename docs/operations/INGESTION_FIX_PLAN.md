@@ -1,7 +1,7 @@
 # Target Architecture: Ingestion That Survives the Load Test
 
 Companion to the architecture diagram
-[`ingestion-fix.html`](../.archify/architecture-ingest-fixed-20261101-205225/ingestion-fix.html)
+[`ingestion-fix.html`](../../.archify/architecture-ingest-fixed-20261101-205225/ingestion-fix.html)
 (source: `.archify/architecture-ingest-fixed-20261101-205225/fix.json`) and to
 [`docs/operations/INGESTION_FAILURE_ANALYSIS.md`](INGESTION_FAILURE_ANALYSIS.md), which documents the measured
 failure. Sections 2-4 describe the target; the code-level changes there are implemented (async queue,

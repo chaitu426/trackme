@@ -23,6 +23,13 @@ export const RANGES: Array<{ id: RangeId; label: string }> = [
   { id: "90d", label: "Last 90 days" },
 ];
 
+/** One earlier exchange in the same conversation, so a follow-up ("and last month?", "why?") has something to refer to. */
+export interface HistoryTurn {
+  question: string;
+  /** The plain text of the answer the person was shown (figures included), not the full structured answer. */
+  answer: string;
+}
+
 /** What the agent may look at and how. Everything here is visible to the person and changeable by them. */
 export interface AskScope {
   workspaceSlug: string;
@@ -38,6 +45,8 @@ export interface AskScope {
   instructions: string;
   /** The page the person asked from ("Web Vitals"), so "this" and "here" mean something. */
   page?: string;
+  /** The last few exchanges of this conversation, oldest first. Untrusted: clamped server-side and shown to the model as context only. */
+  history?: HistoryTurn[];
 }
 
 export interface EvidenceItem {

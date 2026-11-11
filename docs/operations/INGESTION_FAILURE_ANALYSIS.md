@@ -1,7 +1,7 @@
 # Ingestion Load Test: Why It Failed
 
 Companion to the architecture diagram
-[`ingestion-failure.html`](../.archify/architecture-ingest-failure-20261101-205225/ingestion-failure.html)
+[`ingestion-failure.html`](../../.archify/architecture-ingest-failure-20261101-205225/ingestion-failure.html)
 (source: `.archify/architecture-ingest-failure-20261101-205225/failure.json`).
 
 This document explains, mechanism by mechanism, why the trackme ingestion path collapsed under the
@@ -206,4 +206,4 @@ than drawing a broken edge. It is a configuration gap, not a runtime error.
 | Metrics | Lag only set per batch, reads 0 | `worker.ts:176`, `metrics.ts:48` |
 
 Fix proposal: [`docs/operations/INGESTION_FIX_PLAN.md`](INGESTION_FIX_PLAN.md) and
-[`ingestion-fix.html`](../.archify/architecture-ingest-fixed-20261101-205225/ingestion-fix.html).
+[`ingestion-fix.html`](../../.archify/architecture-ingest-fixed-20261101-205225/ingestion-fix.html).

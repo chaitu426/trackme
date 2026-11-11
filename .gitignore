@@ -74,3 +74,6 @@ apps/web/public/tracker.*.js
 
 # Local object store (source maps) when no bucket is configured
 .data/
+
+# Compiled binaries
+*.exe

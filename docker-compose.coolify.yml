@@ -1,0 +1,135 @@
+# Coolify: "Docker Compose" resource. Set env vars in the Coolify UI (referenced as ${VAR}).
+# Infra (postgres, redis, kafka, clickhouse) already runs on the shared network below.
+# Assign domains in Coolify: web -> :3000, docs -> :3002, ingestion -> :3001, ingest-proxy -> :3080.
+
+x-build: &build
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: trackme-app:latest
+
+x-env: &env
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  REDIS_RATELIMIT_URL: ${REDIS_RATELIMIT_URL:-${REDIS_URL}}
+  REDIS_CACHE_URL: ${REDIS_CACHE_URL:-${REDIS_URL}}
+  REDIS_STATE_URL: ${REDIS_STATE_URL:-${REDIS_URL}}
+  REDIS_COORD_URL: ${REDIS_COORD_URL:-${REDIS_URL}}
+  KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+  KAFKA_TOPIC: ${KAFKA_TOPIC:-growth_events}
+  KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC:-growth_events_dlq}
+  KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-event_worker_group}
+  CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+  CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+  CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
+  CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+  CLICKHOUSE_DB: ${CLICKHOUSE_DB:-growth_analytics}
+  NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+  NEXTAUTH_URL: ${NEXTAUTH_URL}
+  SITE_SIGNING_SECRET_KEY: ${SITE_SIGNING_SECRET_KEY}
+  INGESTION_URL: ${INGESTION_URL:-http://ingestion:3001}
+
+services:
+  migrate:
+    <<: *build
+    container_name: trackme-migrate
+    command: ["pnpm", "db:migrate"]
+    restart: "no"
+    environment: *env
+    networks: [coolify]
+
+  web:
+    <<: *build
+    container_name: trackme-web
+    command: ["pnpm", "--filter", "@trackme/web", "start"]
+    restart: unless-stopped
+    expose: ["3000"]
+    environment: *env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks: [coolify]
+
+  docs:
+    <<: *build
+    container_name: trackme-docs
+    command: ["pnpm", "--filter", "@trackme/tracker-docs", "start"]
+    restart: unless-stopped
+    expose: ["3002"]
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+    networks: [coolify]
+
+  ingestion:
+    <<: *build
+    container_name: trackme-ingestion
+    command: ["pnpm", "--filter", "@trackme/ingestion-go", "start"]
+    restart: unless-stopped
+    expose: ["3001"]
+    environment:
+      <<: *env
+      INGESTION_PORT: "3001"
+    networks:
+      coolify:
+        aliases: [ingestion]
+
+  ingest-proxy:
+    <<: *build
+    container_name: trackme-ingest-proxy
+    working_dir: /app/services/ingest-proxy
+    command: ["./ingest-proxy"]
+    restart: unless-stopped
+    expose: ["3080"]
+    environment:
+      INGEST_URL: ${PROXY_INGEST_URL:-http://ingestion:3001}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      SIGNING_SECRET: ${SIGNING_SECRET}
+      LISTEN_ADDR: ":3080"
+    depends_on: [ingestion]
+    networks: [coolify]
+
+  event-worker:
+    <<: *build
+    container_name: trackme-event-worker
+    command: ["pnpm", "--filter", "@trackme/event-worker", "start"]
+    restart: unless-stopped
+    environment: *env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks: [coolify]
+
+  scheduled-worker:
+    <<: *build
+    container_name: trackme-scheduled-worker
+    command: ["pnpm", "--filter", "@trackme/scheduled-worker", "start"]
+    restart: unless-stopped
+    environment: *env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks: [coolify]
+
+  ask-worker:
+    <<: *build
+    container_name: trackme-ask-worker
+    command: ["pnpm", "--filter", "@trackme/ask-worker", "start"]
+    restart: unless-stopped
+    environment:
+      <<: *env
+      ASK_ENABLED: ${ASK_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks: [coolify]
+
+networks:
+  coolify:
+    name: orp7ujojmp9hb8in8fs3lh7r
+    external: true

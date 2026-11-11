@@ -17,3 +17,5 @@ export {
   type RunEvent,
 } from "./queue.js";
 export * from "./planner.js";
+export * from "./failure.js";
+export * from "./calc.js";

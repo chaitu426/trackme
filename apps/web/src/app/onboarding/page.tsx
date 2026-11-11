@@ -3,6 +3,9 @@ import { LogoMark } from "@/components/brand/logo-mark";
 import { requireUser } from "@/lib/auth";
 import { listUserWorkspaces } from "@/lib/tenancy";
 import { OnboardingForm } from "./onboarding-form";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Set up your workspace" };
 
 export default async function OnboardingPage() {
   const user = await requireUser();

@@ -2,8 +2,8 @@
   "name": "trackme-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "Production-grade, privacy-first, multi-tenant B2B SaaS growth intelligence & analytics platform",
-  "author": "Growth Intelligence Team",
+  "description": "TrackMe: privacy-first, multi-tenant web analytics, error tracking and payments insight",
+  "author": "TrackMe",
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.5.2",
   "scripts": {

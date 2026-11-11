@@ -10,7 +10,7 @@
 
 A page that turns off web vitals and errors downloads and parses 22% less than before. The core with vitals only
 (no errors) is 7,224 B: error capture costs the core 624 B (config, three methods, release tags) and the rest sits
-in its own file. The CI budgets are 8,000 B core, 3,800 B vitals, 4,500 B errors (`scripts/check-bundle-size.mjs`).
+in its own file. The CI budgets are 8,000 B core, 3,800 B vitals, 4,500 B errors (`packages/tracker/scripts/check-bundle-size.mjs`).
 
 What was tried and rejected, with numbers: a stronger minifier (terser, 3 passes) saves 180 B (2.5%) for a new build
 dependency; replacing the native `TextEncoder` byte count in the transport with a hand-written loop adds code and is
@@ -20,7 +20,7 @@ unlikely to be faster. Behaviour of everything in the core is unchanged: all pre
 
 - `tracker.js` loads a chunk by adding a `<script async>` pointing **beside itself** (same directory). The chunk
   hands its API back on its own script element, so there are no globals.
-- Build (`scripts/build-iife.mjs`): chunks are built first and named by content hash; the main file is built last
+- Build (`packages/tracker/scripts/build-iife.mjs`): chunks are built first and named by content hash; the main file is built last
   with each chunk's name and sha384 baked in. If the page loaded `tracker.js` with `integrity=`, each chunk is loaded
   with its own `integrity=` too, so SRI pinning still covers all code that runs.
 - npm build: the same features are plain dynamic `import()`s, split by your bundler.

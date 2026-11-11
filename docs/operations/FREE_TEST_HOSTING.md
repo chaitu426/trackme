@@ -103,7 +103,7 @@ pnpm start:web         # :3000
 ```bash
 curl -s localhost:3001/healthz
 pnpm seed:demo                       # demo workspace + site
-pnpm exec tsx scripts/e2e-load.ts    # sends events, checks they reach ClickHouse
+pnpm traffic:simulate    # sends events to the edge
 ```
 Then open `http://localhost:3000`, sign up (dev mode returns the OTP as `devCode`, see §7), add the printed tracker snippet to any HTML page.
 
@@ -143,7 +143,7 @@ Setting names are from memory of the ClickHouse docs, so **(verify)** against th
 ## 6. Path B: one free cloud VM, everything native
 
 1. **VM**: Oracle Cloud Always Free Ampere A1. Oracle's [resource page](https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm) says 3,000 OCPU-hours and 18,000 GB-hours per month, i.e. 4 OCPU / 24 GB. Several 2026 posts say it was **cut to 2 OCPU / 12 GB from 15 June 2026 (verify)**. Both fit the budget in §2.
-   - Idle reclamation: instances under roughly 15–20% CPU/network/memory (95th percentile, 7 days) may be reclaimed **(verify)**. Running the real stack plus a periodic `scripts/e2e-load.ts` usually keeps it busy; upgrading the account to pay-as-you-go while staying inside the free limits is the commonly reported safeguard **(verify)**.
+   - Idle reclamation: instances under roughly 15–20% CPU/network/memory (95th percentile, 7 days) may be reclaimed **(verify)**. Running the real stack plus periodic `pnpm traffic:simulate` usually keeps it busy; upgrading the account to pay-as-you-go while staying inside the free limits is the commonly reported safeguard **(verify)**.
    - Capacity is often "out of host capacity": retry later or try another availability domain/region.
 2. Ubuntu 22.04/24.04 arm64. Open ports 80/443 in the VCN security list **and** `sudo iptables`/ufw (Oracle images block them by default).
 3. Install as in §3 (steps 3–5, no WSL). ClickHouse and Redpanda both publish arm64 builds.

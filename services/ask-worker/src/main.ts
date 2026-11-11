@@ -1,6 +1,6 @@
 import { Redis } from "ioredis";
 import { env } from "@trackme/config";
-import { consume, createDepsFactory, requeueStale } from "./consumer.js";
+import { consume, createDepsFactory, reenqueue, requeueStale } from "./consumer.js";
 import { startMetricsServer } from "./metrics.js";
 
 /**
@@ -36,7 +36,11 @@ const deps = createDepsFactory(blocking, {
 
 const sweeper = setInterval(() => {
   void requeueStale(env.ASK_RUN_TIMEOUT_MS)
-    .then((n) => n > 0 && console.warn(`ask worker: re-queued ${n} stale run(s)`))
+    .then(async (ids) => {
+      if (ids.length === 0) return;
+      await reenqueue(redis, ids);
+      console.warn(`ask worker: re-queued ${ids.length} stale run(s)`);
+    })
     .catch((err) => console.error("ask worker: sweeper failed:", err));
 }, Math.min(env.ASK_RUN_TIMEOUT_MS, 30_000));
 

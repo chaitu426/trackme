@@ -38,3 +38,9 @@ test("only the source map upload may exceed the normal body limit", () => {
   assert.equal(bodyLimitFor("/api/v1/deploys"), MAX_API_BODY_BYTES);
   assert.equal(bodyLimitFor("/api/v1/sourcemaps/extra"), MAX_API_BODY_BYTES);
 });
+
+test("the brand files crawlers and link previews fetch are reachable without a session", () => {
+  for (const p of ["/opengraph-image", "/apple-icon", "/manifest.webmanifest", "/sitemap.xml", "/robots.txt", "/icon.svg"]) {
+    assert.equal(isPublicPath(p), true, p);
+  }
+});

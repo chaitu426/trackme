@@ -12,6 +12,7 @@ import {
   type BreakdownDimension,
 } from "@trackme/analytics";
 import type { MetricQueryRequest } from "@trackme/contracts";
+import { moreTemplates } from "./templates-more.js";
 import type { SourceId } from "./types.js";
 import type { ResolvedRange } from "./scope.js";
 
@@ -339,6 +340,7 @@ const AllTemplates = [
   gatewayHealth,
   checkoutFunnel,
   revenueLeaks,
+  ...moreTemplates,
 ] as Array<Template<unknown>>;
 
 const BY_ID = new Map(AllTemplates.map((t) => [t.id, t]));
@@ -356,14 +358,31 @@ export function catalogForPrompt(): Array<{ id: string; source: SourceId; descri
   return AllTemplates.map((t) => ({ id: t.id, source: t.source, description: t.description, params: zodShape(t.params) }));
 }
 
-function zodShape(schema: z.ZodType<unknown>): unknown {
-  if (schema instanceof z.ZodObject) {
-    const shape = schema.shape as Record<string, z.ZodTypeAny>;
+/** One parameter as the planner reads it: its type, the allowed values of an enum, and whether it may be left out. */
+function describeParam(v: z.ZodTypeAny): string {
+  let inner: z.ZodTypeAny = v;
+  let optional = false;
+  let fallback: unknown;
+  for (let i = 0; i < 4; i++) {
+    if (inner instanceof z.ZodDefault) {
+      optional = true;
+      fallback = inner._def.defaultValue();
+      inner = inner._def.innerType;
+    } else if (inner instanceof z.ZodOptional) {
+      optional = true;
+      inner = inner._def.innerType;
+    } else break;
+  }
+  const base = inner instanceof z.ZodEnum ? (inner.options as string[]).map((o) => `"${o}"`).join("|") : inner._def.typeName.replace("Zod", "").toLowerCase();
+  return `${base}${optional ? " (optional" + (fallback !== undefined ? `, default ${JSON.stringify(fallback)}` : "") + ")" : ""}`;
+}
+
+function zodShape(schema: z.ZodTypeAny): unknown {
+  let s: z.ZodTypeAny = schema;
+  if (s instanceof z.ZodDefault) s = s._def.innerType;
+  if (s instanceof z.ZodObject) {
     const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(shape)) {
-      const inner = v instanceof z.ZodDefault ? v._def.innerType : v;
-      out[k] = inner._def.typeName.replace("Zod", "").toLowerCase();
-    }
+    for (const [k, v] of Object.entries(s.shape as Record<string, z.ZodTypeAny>)) out[k] = describeParam(v);
     return out;
   }
   return {};

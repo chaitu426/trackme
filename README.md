@@ -39,7 +39,7 @@ Ask is a floating panel in the dashboard that answers natural-language questions
 - A mechanical **grounding gate** drops any figure not present in the cited evidence's sample before the answer is stored.
 - Cost is bounded by a shared Redis budget (per-workspace concurrency + a global completions-per-minute bucket), and every run is written to `ask_runs` and the audit log.
 
-Ask runs in two modes, chosen by `NEXT_PUBLIC_ASK_MODE`: `demo` (canned answers, no key needed) or `live` (real planner). See `docs/ask-agent.md`.
+Ask is off until `ASK_ENABLED=true` and an `OPENAI_API_KEY` are set; there is no canned or demo mode, so every answer comes from a run over the workspace's own data. See `docs/features/ask-agent.md`.
 
 ## Repository Structure
 
@@ -110,19 +110,18 @@ Open http://localhost:3000/demo.html to verify tracker → Go → Kafka → Clic
 pnpm start:all      # web + docs + ingestion + event-worker + scheduled-worker + ask-worker (production builds)
 ```
 
-### Enabling Ask (live mode)
+### Enabling Ask
 
-Ask ships in `demo` mode (canned answers, no key). To answer from real data:
+Ask is off by default. To turn it on:
 
 1. Set in `.env`:
    - `ASK_ENABLED=true`
    - `OPENAI_API_KEY=sk-...`
-   - `NEXT_PUBLIC_ASK_MODE=live`
 2. Run migrations so the `ask_runs` table exists (`pnpm db:migrate`).
 3. Start the worker: `pnpm start:ask` (or include it via `pnpm start:all`).
-4. Restart the web app — `NEXT_PUBLIC_ASK_MODE` is baked in at build time.
+4. Restart the web app so it reads `ASK_ENABLED`.
 
-The worker prints `ask worker: consuming as ask-w… (model …)` when it is live. Full variable reference is in `docs/ask-agent.md` and `.env.example`.
+The worker prints `ask worker: consuming as ask-w… (model …)` when it is live. Full variable reference is in `docs/features/ask-agent.md` and `.env.example`.
 
 ### Shared landing page and docs
 

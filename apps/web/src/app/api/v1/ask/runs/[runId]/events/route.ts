@@ -88,6 +88,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
         const emitFromRow = (s: NonNullable<Awaited<ReturnType<typeof state>>>): boolean | "failed" => {
           if (s.status === "done" && s.answer) return emit({ type: "answer", answer: s.answer as Answer });
           if (s.status === "failed") return emit({ type: "error", message: s.error ?? "The run failed." }) || "failed";
+          if (s.status === "cancelled") return emit({ type: "error", message: "Stopped." }) || "failed";
           return false;
         };
 
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
 
           // 2. A run that already finished, whose answer the stream did not carry (trimmed, or a publish race).
           const initial = await state();
-          if (initial && (initial.status === "done" || initial.status === "failed")) {
+          if (initial && (initial.status === "done" || initial.status === "failed" || initial.status === "cancelled")) {
             if (emitFromRow(initial)) {
               await finish(initial.status);
               return;
@@ -134,7 +135,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
             }
             if (live.length === 0) {
               const ended = await state();
-              if (ended && (ended.status === "done" || ended.status === "failed")) {
+              if (ended && (ended.status === "done" || ended.status === "failed" || ended.status === "cancelled")) {
                 // No step arrived for a full block and the row is final: nothing more will come.
                 emitFromRow(ended);
                 await finish(ended.status);

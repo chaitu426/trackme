@@ -181,7 +181,7 @@ Image notes:
 
 - Build with the **monorepo root as context** so workspace packages (`packages/*`) are available; `pnpm deploy --filter <package> --prod` produces a small runtime folder per service.
 - Run as a non-root user; `EXPOSE` the port; add a `HEALTHCHECK` only where the platform does not do it for you (the edge exposes `GET /health`).
-- The web build runs `scripts/copy-tracker-assets.mjs` first; keep the order.
+- The web build runs `apps/web/scripts/copy-tracker-assets.mjs` first; keep the order.
 - Pin Node 22+ (`engines` allows 20+) and Go to the version in `go.mod`.
 
 ## 7. Release order

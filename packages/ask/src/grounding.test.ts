@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groundAnswer, citationsOf, numbersIn } from "./grounding.js";
+import { groundAnswer, citationsOf, numbersIn, fallbackAnswer } from "./grounding.js";
 import type { Answer, EvidenceItem } from "./types.js";
 
 const ev = (n: number, sample: Array<Array<string | number>>): EvidenceItem => ({
@@ -81,4 +81,37 @@ test("a trail with an ungrounded node is trimmed; below two nodes it is removed"
   });
   const r = groundAnswer(a);
   assert.equal(r.answer.trail, undefined);
+});
+
+test("a figure rounded the way a person writes it is still grounded", () => {
+  const answer = base({ evidence: [ev(1, [[61.84, "0.618"]])], blocks: [{ type: "text", text: "About 61.8% [1], or 62% of sessions [1]." }] });
+  // 61.84 → "61.8" matches; "62" does not match at 0 decimals only if rounding fails: round(61.84, 0) === 62.
+  assert.equal(groundAnswer(answer).answer.blocks.length, 1);
+});
+
+test("a calculator result and the question's own frame are grounded; an invented figure is still dropped", () => {
+  const answer = base({
+    evidence: [ev(1, [[1280, 1010]])],
+    blocks: [{ type: "text", text: "Up 26.7% over the last 30 days [1]." }],
+  });
+  assert.equal(groundAnswer(answer).answer.blocks.length, 0);
+  assert.equal(groundAnswer(answer, { derived: ["26.7327"], allowed: ["30"] }).answer.blocks.length, 1);
+  const invented = base({ evidence: [ev(1, [[1280, 1010]])], blocks: [{ type: "text", text: "Up 99% [1]." }] });
+  assert.equal(groundAnswer(invented, { derived: ["26.7327"], allowed: ["30"] }).answer.blocks.length, 0);
+});
+
+test("dates and ranges in prose are not read as negative figures", () => {
+  assert.deepEqual(numbersIn("from 2026-11-10 to 3-5 pages"), ["2026", "11", "10", "3", "5"]);
+  assert.deepEqual(numbersIn("down -4.5%"), ["-4.5"]);
+});
+
+test("when the gate drops every block the person still gets the evidence, never an empty answer", () => {
+  const dropped = groundAnswer(base({ blocks: [{ type: "text", text: "Revenue was 999 [1]." }] }));
+  assert.equal(dropped.grounded, false);
+  const out = fallbackAnswer(dropped.answer, dropped.dropped);
+  assert.equal(out.confidence, "low");
+  assert.equal(out.blocks[0]?.type, "callout");
+  assert.equal(out.blocks.filter((b) => b.type === "table").length, 2);
+  const none = fallbackAnswer({ ...dropped.answer, evidence: [] }, []);
+  assert.equal(none.blocks[0]?.type, "text");
 });

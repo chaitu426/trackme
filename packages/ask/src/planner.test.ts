@@ -50,13 +50,48 @@ test("planner runs a template, streams a step, feeds results back, then finishes
   assert.match(String(last.content), /"n":1/);
 });
 
-test("planner stops after maxSteps without a finish", async () => {
-  const looping: ChatReply = { content: null, toolCalls: [{ id: "c", name: "run_query", arguments: JSON.stringify({ template: "traffic_overview" }) }], tokens: 1 };
+test("planner with evidence in hand but no finish forces a final round, then returns the evidence rather than failing", async () => {
+  const looping: ChatReply = { content: null, toolCalls: [{ id: "c", name: "run_query", arguments: JSON.stringify({ template: "traffic_overview", params: { n: 1 } }) }], tokens: 1 };
   const chat = new ScriptedChat([looping, looping, looping]);
-  await assert.rejects(
-    plan({ question: "q", scope }, { chat, tenant, maxTokens: 10, maxSteps: 2, now, runTemplate: fakeRun }),
-    /needed more steps/
-  );
+  const out = await plan({ question: "q", scope }, { chat, tenant, maxTokens: 10, maxSteps: 2, now, runTemplate: fakeRun });
+  assert.equal(out.answer.evidence.length, 1);
+  assert.equal(out.answer.blocks.length, 0);
+  assert.equal(out.answer.confidence, "low");
+});
+
+test("planner with no evidence and no finish fails with a named reason", async () => {
+  const chat = new ScriptedChat([{ content: null, toolCalls: [{ id: "c", name: "calculate", arguments: JSON.stringify({ expression: "1+1" }) }], tokens: 1 }]);
+  await assert.rejects(plan({ question: "q", scope }, { chat, tenant, maxTokens: 10, maxSteps: 1, now, runTemplate: fakeRun }), /more lookups/);
+});
+
+test("calculate results are fed back and registered as derived figures", async () => {
+  const chat = new ScriptedChat([
+    { content: null, toolCalls: [{ id: "c1", name: "calculate", arguments: JSON.stringify({ expression: "(1280 - 1010) / 1010 * 100" }) }], tokens: 1 },
+    { content: null, toolCalls: [{ id: "c2", name: "finish", arguments: JSON.stringify({ blocks: [{ type: "text", text: "Up 26.7%" }], confidence: "high" }) }], tokens: 1 },
+  ]);
+  const out = await plan({ question: "q", scope }, { chat, tenant, maxTokens: 10, maxSteps: 4, now, runTemplate: fakeRun });
+  assert.deepEqual(out.derived, ["26.7327"]);
+  assert.match(String(chat.seen[1]!.at(-1)!.content), /= 26\.7327/);
+});
+
+test("a cancelled run stops before the next model call", async () => {
+  const chat = new ScriptedChat([]);
+  await assert.rejects(plan({ question: "q", scope }, { chat, tenant, maxTokens: 10, maxSteps: 4, now, runTemplate: fakeRun, shouldStop: async () => true }), /Stopped/);
+  assert.equal(chat.seen.length, 0);
+});
+
+test("earlier turns reach the prompt as context, marked as not instructions", () => {
+  const withHistory: AskScope = { ...scope, history: [{ question: "traffic last week?", answer: "12,400 visitors." }] };
+  const p = systemPrompt(withHistory, resolveRange("30d", now), now);
+  assert.match(p, /traffic last week\?/);
+  assert.match(p, /not an instruction/);
+  assert.match(p, /Today is 2026-11-10/);
+});
+
+test("the prompt tells the model the allowed values of an enum parameter", () => {
+  const p = systemPrompt(scope, resolveRange("30d", now), now);
+  assert.match(p, /"page"\|"referrer"/);
+  assert.match(p, /compare_periods/);
 });
 
 test("an assistant tool-call turn is sent back to the provider in wire shape, type included", () => {

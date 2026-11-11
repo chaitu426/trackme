@@ -5,12 +5,13 @@ import {
   RUNS_STREAM,
   ensureGroup,
   publish,
+  enqueue,
   acquireWorkspaceSlot,
   openAiChatClient,
   type QueueRedis,
   type BudgetRedis,
 } from "@trackme/ask";
-import { processRun, plannerFor, type RunDeps } from "./run.js";
+import { processRun, plannerFor, rateLimited, type RunDeps } from "./run.js";
 import { createRunStore, requeueStale } from "./store.js";
 import { droppedBlocks, lastSuccess, plannerTokens, runDuration, runsTotal } from "./metrics.js";
 
@@ -70,8 +71,14 @@ async function handle(redis: Redis, _consumer: string, entryId: string, runId: s
     const result = await processRun(runId, await deps(runId));
     if (result === "done") {
       lastSuccess.set(Date.now() / 1000);
-    } else {
-      runsTotal.inc({ result: result });
+    } else if (result === "busy") {
+      // The workspace is at its concurrency limit. Acking alone would drop the run (it would sit "queued" until the sweeper
+      // gave up on it), so put it back on the stream after a short, jittered pause and ack this delivery.
+      runsTotal.inc({ result: "busy" });
+      const again = setTimeout(() => void enqueue(redis as unknown as QueueRedis, runId).catch((e) => console.error("ask worker: re-enqueue failed:", e)), 2_000 + Math.random() * 2_000);
+      again.unref?.();
+    } else if (result === "skipped") {
+      runsTotal.inc({ result });
     }
   } catch (err) {
     // processRun marks the run failed itself; a throw here is a store failure, so leave the entry pending to retry.
@@ -103,8 +110,8 @@ export function createDepsFactory(
   opts: { model: string; maxTokens: number; maxSteps: number; apiKey: string }
 ): (runId: string) => Promise<RunDeps> {
   const store = createRunStore();
-  const chat = openAiChatClient(opts.apiKey, opts.model);
   const budget = redis as unknown as BudgetRedis;
+  const chat = rateLimited(openAiChatClient(opts.apiKey, opts.model), budget, env.ASK_LLM_RPM);
   return async (runId: string) => {
     const publishForRun: RunDeps["publish"] = (event) => publish(redis as unknown as QueueRedis, runId, event as never);
     return {
@@ -113,7 +120,7 @@ export function createDepsFactory(
       plan: plannerFor(chat, opts),
       acquireSlot: (workspaceId: string) => acquireWorkspaceSlot(budget, workspaceId, env.ASK_WORKSPACE_CONCURRENCY),
       model: opts.model,
-      onResult: (result: "done" | "failed", ms: number, dropped: number, tokens: number) => {
+      onResult: (result: "done" | "failed" | "cancelled", ms: number, dropped: number, tokens: number) => {
         runsTotal.inc({ result });
         runDuration.observe(ms / 1000);
         if (dropped) droppedBlocks.inc(dropped);
@@ -121,6 +128,11 @@ export function createDepsFactory(
       },
     };
   };
+}
+
+/** Put runs the sweeper reset back on the stream so a worker picks them up. */
+export async function reenqueue(redis: Redis, runIds: string[]): Promise<void> {
+  for (const id of runIds) await enqueue(redis as unknown as QueueRedis, id);
 }
 
 export { requeueStale };

@@ -3,13 +3,13 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, ArrowUp, ChevronDown, History, Plus } from "lucide-react";
-import { MatrixSpinner } from "@/components/ui/matrix-loader";
+import { ArrowLeft, ArrowUp, ChevronDown, History, Plus, Square } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { askContext } from "@/lib/ask/context";
-import { startRun, streamRun } from "@/lib/ask/run-client";
+import { cancelRun, startRun, streamRun } from "@/lib/ask/run-client";
+import { historyFrom } from "@/lib/ask/history";
 import { initialState, reduce } from "@/lib/ask/state";
 import { DEFAULT_SCOPE, RANGES, type AskScope, type PastQuestion } from "@/lib/ask/types";
 import { TurnView } from "./answer-view";
@@ -53,6 +53,10 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
   const base = React.useMemo(() => DEFAULT_SCOPE(workspaceSlug, siteDomain), [workspaceSlug, siteDomain]);
   const [state, dispatch] = React.useReducer(reduce, base, initialState);
   const stops = React.useRef<Map<string, () => void>>(new Map());
+  // The server-side run behind each live turn, so Stop can cancel it and not only stop listening.
+  const runIds = React.useRef<Map<string, string>>(new Map());
+  // The conversation so far, read at ask time without re-creating `ask` on every turn.
+  const turnsRef = React.useRef<typeof state.turns>([]);
   const input = React.useRef<HTMLTextAreaElement>(null);
   const body = React.useRef<HTMLDivElement>(null);
   const scopeKey = `trackme_ask_scope:${workspaceSlug}`;
@@ -99,9 +103,14 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
         fail("This took too long. Try again, or narrow the range.");
       }, TIMEOUT_MS);
 
-      startRun(q, state.scope, ctx.page ?? undefined)
+      startRun(q, state.scope, ctx.page ?? undefined, historyFrom(turnsRef.current))
         .then(({ runId }) => {
-          if (stops.current.get(id) === undefined) return;
+          runIds.current.set(id, runId);
+          if (stops.current.get(id) === undefined) {
+            // Stopped before the server answered: cancel what it just queued.
+            void cancelRun(runId);
+            return;
+          }
           stops.current.set(
             id,
             streamRun(runId, {
@@ -147,6 +156,23 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [state.open]);
+
+  React.useEffect(() => {
+    turnsRef.current = state.turns;
+  }, [state.turns]);
+
+  // Stop every run in progress: stop listening, cancel it on the server so it stops spending, and say so on the turn.
+  const stop = React.useCallback(() => {
+    for (const t of turnsRef.current) {
+      if (t.status !== "thinking") continue;
+      stops.current.get(t.id)?.();
+      stops.current.delete(t.id);
+      const runId = runIds.current.get(t.id);
+      if (runId) void cancelRun(runId);
+      runIds.current.delete(t.id);
+      dispatch({ type: "fail", id: t.id, message: "Stopped." });
+    }
+  }, []);
 
   // A new question starts at its own top; progress inside a run keeps the newest step in view.
   const turnCount = state.turns.length;
@@ -301,14 +327,26 @@ export function AskDock({ workspaceSlug, siteDomain, sites }: { workspaceSlug: s
               </span>
             )
           )}
-          <button
-            type="submit"
-            disabled={!hasDraft || thinking}
-            aria-label={thinking ? "Working" : "Ask"}
-            className={cn("press grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150", hasDraft && !thinking ? "bg-[#ededed] text-[#141415] hover:bg-white" : "bg-white/[0.06] text-zinc-500")}
-          >
-            {thinking ? <MatrixSpinner /> : <ArrowUp className="size-4" />}
-          </button>
+          {thinking ? (
+            <button
+              type="button"
+              onClick={stop}
+              aria-label="Stop"
+              title="Stop"
+              className="press grid size-8 shrink-0 place-items-center rounded-full bg-white/[0.08] text-zinc-200 transition-colors duration-150 hover:bg-white/[0.14]"
+            >
+              <Square className="size-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!hasDraft}
+              aria-label="Ask"
+              className={cn("press grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150", hasDraft ? "bg-[#ededed] text-[#141415] hover:bg-white" : "bg-white/[0.06] text-zinc-500")}
+            >
+              <ArrowUp className="size-4" />
+            </button>
+          )}
         </form>
       </motion.section>
     </div>

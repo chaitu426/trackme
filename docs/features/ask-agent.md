@@ -5,8 +5,6 @@ usable behind it. Fold it (`Esc`, or the chevron) and it is a bar again. There i
 
 **Status: live.** The question goes to the Ask worker, which plans over the workspace's own ClickHouse data with an OpenAI model, and the steps and answer stream back over SSE. No answer is ever canned: if a run fails, the panel says why and shows nothing else. See **Backend** below.
 
-The interface is the same in both modes; clicking **Try again** on a live run that found nothing is the only visible difference from the demo's canned answers.
-
 ## What it is not
 
 Not a chat transcript. A turn is a **finding**:
@@ -83,6 +81,23 @@ queue, the budget in Redis is shared by every node, and run state lives in Postg
    returns 429 with `Retry-After` before a row is written; the worker takes a slot for the whole run.
 7. **Audit.** Every accepted run writes an `ask:run` audit record (question truncated, sources, range) and an `ask_runs` row that keeps the full `Answer` JSON.
 
+### Catalog
+
+Traffic: `traffic_overview`, `compare_periods` (this period vs the equal one before, with the change), `traffic_timeseries`, `traffic_breakdown`, `page_engagement`, `web_vitals`, `web_vitals_by_page`, `custom_events`.
+Errors: `errors_top`, `error_trend`. Payments: `payments_overview`, `gateway_health`, `checkout_funnel`, `revenue_leaks`, `payment_failures`, `payment_recovery`, `refunds_disputes`.
+Releases: `releases_seen`, `release_new_issues`. People (aggregates only, never names or ids): `retention`, `people_overview`.
+The prompt lists each parameter with its allowed values, so the model does not guess enum names.
+
+### Conversation, arithmetic and failure handling
+
+- **Follow-ups.** The browser sends the last four finished exchanges (question and the answer text shown) with the next question. They reach the model as context, marked as not instructions and not evidence; anything cited is re-queried.
+- **`calculate` tool.** Exact arithmetic for derived figures (a change in percent, a share). Its results are accepted by the grounding gate; a figure that is neither in the evidence, nor calculated, nor a rounding of an evidence figure, nor the range length is still dropped.
+- **Never empty.** If the gate drops every block, the person gets the evidence tables with a plain note and low confidence, not a finished run with nothing on screen. Out of tool rounds with evidence in hand, the last round is forced to `finish`.
+- **Named failures.** Provider rate limit, timeout, rejected key and provider outage each have their own message (`packages/ask/src/failure.ts`); detail stays in the worker log. A run has a 150 s wall-clock deadline.
+- **Stop.** The panel's Stop button calls `DELETE /api/v1/ask/runs/:id` (creator only); the worker checks between model calls and the run ends as `cancelled`.
+- **Queue correctness.** A run that finds its workspace at the concurrency limit is re-enqueued after a short pause (it was previously acked and lost). Stale runs are re-enqueued onto the stream (they were reset in Postgres but never redelivered) and failed after ten minutes. A finished run that is redelivered is not run again. The fleet-wide `ASK_LLM_RPM` bucket is now enforced in the worker, not only pre-checked by the web route.
+- **Prompt injection.** Query results are wrapped as data and the prompt tells the model to ignore instructions inside them.
+
 ### Configuration
 
 | Variable | Default | Meaning |
@@ -119,7 +134,7 @@ An answer about something that cost money carries three extra things (all in `ty
 2. **`watch`**: a standing check the answer suggests ("a gateway's success rate falls below 70% over 15 minutes"). One click opens channels (Email, Slack, Webhook) and arms it. A question asked once keeps being asked.
 3. **Case file and ticket** (built in the browser from the answer, so they never say more than the answer did): *Copy case file* gives markdown with the question, answer, trail, every query as SQL and the assumptions; *Copy ticket* gives a title that leads with the cause and the money, the impact, and where to start. The finding leaves the panel and goes where work happens.
 
-Demo status: trail, watch and the two copies work in the preview. A watch is saved in the browser only (`trackme_ask_watches`).
+Status: the interface draws `trail` and `watch`, and the case-file and ticket copies work from any answer, but the backend does not produce a trail or a watch yet (Phase 2, below), so a live answer carries neither today. A watch armed in the panel is saved in the browser only (`trackme_ask_watches`).
 
 ### Backend, for the next phase
 

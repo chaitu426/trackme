@@ -626,8 +626,8 @@ Reverse order of risk: 0, 1, 2 are largely independent and can run in parallel; 
 ## 9. Test plan
 
 1. **Load shape.** 1,000 sites with Zipf popularity (exponent about 1.1), 10,000 req/s, 1-50 events per request
-   mix, 5% retries, bursts of 3x for 10 s. `scripts/e2e-load.ts` and `scripts/simulate-traffic.ts` are the
-   starting points; add the Zipf distribution and a deterministic event-ID ledger so completeness is checkable.
+   mix, 5% retries, bursts of 3x for 10 s. `scripts/simulate-traffic.ts` is the
+   starting point; add the Zipf distribution and a deterministic event-ID ledger so completeness is checkable.
 2. **Invariant checks after every run:** acked = stored + declared shed (by class); duplicates <= 0.01%; no
    `DROPPED` outcome without a matching retry; parts per partition stay under the alert threshold.
 3. **Chaos matrix** (each for 60-120 s under load): kill Redis; add 500 ms latency to Redis; stall Kafka leader;
@@ -700,7 +700,7 @@ stack** (Docker was down). Treat Phases 1-6 as reviewed code, not validated beha
 
 | Phase | Built | Flag / how to enable | Not built, and why |
 |---|---|---|---|
-| **0 Measure** | `edge_stage_duration_seconds`, `worker_stage_seconds`; `scripts/phase0-probe.ts` (Redis commands/keys per event, ClickHouse new parts/s, per-MV cost, stage quantiles); `e2e-load.ts baseline` (open-loop Poisson arrivals, Zipf sites, mixed events, acked-vs-stored ledger, prints which findings reproduce) | `npx tsx scripts/e2e-load.ts baseline --rps=2000 --seconds=120` (edge needs `TRUSTED_PROXY_HOPS=1`) | Not run. This is the next action. |
+| **0 Measure** | `edge_stage_duration_seconds`, `worker_stage_seconds`; a planned probe script (Redis commands/keys per event, ClickHouse new parts/s, per-MV cost, stage quantiles) and a planned open-loop baseline load script (Poisson arrivals, Zipf sites, acked-vs-stored ledger) | both removed from the repo; rewrite when needed (edge needs `TRUSTED_PROXY_HOPS=1`) | Not run. This is the next action. |
 | **1 Worker** | Exact-replay intent record (`intent.ts`) + commit after every batch; realtime split into its own consumer group; batched DLQ send; 1 MB / 500 ms fetch defaults; migration `011` (dedupe window 1,000 -> 20,000 blocks) | On by default. `WORKER_ROLES=writer,realtime`. **Apply `011` before deploying.** | Go consumer / validation sampling: decide from the Phase 0 profile (D7). `SAMPLE BY` and `sample_weight` columns: see Phase 5 note. |
 | **2 Edge intake** | Disk WAL (spill instead of 429 or drop, replay oldest-first); adaptive concurrency limiter; per-response jittered `Retry-After` | `EDGE_WAL_DIR`, `EDGE_ADAPTIVE_LIMIT=true` | Sharded per-core ring buffers: contention is unproven; Phase 0 stage timings decide. Protobuf payload. |
 | **3 Leases** | `internal/lease`: Doorman-style site rate leases (one pipelined Redis call per tick), chunked quota, local sliding-window IP limit, local fingerprint dedupe; stale-if-error (6 h) and error backoff in the site resolver | `EDGE_LEASES=true`, `SITE_EVENTS_PER_SEC`, `EDGE_FLEET_SIZE` | Per-session limit (the gate request carries no session ids); LB rendezvous routing (infrastructure); resolver RCU/LRU/prewarm; versioned settings poll. |

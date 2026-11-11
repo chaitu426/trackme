@@ -18,11 +18,16 @@ export class RunRefusedError extends Error {
   }
 }
 
-export async function startRun(question: string, scope: AskScope, page?: string): Promise<{ runId: string }> {
+export async function startRun(
+  question: string,
+  scope: AskScope,
+  page?: string,
+  history?: Array<{ question: string; answer: string }>
+): Promise<{ runId: string }> {
   const response = await fetch("/api/v1/ask/runs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, scope: { ...scope, ...(page ? { page } : {}) } }),
+    body: JSON.stringify({ question, scope: { ...scope, ...(page ? { page } : {}), ...(history?.length ? { history } : {}) } }),
   });
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as { detail?: string; title?: string } | null;
@@ -32,6 +37,11 @@ export async function startRun(question: string, scope: AskScope, page?: string)
   const body = (await response.json()) as { runId?: string };
   if (!body.runId) throw new RunRefusedError("Ask could not start. Try again.", 500);
   return { runId: body.runId };
+}
+
+/** Ask the server to stop a run. Best effort: the panel has already stopped listening, this just stops the spending. */
+export async function cancelRun(runId: string): Promise<void> {
+  await fetch(`/api/v1/ask/runs/${encodeURIComponent(runId)}`, { method: "DELETE" }).catch(() => undefined);
 }
 
 export interface RunHandlers {

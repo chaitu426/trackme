@@ -40,4 +40,4 @@ Diagrams (Excalidraw, open at excalidraw.com): `trackme-architecture*.excalidraw
 ## Plans: what is next
 [implementation-plan](plans/implementation-plan.md), [phase1-plan](plans/phase1-plan.md), [phase2-plan](plans/phase2-plan.md), [suite-foundation-plan](plans/suite-foundation-plan.md), [feature-ideas](plans/feature-ideas.md).
 
-Also at the repository root: `README.md` (setup) and `SECURITY.md` (reporting a vulnerability).
+Also at the repository root: `README.md` (setup). Security findings and their guards are in [SECURITY_AUDIT](operations/SECURITY_AUDIT.md).

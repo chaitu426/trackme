@@ -9,6 +9,8 @@ import { RANGES, SOURCES, type AskScope, type RangeId, type SourceId } from "./t
 export const MAX_SCOPE_ROWS = 1_000;
 export const MAX_INSTRUCTIONS = 800;
 export const MAX_QUESTION = 600;
+export const MAX_HISTORY_TURNS = 6;
+export const MAX_HISTORY_ANSWER = 1_500;
 
 const RANGE_IDS = RANGES.map((r) => r.id) as [RangeId, ...RangeId[]];
 const SOURCE_IDS = SOURCES.map((s) => s.id) as [SourceId, ...SourceId[]];
@@ -30,6 +32,10 @@ export const ScopeInputSchema = z.object({
   maxRows: z.number().int().positive().max(MAX_SCOPE_ROWS).default(MAX_SCOPE_ROWS),
   instructions: z.string().max(MAX_INSTRUCTIONS).default(""),
   page: z.string().trim().max(80).optional(),
+  history: z
+    .array(z.object({ question: z.string().max(MAX_QUESTION), answer: z.string().max(MAX_HISTORY_ANSWER) }))
+    .max(MAX_HISTORY_TURNS)
+    .optional(),
 });
 
 export const RunInputSchema = z.object({
@@ -56,6 +62,7 @@ export function clampScope(input: z.infer<typeof ScopeInputSchema>): AskScope {
     maxRows: Math.min(input.maxRows, MAX_SCOPE_ROWS),
     instructions: input.instructions.slice(0, MAX_INSTRUCTIONS),
     ...(input.page ? { page: input.page } : {}),
+    ...(input.history?.length ? { history: input.history.slice(-MAX_HISTORY_TURNS) } : {}),
   };
 }
 

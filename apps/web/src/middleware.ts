@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 import { cspHeader, cspMode, newNonce } from "@/lib/csp";
 
-const PUBLIC_EXACT = new Set(["/", "/login", "/signup", "/tracker.js", "/demo.html"])
+// The brand files (social card, touch icon, manifest, sitemap) are fetched by crawlers and link unfurlers that never have a session.
+const PUBLIC_EXACT = new Set(["/", "/login", "/signup", "/tracker.js", "/demo.html", "/opengraph-image", "/apple-icon", "/manifest.webmanifest", "/sitemap.xml", "/robots.txt"])
 const PUBLIC_API_PREFIXES = [
   "/api/auth/login",
   "/api/auth/signup",

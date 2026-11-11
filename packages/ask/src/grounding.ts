@@ -34,7 +34,8 @@ export function citationsOf(answer: Answer): number[] {
 /** Numbers written in a string, normalized: "₹195,970" and "195970" both become "195970"; "61.8%" becomes "61.8". */
 export function numbersIn(text: string): string[] {
   const out: string[] = [];
-  for (const m of text.matchAll(/-?\d[\d,]*(?:\.\d+)?/g)) {
+  // A minus counts as a sign only when it does not follow a digit or letter, so "2026-11-10" and "3-5" are not negatives.
+  for (const m of text.matchAll(/(?:(?<![\w.])-)?\d[\d,]*(?:\.\d+)?/g)) {
     const raw = m[0].replace(/,/g, "");
     if (raw === "" || raw === "-") continue;
     out.push(raw);
@@ -53,16 +54,40 @@ function numbersInEvidence(ev: EvidenceItem): Set<string> {
   return set;
 }
 
-/** True when every number in `text` is present in at least one of the cited evidence samples. Citation markers [n] are not figures. */
-function figuresGrounded(text: string, cited: EvidenceItem[]): boolean {
+export interface GroundingOptions {
+  /** Figures the planner computed with its `calculate` tool; exact, so they are as good as evidence. */
+  derived?: string[];
+  /** Figures that come from the question's own frame (the range length, for example) rather than from data. */
+  allowed?: string[];
+}
+
+const decimalsOf = (raw: string): number => (raw.split(".")[1] ?? "").length;
+const roundTo = (v: number, d: number): number => Math.round(v * 10 ** d) / 10 ** d;
+
+/**
+ * True when the figure is in the cited evidence, was computed by the calculator, belongs to the question's frame, or is the
+ * evidence figure rounded the way a person would write it ("61.84" cited, "61.8" written; a 0.618 share written as 61.8%).
+ */
+function figureKnown(raw: string, known: Set<string>, knownNums: number[], opts: GroundingOptions): boolean {
+  if (known.has(raw) || opts.derived?.includes(raw) || opts.allowed?.includes(raw)) return true;
+  const x = Number(raw);
+  if (!Number.isFinite(x)) return false;
+  const d = decimalsOf(raw);
+  const candidates = [...knownNums, ...(opts.derived ?? []).map(Number)];
+  return candidates.some((y) => roundTo(y, d) === x || roundTo(y * 100, d) === x);
+}
+
+/** True when every number in `text` is grounded. Citation markers [n] are not figures. */
+function figuresGrounded(text: string, cited: EvidenceItem[], opts: GroundingOptions): boolean {
   const known = new Set<string>();
   for (const ev of cited) for (const v of numbersInEvidence(ev)) known.add(v);
+  const knownNums = [...known].map(Number).filter(Number.isFinite);
   const prose = text.replace(/\[\d+\]/g, " ");
-  for (const num of numbersIn(prose)) if (!known.has(num)) return false;
+  for (const num of numbersIn(prose)) if (!figureKnown(num, known, knownNums, opts)) return false;
   return true;
 }
 
-export function groundAnswer(input: Answer): GroundingReport {
+export function groundAnswer(input: Answer, opts: GroundingOptions = {}): GroundingReport {
   const byN = new Map(input.evidence.map((e) => [e.n, e]));
   const dropped: string[] = [];
 
@@ -87,7 +112,7 @@ export function groundAnswer(input: Answer): GroundingReport {
     }
     if (b.type === "text") {
       const cited = cites.map((n) => byN.get(n)).filter((e): e is EvidenceItem => e !== undefined);
-      if (!figuresGrounded(b.text, cited)) {
+      if (!figuresGrounded(b.text, cited, opts)) {
         dropped.push("text block has a figure not found in its cited evidence");
         return false;
       }
@@ -135,4 +160,35 @@ export function groundAnswer(input: Answer): GroundingReport {
   if (trail) answer.trail = trail;
   else delete answer.trail;
   return { answer, dropped, grounded };
+}
+
+/**
+ * What the person sees when the gate dropped every block: the evidence itself, as tables, with a plain note. A run that found
+ * data must never end as "done" with nothing on screen, and must never show an unverified sentence in its place.
+ */
+export function fallbackAnswer(answer: Answer, dropped: string[]): Answer {
+  const tables: Block[] = answer.evidence.slice(0, 4).map((e) => ({
+    type: "table" as const,
+    title: e.title,
+    columns: e.columns,
+    rows: e.sample.map((r) => r.map((c) => String(c))),
+    cite: e.n,
+  }));
+  const blocks: Block[] =
+    tables.length > 0
+      ? [
+          {
+            type: "callout",
+            tone: "warn",
+            text: "I found the data but could not verify a written summary against it, so here are the results themselves.",
+          },
+          ...tables,
+        ]
+      : [{ type: "text", text: "I could not find data to answer that from the sources switched on." }];
+  return {
+    ...answer,
+    blocks,
+    confidence: "low",
+    assumptions: [...answer.assumptions, ...(dropped.length ? ["The written summary failed the figure check and was withheld."] : [])],
+  };
 }

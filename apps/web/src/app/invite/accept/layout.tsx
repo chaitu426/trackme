@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Accept invitation", robots: { index: false, follow: false } };
 
 // Next.js requires a Suspense boundary when the page uses useSearchParams().
 export default function InviteAcceptLayout({ children }: { children: React.ReactNode }) {
