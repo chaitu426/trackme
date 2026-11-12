@@ -5,6 +5,7 @@ import {
   ApiKeyScopeSchema,
   SiteSettingsSchema,
   WorkspaceRoleSchema,
+  CompanyRoleSchema,
   type ApiKeyScope,
   type SiteSettings,
   type WorkspaceRole,
@@ -12,6 +13,7 @@ import {
 import {
   assertPermission,
   assertWorkspaceMatch,
+  effectiveWorkspaceRole,
   hashApiKey,
   hasScope,
   type Permission,
@@ -28,6 +30,8 @@ import {
   usageCounters,
   workspaceMembers,
   workspaces,
+  companyMembers,
+  or,
 } from "@trackme/db";
 import { requireApiUser } from "./auth";
 import { checkRateLimit } from "./rate-limit";
@@ -79,6 +83,13 @@ function roleFromApiKeyScopes(scopes: ApiKeyScope[]): WorkspaceRole {
   throw new AppError(403, "FORBIDDEN", "API key is missing analytics read scope");
 }
 
+/** Direct membership combined with the company role. Unknown stored values grant nothing. */
+function resolveRole(direct: string | null, company: string | null): WorkspaceRole | null {
+  const d = WorkspaceRoleSchema.safeParse(direct);
+  const c = CompanyRoleSchema.safeParse(company);
+  return effectiveWorkspaceRole(d.success ? d.data : null, c.success ? c.data : null);
+}
+
 async function loadMembershipContext(
   userId: string,
   workspaceId: string,
@@ -86,33 +97,38 @@ async function loadMembershipContext(
 ): Promise<TenantContext> {
   if (options.cache) {
     const role = await cachedMembershipRole(userId, workspaceId, async () => (await queryMembership(userId, workspaceId)).role);
-    return { userId, workspaceId, role: parseRole(role) };
+    return { userId, workspaceId, role: parseRole(role), principal: "user" };
   }
   return queryMembership(userId, workspaceId);
 }
 
 async function queryMembership(userId: string, workspaceId: string): Promise<TenantContext> {
+  // One query: the person's direct membership, and their role in the company that owns the workspace.
   const rows = await db
     .select({
+      workspaceId: workspaces.id,
       role: workspaceMembers.role,
-      workspaceId: workspaceMembers.workspaceId,
+      companyRole: companyMembers.role,
     })
-    .from(workspaceMembers)
-    .where(
-      and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.workspaceId, workspaceId))
+    .from(workspaces)
+    .leftJoin(
+      workspaceMembers,
+      and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId))
     )
+    .leftJoin(
+      companyMembers,
+      and(eq(companyMembers.companyId, workspaces.companyId), eq(companyMembers.userId, userId))
+    )
+    .where(eq(workspaces.id, workspaceId))
     .limit(1);
 
-  const membership = rows[0];
-  if (!membership) {
+  const row = rows[0];
+  const role = row ? resolveRole(row.role, row.companyRole) : null;
+  if (!row || !role) {
     throw new AppError(403, "TENANT_ISOLATION_VIOLATION", "Cross-workspace access is strictly forbidden");
   }
 
-  return {
-    userId,
-    workspaceId: membership.workspaceId,
-    role: parseRole(membership.role),
-  };
+  return { userId, workspaceId: row.workspaceId, role, principal: "user" };
 }
 
 /** Per caller (a signed-in user, or one API key) per minute, across every authenticated endpoint. */
@@ -185,6 +201,7 @@ async function authenticateApiKey(
     userId: `api-key:${apiKey.id}`,
     workspaceId: apiKey.workspaceId,
     role: roleFromApiKeyScopes(apiKey.scopes),
+    principal: "api_key",
   };
 
   assertWorkspaceMatch(ctx, workspaceId);
@@ -210,7 +227,7 @@ export async function authenticateDeployKey(request: NextRequest): Promise<{ wor
 export async function authenticateRequest(
   request: NextRequest,
   workspaceId: string,
-  requiredScopeOrPermission: ApiKeyScope | Permission | "read:analytics" | "admin:workspace" = "analytics:read",
+  permission: Permission,
   options: { cacheMembership?: boolean } = {}
 ): Promise<TenantContext> {
   const apiKeyContext = await authenticateApiKey(request, workspaceId);
@@ -219,14 +236,6 @@ export async function authenticateRequest(
     (await loadMembershipContext((await requireApiUser(request)).id, workspaceId, { cache: options.cacheMembership === true }));
 
   assertWorkspaceMatch(ctx, workspaceId);
-
-  const permission: Permission =
-    requiredScopeOrPermission === "admin:workspace"
-      ? "workspace:manage"
-      : requiredScopeOrPermission === "read:analytics"
-      ? "analytics:read"
-      : (requiredScopeOrPermission as Permission);
-
   assertPermission(ctx, permission);
   await enforceCallerLimit(ctx);
   return ctx;
@@ -239,7 +248,7 @@ export async function requireMetricsAccess(
 ): Promise<TenantContext> {
   // Read-only analytics path: membership (30 s) and site ownership (10 min) are
   // cached, with explicit invalidation on member removal/role change and site delete.
-  const ctx = await authenticateRequest(request, workspaceId, "read:analytics", { cacheMembership: true });
+  const ctx = await authenticateRequest(request, workspaceId, "analytics:read", { cacheMembership: true });
 
   const belongs = await cachedSiteInWorkspace(siteId, workspaceId, async () => {
     const siteRows = await db
@@ -265,18 +274,25 @@ export const requireWorkspaceBySlug = cache(async (userId: string, slug: string)
       id: workspaces.id,
       name: workspaces.name,
       slug: workspaces.slug,
+      companyId: workspaces.companyId,
       role: workspaceMembers.role,
+      companyRole: companyMembers.role,
     })
     .from(workspaces)
-    .innerJoin(
+    .leftJoin(
       workspaceMembers,
       and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId))
+    )
+    .leftJoin(
+      companyMembers,
+      and(eq(companyMembers.companyId, workspaces.companyId), eq(companyMembers.userId, userId))
     )
     .where(eq(workspaces.slug, slug))
     .limit(1);
 
   const workspace = rows[0];
-  if (!workspace) {
+  const role = workspace ? resolveRole(workspace.role, workspace.companyRole) : null;
+  if (!workspace || !role) {
     throw new AppError(403, "TENANT_ISOLATION_VIOLATION", "Workspace not found for this account");
   }
 
@@ -284,7 +300,8 @@ export const requireWorkspaceBySlug = cache(async (userId: string, slug: string)
     id: workspace.id,
     name: workspace.name,
     slug: workspace.slug,
-    role: parseRole(workspace.role),
+    companyId: workspace.companyId,
+    role,
   };
 });
 
@@ -301,18 +318,31 @@ export const listWorkspaceSites = cache(async (workspaceId: string) => {
 });
 
 export const listUserWorkspaces = cache(async (userId: string) => {
-  return db
+  // Workspaces the person belongs to directly, plus every workspace of a company they own.
+  const rows = await db
     .select({
       id: workspaces.id,
       name: workspaces.name,
       slug: workspaces.slug,
+      companyId: workspaces.companyId,
       role: workspaceMembers.role,
+      companyRole: companyMembers.role,
     })
     .from(workspaces)
-    .innerJoin(
+    .leftJoin(
       workspaceMembers,
       and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId))
-    );
+    )
+    .leftJoin(
+      companyMembers,
+      and(eq(companyMembers.companyId, workspaces.companyId), eq(companyMembers.userId, userId))
+    )
+    .where(or(eq(workspaceMembers.userId, userId), eq(companyMembers.userId, userId)));
+
+  return rows.flatMap((row) => {
+    const role = resolveRole(row.role, row.companyRole);
+    return role ? [{ id: row.id, name: row.name, slug: row.slug, companyId: row.companyId, role }] : [];
+  });
 });
 
 export type DashboardSite = {

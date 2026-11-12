@@ -3,6 +3,10 @@ import { z } from "zod";
 export const WorkspaceRoleSchema = z.enum(["owner", "admin", "member", "viewer"]);
 export type WorkspaceRole = z.infer<typeof WorkspaceRoleSchema>;
 
+/** Roles in a company, the tier above workspaces. A company owner has owner-level access to every workspace in it. */
+export const CompanyRoleSchema = z.enum(["owner", "billing_admin"]);
+export type CompanyRole = z.infer<typeof CompanyRoleSchema>;
+
 export const ApiKeyScopeSchema = z.enum([
   "read:analytics",
   "write:events",

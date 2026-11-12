@@ -3,7 +3,7 @@
  * Idempotent: upserts by public key.
  */
 import { hashApiKey } from "@trackme/authz";
-import { db, sites, workspaces, eq } from "@trackme/db";
+import { db, sites, workspaces, companies, eq } from "@trackme/db";
 
 const DEMO_PUBLIC_KEY = "site_pub_ueBSEXIWEdSjNQdRUu-opxZy";
 const DEMO_SETTINGS = {
@@ -42,23 +42,19 @@ async function main() {
     process.exit(0);
   }
 
-  const [workspace] = await db
-    .insert(workspaces)
-    .values({
-      name: "TrackMe Demo",
-      slug: "trackme-demo",
-    })
-    .onConflictDoNothing()
-    .returning({ id: workspaces.id, slug: workspaces.slug });
-
-  let workspaceId = workspace?.id;
+  // A workspace belongs to a company. Reuse the demo workspace if it exists; otherwise create both.
+  let workspaceId = (
+    await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.slug, "trackme-demo")).limit(1)
+  )[0]?.id;
   if (!workspaceId) {
-    const rows = await db
-      .select({ id: workspaces.id })
-      .from(workspaces)
-      .where(eq(workspaces.slug, "trackme-demo"))
-      .limit(1);
-    workspaceId = rows[0]?.id;
+    const [company] = await db.insert(companies).values({ name: "TrackMe Demo" }).returning({ id: companies.id });
+    if (!company) throw new Error("Failed to create demo company");
+    const [workspace] = await db
+      .insert(workspaces)
+      .values({ companyId: company.id, name: "TrackMe Demo", slug: "trackme-demo" })
+      .onConflictDoNothing()
+      .returning({ id: workspaces.id });
+    workspaceId = workspace?.id;
   }
 
   if (!workspaceId) {

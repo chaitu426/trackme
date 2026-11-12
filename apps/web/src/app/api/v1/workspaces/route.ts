@@ -8,8 +8,11 @@ import {
   db,
   workspaces,
   workspaceMembers,
+  companies,
+  companyMembers,
   sites,
   eq,
+  and,
 } from "@trackme/db";
 import { requireApiUser } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
@@ -18,6 +21,11 @@ import { resolveTrackerIntegrity, resolveTrackerScriptUrl } from "@/lib/tracker-
 
 const CreateWorkspaceSchema = z.object({
   name: z.string().trim().min(2).max(64),
+  /**
+   * The company to create the workspace under. Omit it and the caller's only company is used; a first-time
+   * caller with no company gets one created, named after the workspace.
+   */
+  companyId: z.string().uuid().optional(),
   domain: z
     .string()
     .trim()
@@ -63,9 +71,35 @@ export async function POST(request: NextRequest) {
     const publicKeyHash = hashApiKey(publicKey);
 
     const created = await db.transaction(async (tx) => {
+      // Workspaces live under a company, and only a company owner can add one.
+      const owned = await tx
+        .select({ companyId: companyMembers.companyId })
+        .from(companyMembers)
+        .where(and(eq(companyMembers.userId, user.id), eq(companyMembers.role, "owner")));
+
+      let companyId: string;
+      if (parsed.data.companyId) {
+        if (!owned.some((c) => c.companyId === parsed.data.companyId)) {
+          throw new AppError(403, "FORBIDDEN", "Only a company owner can create workspaces in this company.");
+        }
+        companyId = parsed.data.companyId;
+      } else if (owned.length === 1) {
+        companyId = owned[0]!.companyId;
+      } else if (owned.length > 1) {
+        throw new AppError(400, "COMPANY_REQUIRED", "You own more than one company. Say which one the workspace belongs to.");
+      } else {
+        const [company] = await tx.insert(companies).values({ name: parsed.data.name }).returning({ id: companies.id });
+        if (!company) {
+          throw new AppError(500, "COMPANY_CREATE_FAILED", "Unable to create company");
+        }
+        await tx.insert(companyMembers).values({ companyId: company.id, userId: user.id, role: "owner" });
+        companyId = company.id;
+      }
+
       const workspaceRows = await tx
         .insert(workspaces)
         .values({
+          companyId,
           name: parsed.data.name,
           slug,
         })

@@ -78,6 +78,20 @@
       "when": 1794288948331,
       "tag": "0010_wooden_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794502800257,
+      "tag": "0011_api_key_created_by",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794503219760,
+      "tag": "0012_company_tier",
+      "breakpoints": true
     }
   ]
 }

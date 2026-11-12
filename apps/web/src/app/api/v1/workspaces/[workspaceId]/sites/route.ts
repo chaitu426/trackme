@@ -26,7 +26,7 @@ export async function GET(
 ) {
   try {
     const { workspaceId } = await props.params;
-    await authenticateRequest(request, workspaceId, "read:analytics");
+    await authenticateRequest(request, workspaceId, "analytics:read");
 
     const rows = await db
       .select({

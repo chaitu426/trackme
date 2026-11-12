@@ -65,7 +65,7 @@ export async function GET(
 ) {
   try {
     const { workspaceId, siteId } = await props.params;
-    await authenticateRequest(req, workspaceId, "read:analytics");
+    await authenticateRequest(req, workspaceId, "analytics:read");
 
     const rules = await db
       .select({
@@ -98,7 +98,7 @@ export async function POST(
 ) {
   try {
     const { workspaceId, siteId } = await props.params;
-    await authenticateRequest(req, workspaceId, "admin:workspace");
+    await authenticateRequest(req, workspaceId, "alerts:manage");
 
     const body = await req.json();
     const parsed = CreateRuleSchema.safeParse(body);

@@ -16,7 +16,7 @@ export async function DELETE(
 ) {
   try {
     const { workspaceId, siteId } = await props.params;
-    await authenticateRequest(request, workspaceId, "admin:workspace");
+    await authenticateRequest(request, workspaceId, "sites:delete");
 
     // Ensure at least 1 site remains in workspace
     const allSites = await db
@@ -51,7 +51,7 @@ export async function PATCH(
 ) {
   try {
     const { workspaceId, siteId } = await props.params;
-    await authenticateRequest(request, workspaceId, "admin:workspace");
+    await authenticateRequest(request, workspaceId, "sites:update");
 
     const body = await request.json().catch(() => ({}));
     const parsed = UpdateSiteSchema.safeParse(body);

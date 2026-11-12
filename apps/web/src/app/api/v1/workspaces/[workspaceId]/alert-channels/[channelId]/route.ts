@@ -21,7 +21,7 @@ export async function PATCH(
 ) {
   try {
     const { workspaceId, channelId } = await props.params;
-    await authenticateRequest(req, workspaceId, "admin:workspace");
+    await authenticateRequest(req, workspaceId, "alerts:manage");
 
     const body = await req.json().catch(() => ({}));
     const parsed = UpdateSchema.safeParse(body);
@@ -51,7 +51,7 @@ export async function DELETE(
 ) {
   try {
     const { workspaceId, channelId } = await props.params;
-    await authenticateRequest(req, workspaceId, "admin:workspace");
+    await authenticateRequest(req, workspaceId, "alerts:manage");
 
     const deleted = await db
       .delete(alertChannels)

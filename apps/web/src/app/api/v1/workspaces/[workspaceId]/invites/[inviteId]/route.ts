@@ -12,14 +12,17 @@ export async function DELETE(
 ) {
   try {
     const { workspaceId, inviteId } = await props.params;
-    const ctx = await authenticateRequest(request, workspaceId, "admin:workspace");
+    const ctx = await authenticateRequest(request, workspaceId, "workspace:members");
 
+    // Revoke, never delete: the row stays as the record of who was invited, and the token stops working.
     const deleted = await db
-      .delete(workspaceInvites)
+      .update(workspaceInvites)
+      .set({ status: "revoked" })
       .where(
         and(
           eq(workspaceInvites.id, inviteId),
-          eq(workspaceInvites.workspaceId, workspaceId)
+          eq(workspaceInvites.workspaceId, workspaceId),
+          eq(workspaceInvites.status, "pending")
         )
       )
       .returning({ id: workspaceInvites.id, email: workspaceInvites.email });

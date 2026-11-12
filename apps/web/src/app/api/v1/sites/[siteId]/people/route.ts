@@ -34,7 +34,7 @@ async function handleGet(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "read:analytics");
+    await authenticateRequest(request, siteRow.workspaceId, "analytics:read");
 
     const search = request.nextUrl.searchParams.get("query")?.trim() || "";
     const limit = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("limit") || 50)));

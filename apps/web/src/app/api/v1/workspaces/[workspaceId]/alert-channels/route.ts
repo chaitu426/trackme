@@ -53,7 +53,7 @@ export async function GET(
 ) {
   try {
     const { workspaceId } = await props.params;
-    await authenticateRequest(req, workspaceId, "read:analytics");
+    await authenticateRequest(req, workspaceId, "analytics:read");
 
     const channels = await db
       .select()
@@ -83,7 +83,7 @@ export async function POST(
 ) {
   try {
     const { workspaceId } = await props.params;
-    await authenticateRequest(req, workspaceId, "admin:workspace");
+    await authenticateRequest(req, workspaceId, "alerts:manage");
     await checkRateLimit(`channel_create:${workspaceId}`, 20, 60 * 60, "Too many notification channels created. Try again later.");
 
     const body = await req.json().catch(() => ({}));

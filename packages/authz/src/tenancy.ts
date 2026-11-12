@@ -1,17 +1,22 @@
 import { WorkspaceRole, AppError } from "@trackme/contracts";
-import { Permission, hasPermission } from "./permissions.js";
+import { API_KEY_DENIED, Permission, hasPermission } from "./permissions.js";
 
 export interface TenantContext {
   userId: string;
   workspaceId: string;
   role: WorkspaceRole;
   siteId?: string;
+  /** Who is acting: a signed-in person, or an API key. Defaults to a person. */
+  principal?: "user" | "api_key";
 }
 
 /**
  * Enforce that the active tenant context possesses the required permission
  */
 export function assertPermission(ctx: TenantContext, permission: Permission): void {
+  if (ctx.principal === "api_key" && API_KEY_DENIED.has(permission)) {
+    throw new AppError(403, "FORBIDDEN", `API keys cannot use '${permission}'. Sign in as a member instead.`);
+  }
   if (!hasPermission(ctx.role, permission)) {
     throw new AppError(
       403,
@@ -33,4 +38,3 @@ export function assertWorkspaceMatch(ctx: TenantContext, targetWorkspaceId: stri
     );
   }
 }
-

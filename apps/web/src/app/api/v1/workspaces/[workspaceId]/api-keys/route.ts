@@ -59,6 +59,7 @@ export async function POST(
       .insert(apiKeys)
       .values({
         workspaceId,
+        createdBy: ctx.userId,
         name: parsed.data.name,
         prefix: generated.prefix,
         keyHash: generated.keyHash,

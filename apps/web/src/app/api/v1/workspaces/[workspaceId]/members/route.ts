@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
-import { hasPermission } from "@trackme/authz";
+import { canInviteRole, hasPermission } from "@trackme/authz";
 import {
   db,
   workspaceMembers,
@@ -31,7 +31,7 @@ export async function GET(
 ) {
   try {
     const { workspaceId } = await props.params;
-    const ctx = await authenticateRequest(request, workspaceId, "read:analytics");
+    const ctx = await authenticateRequest(request, workspaceId, "members:read");
 
     const members = await db
       .select({
@@ -75,7 +75,7 @@ export async function POST(
 ) {
   try {
     const { workspaceId } = await props.params;
-    const ctx = await authenticateRequest(request, workspaceId, "admin:workspace");
+    const ctx = await authenticateRequest(request, workspaceId, "workspace:members");
 
     const body = await request.json().catch(() => ({}));
     const parsed = InviteMemberSchema.safeParse(body);
@@ -85,6 +85,9 @@ export async function POST(
 
     const email = parsed.data.email.toLowerCase();
     const role = parsed.data.role;
+    if (!canInviteRole(ctx.role, role)) {
+      throw new AppError(403, "FORBIDDEN", `Your role cannot invite someone as ${role}. Ask the workspace owner.`);
+    }
 
     // Invitations send mail from our domain to any address, so they are limited per inviter and per
     // workspace, capped while pending, and only a verified account may send them.

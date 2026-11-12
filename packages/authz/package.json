@@ -10,6 +10,11 @@
       "require": "./dist/index.js",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./roles": {
+      "import": "./dist/roles.js",
+      "require": "./dist/roles.js",
+      "types": "./dist/roles.d.ts"
     }
   },
   "scripts": {

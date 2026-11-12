@@ -1,5 +1,7 @@
 "use client";
 
+import type { WorkspaceRole } from "@trackme/contracts";
+import { canChangeRole, canInviteRole, canRemoveMember } from "@trackme/authz/roles";
 import { MatrixSpinner } from "@/components/ui/matrix-loader";
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -219,7 +221,8 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
                 onChange={setInviteRole}
                 className="self-start"
                 items={[
-                  { id: "admin", label: "Admin" },
+                  // Only the owner can hand out admin; an admin can invite members and viewers.
+                  ...(canInviteRole(workspace.role as WorkspaceRole, "admin") ? [{ id: "admin" as const, label: "Admin" }] : []),
                   { id: "member", label: "Member" },
                   { id: "viewer", label: "Viewer" },
                 ]}
@@ -346,10 +349,10 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
                           <SelectDropdown
                             ariaLabel={`Role for ${member.name}`}
                             value={member.role}
-                            disabled={busy || isSelf || !canManage}
+                            disabled={busy || isSelf || !canManage || !canChangeRole(workspace.role as WorkspaceRole, member.role as WorkspaceRole, "viewer")}
                             onChange={(role) => void handleChangeRole(member.id, role as "admin" | "member" | "viewer")}
                             options={[
-                              { value: "admin", label: "Admin" },
+                              ...(isOwner || member.role === "admin" ? [{ value: "admin", label: "Admin" }] : []),
                               { value: "member", label: "Member" },
                               { value: "viewer", label: "Viewer" },
                             ]}
@@ -367,7 +370,7 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
                             onConfirm={() => void handleChangeRole(member.id, "owner")}
                           />
                         )}
-                        {!memberIsOwner && !isSelf && canManage && (
+                        {!memberIsOwner && !isSelf && canManage && canRemoveMember(workspace.role as WorkspaceRole, member.role as WorkspaceRole) && (
                           <ConfirmAction icon={Trash2} title={`Remove ${member.name}`} confirmLabel="Remove" busy={busy} onConfirm={() => void handleRemoveMember(member.id)} />
                         )}
                         {isSelf && !memberIsOwner && (

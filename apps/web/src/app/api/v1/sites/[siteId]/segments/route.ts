@@ -23,7 +23,7 @@ function isMissingTable(error: unknown): boolean {
 async function handleGet(request: NextRequest, props: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await props.params;
-    await authorizeSite(request, siteId, "read:analytics");
+    await authorizeSite(request, siteId, "analytics:read");
     const segments = await db
       .select({ id: siteSegments.id, name: siteSegments.name, definition: siteSegments.definition, createdAt: siteSegments.createdAt })
       .from(siteSegments)
