@@ -5,3 +5,4 @@ export { GlyphField } from "./glyph-field";
 export type { GlyphVariant } from "./glyph-field";
 export { Reveal, Spot } from "./motion";
 export { LogoMark } from "./logo-mark";
+export { RELEASE } from "./version";

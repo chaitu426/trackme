@@ -14,6 +14,7 @@ import { InstallConsole } from "./install-console";
 import { CopySnippet } from "./copy-snippet";
 import { TryChips } from "./try-chips";
 import { CountUp, Reveal, Spot } from "./motion";
+import { RELEASE } from "./version";
 
 export interface LandingLinks {
   /** Docs home. */
@@ -155,10 +156,10 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
               Realtime, down to the last five minutes
             </span>
             <h1 className="rise mt-6 text-balance text-[44px] font-medium leading-[46px] tracking-[-0.035em] text-zinc-50 [animation-delay:60ms] sm:text-[60px] sm:leading-[62px] lg:text-[68px] lg:leading-[70px]">
-              Analytics that counts visits, <span className="text-zinc-500">not people.</span>
+              Analytics for every team, <span className="text-zinc-500">not just the analyst.</span>
             </h1>
             <p className="rise mt-6 max-w-[540px] text-[17px] leading-7 text-zinc-300 [animation-delay:120ms] sm:text-lg sm:leading-[28px]">
-              {product} gives product and engineering teams live traffic, funnels, errors, release impact and payments from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.
+              {product} gives marketing, engineering and product one workspace for live traffic, funnels, errors, release impact and payments, with each person seeing what their role needs. A tag under 10 KB, no tracking cookies, and no IP address ever stored.
             </p>
             <div className="rise mt-8 flex flex-wrap gap-3 [animation-delay:180ms]">
               <SmartLink href={primaryHref} className={primaryButton}>
@@ -430,7 +431,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
                 <Mark />
                 {product}
               </SmartLink>
-              <p className="mt-4 text-sm leading-[22px] text-zinc-400">Cookieless web analytics for product and engineering teams, running on your own infrastructure.</p>
+              <p className="mt-4 text-sm leading-[22px] text-zinc-400">Cookieless analytics for marketing, engineering and product teams, running on your own infrastructure.</p>
               <p className="mt-6 inline-flex items-center gap-2 text-[13px] text-zinc-500">
                 <ShieldCheck className="h-4 w-4" strokeWidth={1.5} />
                 No tracking cookies. No stored IP addresses.
@@ -475,7 +476,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
 
         <div className="relative z-10 border-t border-white/[0.08] bg-[#0f0f10]">
           <Container className="flex flex-col gap-3 py-5 text-[13px] text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-            <p>© {new Date().getFullYear()} {product}</p>
+            <p>© {new Date().getFullYear()} {product} · {RELEASE.label}</p>
             <p className="font-mono text-xs">Go edge · Kafka · ClickHouse</p>
             <a href="#product" className="inline-flex items-center gap-1 text-zinc-400 transition-colors duration-150 hover:text-zinc-100">
               Back to top <ArrowUpRight className="h-4 w-4 -rotate-45" strokeWidth={1.5} />
