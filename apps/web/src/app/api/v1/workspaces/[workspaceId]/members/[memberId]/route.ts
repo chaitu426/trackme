@@ -3,8 +3,9 @@ import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError, WorkspaceRoleSchema, type WorkspaceRole } from "@trackme/contracts";
 import { assertPermission, canChangeRole, canRemoveMember } from "@trackme/authz";
-import { db, workspaceMembers, eq, and } from "@trackme/db";
+import { db, workspaceMembers, teams, teamMembers, sites, siteUserFeatures, eq, and, inArray } from "@trackme/db";
 import { invalidateMembership } from "@/lib/authz-cache";
+import { bumpAccessVersion } from "@/lib/access";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { recordAuditLog } from "@/lib/audit";
@@ -197,7 +198,15 @@ export async function DELETE(
         )
       );
 
+    // Leaving the workspace also leaves its teams and drops any access granted to the person directly.
+    const workspaceTeams = db.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId));
+    const workspaceSites = db.select({ id: sites.id }).from(sites).where(eq(sites.workspaceId, workspaceId));
+    await db.delete(teamMembers).where(and(eq(teamMembers.userId, memberId), inArray(teamMembers.teamId, workspaceTeams)));
+    await db.delete(siteUserFeatures).where(and(eq(siteUserFeatures.userId, memberId), inArray(siteUserFeatures.siteId, workspaceSites)));
+    await db.update(teams).set({ leadUserId: null }).where(and(eq(teams.workspaceId, workspaceId), eq(teams.leadUserId, memberId)));
+
     await invalidateMembership(memberId, workspaceId);
+    await bumpAccessVersion(workspaceId);
 
     await recordAuditLog({
       workspaceId,

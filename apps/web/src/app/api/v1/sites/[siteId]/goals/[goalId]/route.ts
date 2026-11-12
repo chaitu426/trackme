@@ -21,7 +21,7 @@ export async function PATCH(
 ) {
   try {
     const { siteId, goalId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "funnels");
 
     const body = await request.json().catch(() => ({}));
     const parsed = PatchGoalSchema.safeParse(body);
@@ -81,7 +81,7 @@ export async function DELETE(
 ) {
   try {
     const { siteId, goalId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "funnels");
 
     const existingRows = await db
       .select({

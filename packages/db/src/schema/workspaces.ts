@@ -9,6 +9,11 @@ export const workspaces = pgTable("workspaces", {
     .references(() => companies.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  /**
+   * How members and viewers get access to features. 'open': by role alone, as before teams existed. 'restricted': only
+   * what their teams or personal grants allow, per site. Applies only while the plan includes teams.
+   */
+  accessMode: text("access_mode").notNull().default("open"),
   plan: text("plan").notNull().default("starter"),
   timezone: text("timezone").notNull().default("UTC"),
   dataRegion: text("data_region").notNull().default("eu-central-1"),

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
 import { db, siteFunnels, sites, eq, desc } from "@trackme/db";
-import { authenticateRequest } from "@/lib/tenancy";
+import { authenticateSite } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 
 const FunnelStepSchema = z.object({
@@ -36,7 +36,7 @@ export async function GET(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "analytics:read");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "analytics:read", "funnels");
 
     const funnels = await db
       .select()
@@ -67,7 +67,7 @@ export async function POST(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "sites:update");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "sites:update", "funnels");
 
     const body = await request.json().catch(() => ({}));
     const parsed = CreateFunnelSchema.safeParse(body);

@@ -9,7 +9,7 @@ import { paymentRanges } from "@/lib/payments-view";
 export async function GET(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await params;
-    const { site } = await requireSiteAccess(request, siteId);
+    const { site } = await requireSiteAccess(request, siteId, "analytics:read", "payments");
     const range = parseRangeKey(request.nextUrl.searchParams.get("range") ?? undefined);
     const { current } = paymentRanges(range);
     const data = await getRevenueLeaks(siteId, current);

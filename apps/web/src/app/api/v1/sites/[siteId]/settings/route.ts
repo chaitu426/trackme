@@ -35,7 +35,7 @@ export async function GET(
 ) {
   try {
     const { siteId } = await params;
-    const { site } = await requireSiteAccess(request, siteId);
+    const { site } = await requireSiteAccess(request, siteId, "analytics:read", "site_settings");
     return NextResponse.json({
       site: {
         id: site.id,
@@ -56,7 +56,7 @@ export async function PATCH(
 ) {
   try {
     const { siteId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "site_settings");
 
     const parsed = PatchSchema.safeParse(await request.json());
     if (!parsed.success) {

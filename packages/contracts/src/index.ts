@@ -6,3 +6,4 @@ export * from "./errors.js";
 export * from "./scrub.js";
 export * from "./error-status.js";
 export * from "./plans.js";
+export * from "./access.js";

@@ -10,7 +10,7 @@ import { timedRoute } from "@/lib/metrics-registry";
 async function handlePost(request: NextRequest, props: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await props.params;
-    const access = await authorizeSite(request, siteId, "analytics:read");
+    const access = await authorizeSite(request, siteId, "analytics:read", "people");
 
     const parsed = SegmentDefinitionSchema.safeParse((await request.json().catch(() => null))?.definition);
     if (!parsed.success) {

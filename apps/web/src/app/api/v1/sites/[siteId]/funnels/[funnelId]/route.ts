@@ -3,7 +3,7 @@ import { AppError } from "@trackme/contracts";
 import { db, siteFunnels, sites, eq, and } from "@trackme/db";
 import { cachedFunnel } from "@/lib/query-cache";
 import { analyzeFunnel, type FunnelStepDefinition } from "@trackme/analytics";
-import { authenticateRequest } from "@/lib/tenancy";
+import { authenticateSite } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { timedRoute } from "@/lib/metrics-registry";
 
@@ -24,7 +24,7 @@ async function handleGet(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "analytics:read");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "analytics:read", "funnels");
 
     const [funnel] = await db
       .select()
@@ -82,7 +82,7 @@ export async function DELETE(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "sites:update");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "sites:update", "funnels");
 
     const deleted = await db
       .delete(siteFunnels)

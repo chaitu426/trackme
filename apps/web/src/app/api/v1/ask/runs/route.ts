@@ -45,7 +45,7 @@ async function handlePost(request: NextRequest) {
     const site = siteRows[0];
     if (!site) throw new AppError(400, "ASK_NO_SITE", "The site in scope is not part of this workspace.");
 
-    const ctx = await requireMetricsAccess(request, workspace.id, site.id);
+    const ctx = await requireMetricsAccess(request, workspace.id, site.id, "ask");
 
     const redis = getRedis("state");
     const status = await limiterStatus(redis as unknown as { eval: never; get: never }, ctx.workspaceId, {

@@ -8,7 +8,7 @@ import {
   type FunnelStepDefinition,
 } from "@trackme/analytics";
 import { cachedFunnelKind } from "@/lib/query-cache";
-import { authenticateRequest } from "@/lib/tenancy";
+import { authenticateSite } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { timedRoute } from "@/lib/metrics-registry";
 
@@ -32,7 +32,7 @@ async function handleGet(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "analytics:read");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "analytics:read", "funnels");
 
     const [funnel] = await db
       .select()

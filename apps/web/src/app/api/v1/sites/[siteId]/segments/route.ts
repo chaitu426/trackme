@@ -24,7 +24,7 @@ function isMissingTable(error: unknown): boolean {
 async function handleGet(request: NextRequest, props: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await props.params;
-    await authorizeSite(request, siteId, "analytics:read");
+    await authorizeSite(request, siteId, "analytics:read", "people");
     const segments = await db
       .select({ id: siteSegments.id, name: siteSegments.name, definition: siteSegments.definition, createdAt: siteSegments.createdAt })
       .from(siteSegments)
@@ -45,7 +45,7 @@ async function handleGet(request: NextRequest, props: { params: Promise<{ siteId
 async function handlePost(request: NextRequest, props: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await props.params;
-    const access = await authorizeSite(request, siteId, "sites:update");
+    const access = await authorizeSite(request, siteId, "sites:update", "people");
 
     const parsed = CreateSegmentSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {

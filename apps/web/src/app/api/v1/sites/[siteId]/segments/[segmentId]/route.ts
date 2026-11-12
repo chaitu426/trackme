@@ -8,7 +8,7 @@ import { timedRoute } from "@/lib/metrics-registry";
 async function handleDelete(request: NextRequest, props: { params: Promise<{ siteId: string; segmentId: string }> }) {
   try {
     const { siteId, segmentId } = await props.params;
-    await authorizeSite(request, siteId, "sites:update");
+    await authorizeSite(request, siteId, "sites:update", "people");
     const deleted = await db
       .delete(siteSegments)
       .where(and(eq(siteSegments.id, segmentId), eq(siteSegments.siteId, siteId)))

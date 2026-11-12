@@ -36,7 +36,7 @@ async function handleGet(
 ) {
   try {
     const { siteId } = await params;
-    await requireSiteAccess(request, siteId);
+    await requireSiteAccess(request, siteId, "analytics:read", "funnels");
 
     const siteGoals = await db
       .select()
@@ -56,7 +56,7 @@ export async function POST(
 ) {
   try {
     const { siteId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "funnels");
 
     const parsed = CreateGoalSchema.safeParse(await request.json());
     if (!parsed.success) {

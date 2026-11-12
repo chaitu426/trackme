@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AppError, type WorkspaceRole } from "@trackme/contracts";
+import { AppError, FEATURES, type WorkspaceRole } from "@trackme/contracts";
 import { ALL_PERMISSIONS, API_KEY_DENIED, hasPermission } from "./permissions.js";
 import { ROLE_RANK, canChangeRole, canInviteRole, canRemoveMember, effectiveWorkspaceRole } from "./roles.js";
 import { assertPermission } from "./tenancy.js";
@@ -94,6 +94,14 @@ test("every authenticateRequest / authorizeSite call in the web app names a real
     }
     for (const m of text.matchAll(/\bauthenticateRequest\(\s*[^,()]+,\s*[^,()]+\s*\)/g)) {
       problems.push(`${file}: authenticateRequest with no permission: ${m[0]}`);
+    }
+    // Routes that also name a feature: both the permission and the feature must be real.
+    for (const m of text.matchAll(/authenticateSite\(\s*[^,()]+,\s*[^,()]+,\s*[^,()]+,\s*([^,()]+),\s*([^,)]+)\s*\)/g)) {
+      calls += 1;
+      const permission = /^"([^"]+)"$/.exec(m[1]!.trim())?.[1];
+      const feature = /^"([^"]+)"$/.exec(m[2]!.trim())?.[1];
+      if (!permission || !valid.has(permission)) problems.push(`${file}: authenticateSite permission ${m[1]}`);
+      if (!feature || !(FEATURES as readonly string[]).includes(feature)) problems.push(`${file}: authenticateSite feature ${m[2]}`);
     }
   }
   assert.ok(calls > 20, `expected to scan the routes, found ${calls} calls`);

@@ -22,7 +22,7 @@ const PutSchema = z.object({
 export async function GET(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await params;
-    await requireSiteAccess(request, siteId);
+    await requireSiteAccess(request, siteId, "analytics:read", "payments");
     const rows = await db
       .select({ gateway: sitePaymentGateways.gateway, enabled: sitePaymentGateways.enabled, lastEventAt: sitePaymentGateways.lastEventAt })
       .from(sitePaymentGateways)
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "payments");
     assertFeature((await planOfSite(siteId)).plan, "paymentsAnalytics");
     const parsed = PutSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) throw new AppError(400, "INVALID_INPUT", "gateway is required; secret must be 8 to 256 characters");
@@ -78,7 +78,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "payments");
     const gateway = z.enum(GATEWAY_IDS).safeParse(request.nextUrl.searchParams.get("gateway"));
     if (!gateway.success) throw new AppError(400, "INVALID_INPUT", "gateway must be razorpay or stripe");
     await db.delete(sitePaymentGateways).where(and(eq(sitePaymentGateways.siteId, siteId), eq(sitePaymentGateways.gateway, gateway.data)));

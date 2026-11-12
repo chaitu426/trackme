@@ -14,7 +14,7 @@ export async function POST(
 ) {
   try {
     const { siteId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "site_settings");
     const result = await rotateIngestSigningSecret(siteId);
 
     await recordAuditLog({

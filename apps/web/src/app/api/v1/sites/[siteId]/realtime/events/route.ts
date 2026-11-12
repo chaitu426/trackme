@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest, { params }: { params: Promise<{ siteId: string }> }) {
   try {
     const { siteId } = await params;
-    const { site } = await requireSiteAccess(request, siteId);
+    const { site } = await requireSiteAccess(request, siteId, "analytics:read", "acquisition");
     const events = await getRecentEvents(site.workspaceId, site.id, 20);
     return NextResponse.json({ events }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

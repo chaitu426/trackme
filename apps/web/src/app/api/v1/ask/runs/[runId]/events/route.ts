@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
     const rows = await db.select().from(askRuns).where(eq(askRuns.id, runId)).limit(1);
     const run = rows[0];
     if (!run || !run.siteId) throw new AppError(404, "NOT_FOUND", "Run not found");
-    await requireMetricsAccess(request, run.workspaceId, run.siteId);
+    await requireMetricsAccess(request, run.workspaceId, run.siteId, "ask");
 
     // Each SSE connection gets its own blocking reader; sharing the web process's command client would park it.
     const reader = getRedis("state").duplicate();

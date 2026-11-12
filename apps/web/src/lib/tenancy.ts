@@ -1,3 +1,5 @@
+import { levelForPermission, requireFeature } from "./access";
+import type { Feature } from "@trackme/contracts";
 import { cache } from "react";
 import { NextRequest } from "next/server";
 import {
@@ -245,7 +247,8 @@ export async function authenticateRequest(
 export async function requireMetricsAccess(
   request: NextRequest,
   workspaceId: string,
-  siteId: string
+  siteId: string,
+  feature: Feature = "acquisition"
 ): Promise<TenantContext> {
   // Read-only analytics path: membership (30 s) and site ownership (10 min) are
   // cached, with explicit invalidation on member removal/role change and site delete.
@@ -262,6 +265,8 @@ export async function requireMetricsAccess(
   if (!belongs) {
     throw new AppError(403, "TENANT_ISOLATION_VIOLATION", "Site does not belong to this workspace");
   }
+
+  await requireFeature(ctx, siteId, feature, "view");
 
   return {
     ...ctx,
@@ -423,11 +428,13 @@ export const requireSiteByDomain = cache(async (
 export async function requireDashboardSite(
   userId: string,
   workspaceSlug: string,
-  siteDomain: string
+  siteDomain: string,
+  feature?: Feature
 ) {
   const workspace = await requireWorkspaceBySlug(userId, workspaceSlug);
   assertPermission({ userId, workspaceId: workspace.id, role: workspace.role }, "analytics:read");
   const site = await requireSiteByDomain(workspace.id, siteDomain);
+  if (feature) await requireFeature({ userId, role: workspace.role, workspaceId: workspace.id }, site.id, feature, "view");
   return { workspace, site };
 }
 
@@ -467,7 +474,8 @@ export const getSiteById = cache(async (siteId: string): Promise<DashboardSite |
 export async function requireSiteAccess(
   request: NextRequest,
   siteId: string,
-  permission: Permission = "analytics:read"
+  permission: Permission = "analytics:read",
+  feature?: Feature
 ): Promise<{ ctx: TenantContext; site: DashboardSite }> {
   const site = await getSiteById(siteId);
   if (!site) {
@@ -478,8 +486,26 @@ export async function requireSiteAccess(
   const ctx = await loadMembershipContext(user.id, site.workspaceId);
   assertPermission(ctx, permission);
   await enforceCallerLimit(ctx);
+  // Teams: in a restricted workspace, the feature this route belongs to must be open to the person on this site.
+  if (feature) await requireFeature(ctx, site.id, feature, levelForPermission(permission));
 
   return { ctx, site };
+}
+
+/**
+ * `authenticateRequest` for a route that already knows its site: also checks the feature the route belongs to. A read
+ * needs view on the feature; any other permission needs manage.
+ */
+export async function authenticateSite(
+  request: NextRequest,
+  workspaceId: string,
+  siteId: string,
+  permission: Permission,
+  feature: Feature
+): Promise<TenantContext> {
+  const ctx = await authenticateRequest(request, workspaceId, permission);
+  await requireFeature(ctx, siteId, feature, levelForPermission(permission));
+  return ctx;
 }
 
 export async function requireWorkspaceMember(
