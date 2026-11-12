@@ -95,6 +95,9 @@ importers:
       '@trackme/authz':
         specifier: workspace:*
         version: link:../../packages/authz
+      '@trackme/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@trackme/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -249,6 +252,25 @@ importers:
       '@types/node':
         specifier: ^22.13.9
         version: 22.20.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/billing:
+    dependencies:
+      '@trackme/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@trackme/db':
+        specifier: workspace:*
+        version: link:../db
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.9
+        version: 22.20.3
+      tsx:
+        specifier: ^4.19.3
+        version: 4.23.13
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -445,6 +467,9 @@ importers:
       '@trackme/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@trackme/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@trackme/config':
         specifier: workspace:*
         version: link:../../packages/config

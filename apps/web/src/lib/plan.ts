@@ -274,3 +274,28 @@ export async function withPlanLimit<T>(options: PlanLimitOptions, create: (tx: T
     return create(tx);
   });
 }
+
+const USAGE_RESOURCES: LimitedResource[] = [
+  "workspaces",
+  "sites",
+  "members",
+  "viewers",
+  "funnels",
+  "goals",
+  "segments",
+  "apiKeys",
+  "alertRules",
+  "alertChannels",
+  "askRuns",
+];
+
+/** How much of every limited resource is in use now, for the billing page. Read-only. */
+export async function planUsage(workspaceId: string, companyId: string): Promise<Record<LimitedResource, number>> {
+  return db.transaction(async (tx) => {
+    const counts = {} as Record<LimitedResource, number>;
+    for (const resource of USAGE_RESOURCES) {
+      counts[resource] = await countResource(tx, resource, { companyId, workspaceId });
+    }
+    return counts;
+  });
+}

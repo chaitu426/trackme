@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, primaryKey, index, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, primaryKey, index, boolean, integer } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
 /**
@@ -12,6 +12,11 @@ export const companies = pgTable("companies", {
   plan: text("plan").notNull().default("free"),
   /** Set for companies that existed before plans did: they keep Pro while the beta runs. */
   grandfathered: boolean("grandfathered").notNull().default(false),
+  /**
+   * Events per month the edge accepts across every workspace of the company, margin included. Derived from the
+   * plan (`eventQuotaFor`); applyPlan keeps it in step.
+   */
+  monthlyEventQuota: integer("monthly_event_quota").notNull().default(50_000),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

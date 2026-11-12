@@ -1,3 +1,4 @@
+import { isReservedSlug } from "@/lib/reserved-slugs";
 import { assertRoom } from "@/lib/plan";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -41,7 +42,7 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
-  return slug.length >= 2 ? slug : "workspace";
+  return slug.length >= 2 && !isReservedSlug(slug) ? slug : slug.length >= 2 ? `${slug}-workspace` : "workspace";
 }
 
 async function uniqueSlug(base: string): Promise<string> {
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
         .where(and(eq(companyMembers.userId, user.id), eq(companyMembers.role, "owner")));
 
       let companyId: string;
-      let plan = "free"; // a company created just now starts on the free plan
+      let quota = eventQuotaFor("free"); // a company created just now starts on the free plan
       if (parsed.data.companyId) {
         if (!owned.some((c) => c.companyId === parsed.data.companyId)) {
           throw new AppError(403, "FORBIDDEN", "Only a company owner can create workspaces in this company.");
@@ -99,8 +100,10 @@ export async function POST(request: NextRequest) {
       }
       if (owned.some((c) => c.companyId === companyId)) {
         // An existing company: it must have room for another workspace and for the site that comes with it.
-        plan = await assertRoom(tx, { companyId, resource: "workspaces" });
+        await assertRoom(tx, { companyId, resource: "workspaces" });
         await assertRoom(tx, { companyId, resource: "sites" });
+        const [company] = await tx.select({ quota: companies.monthlyEventQuota }).from(companies).where(eq(companies.id, companyId)).limit(1);
+        quota = company?.quota ?? quota;
       }
 
       const workspaceRows = await tx
@@ -109,8 +112,8 @@ export async function POST(request: NextRequest) {
           companyId,
           name: parsed.data.name,
           slug,
-          // What the edge accepts per month comes from the plan: a hard cap on free, a margin on pro.
-          monthlyEventQuota: eventQuotaFor(plan),
+          // Mirrors the company's quota (the edge counts per company): a hard cap on free, a margin on pro.
+          monthlyEventQuota: quota,
         })
         .returning({
           id: workspaces.id,

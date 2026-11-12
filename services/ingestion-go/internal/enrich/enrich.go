@@ -32,6 +32,8 @@ type TrackerEvent struct {
 type EnrichedEvent struct {
 	TrackerEvent
 	WorkspaceID string `json:"workspaceId"`
+	// QuotaKey is what the monthly quota is counted under (the company). Never published downstream.
+	QuotaKey string `json:"-"`
 	SiteID      string `json:"siteId"`
 	ReceivedAt  string `json:"receivedAt"`
 	Country     string `json:"country,omitempty"`
@@ -252,4 +254,12 @@ func StripSelfReferrer(referrer, siteDomain string) string {
 		return ""
 	}
 	return referrer
+}
+
+// QuotaScope is the key the event's monthly quota is counted under: the company when known, else the workspace.
+func (e EnrichedEvent) QuotaScope() string {
+	if e.QuotaKey != "" {
+		return e.QuotaKey
+	}
+	return e.WorkspaceID
 }

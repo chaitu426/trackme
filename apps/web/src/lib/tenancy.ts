@@ -620,21 +620,23 @@ export async function getWorkspaceUsage(workspaceId: string): Promise<WorkspaceU
     db
       .select({
         plan: companies.plan,
-        monthlyQuota: workspaces.monthlyEventQuota,
+        monthlyQuota: companies.monthlyEventQuota,
       })
       .from(workspaces)
       .innerJoin(companies, eq(companies.id, workspaces.companyId))
       .where(eq(workspaces.id, workspaceId))
       .limit(1),
+    // The quota is the company's, shared by all its workspaces, so usage is every workspace's events together.
     db
       .select({
         eventCount: sql<number>`coalesce(sum(${usageCounters.eventCount}), 0)`,
       })
       .from(usageCounters)
+      .innerJoin(workspaces, eq(workspaces.id, usageCounters.workspaceId))
       .where(
         and(
-          eq(usageCounters.workspaceId, workspaceId),
-          eq(usageCounters.period, currentPeriod)
+          eq(usageCounters.period, currentPeriod),
+          sql`${workspaces.companyId} = (SELECT company_id FROM workspaces WHERE id = ${workspaceId})`
         )
       ),
   ]);

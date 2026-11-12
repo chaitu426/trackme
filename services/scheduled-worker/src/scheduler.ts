@@ -6,6 +6,7 @@ import { runDailyRollups } from "./jobs/daily-rollups.js";
 import { runUsageMetering } from "./jobs/usage-metering.js";
 import { reclaimDeadEdgeQuota } from "./jobs/quota-reclaim.js";
 import { runRetentionCleanup } from "./jobs/retention.js";
+import { runBillingMaintenanceJob } from "./jobs/billing-maintenance.js";
 import { runReconciliation } from "./jobs/reconciliation.js";
 import { runErrorRegressions } from "./jobs/error-regressions.js";
 import { runSourceMapRetention } from "./jobs/sourcemap-retention.js";
@@ -103,6 +104,21 @@ cron.schedule("*/15 * * * *", async () => {
     );
   } catch (err) {
     console.error("Failed running usage metering:", err);
+  }
+});
+
+// 3b. Billing clock: ten minutes past every hour. Ends expired trials, grace periods and cancelled subscriptions.
+cron.schedule("10 * * * *", async () => {
+  try {
+    await withDistributedLock(
+      redis,
+      "lock:scheduled:billing_maintenance",
+      300,
+      "Billing Maintenance",
+      instrumentJob("billing_maintenance", () => runBillingMaintenanceJob())
+    );
+  } catch (err) {
+    console.error("Failed running billing maintenance:", err);
   }
 });
 

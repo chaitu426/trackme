@@ -99,6 +99,20 @@
       "when": 1794503888132,
       "tag": "0013_company_plan",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794504672408,
+      "tag": "0014_company_event_quota",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794504794940,
+      "tag": "0015_billing",
+      "breakpoints": true
     }
   ]
 }
