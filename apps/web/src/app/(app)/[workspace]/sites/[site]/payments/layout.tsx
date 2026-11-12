@@ -5,6 +5,7 @@ import { requireWorkspaceBySlug } from "@/lib/tenancy";
 import { planOfWorkspace } from "@/lib/plan";
 import { canManageBilling } from "@/lib/billing";
 import { LockedFeature } from "@/components/plan/locked-feature";
+import { gateSection } from "@/lib/feature-gate";
 
 /**
  * Payments analytics is a Pro feature. One layout covers every page under /payments, so a page added there later is
@@ -15,7 +16,7 @@ export default async function PaymentsLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ workspace: string }>;
+  params: Promise<{ workspace: string; site: string }>;
 }) {
   const user = await requireUser();
   const { workspace: slug } = await params;
@@ -30,5 +31,5 @@ export default async function PaymentsLayout({
       </LockedFeature>
     );
   }
-  return children;
+  return (await gateSection(params, "payments")) ?? children;
 }

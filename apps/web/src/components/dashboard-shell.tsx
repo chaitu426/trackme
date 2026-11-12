@@ -1,5 +1,6 @@
 "use client";
 
+import type { Feature } from "@trackme/contracts";
 import * as React from "react";
 import { Menu, ChevronRight, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -18,6 +19,8 @@ interface DashboardShellProps {
   sites: { id: string; domain: string; displayName: string }[];
   primarySiteDomain: string;
   user: { id: string; email: string };
+  /** Per site (by domain), the features the person has. Absent for a site means nothing is restricted there. */
+  siteFeatures?: Record<string, Feature[]>;
 }
 
 export function DashboardShell({
@@ -27,6 +30,7 @@ export function DashboardShell({
   sites,
   primarySiteDomain,
   user,
+  siteFeatures,
 }: DashboardShellProps) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -66,6 +70,7 @@ export function DashboardShell({
       : primarySiteDomain;
 
   const pageLabel = pageLabelFor(pathname, workspace.slug);
+  const allowedFeatures = siteFeatures?.[activeSiteDomain];
 
   return (
     <div className="dashboard-shell relative flex min-h-screen flex-col bg-background antialiased">
@@ -79,6 +84,7 @@ export function DashboardShell({
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        {...(allowedFeatures ? { allowedFeatures } : {})}
       />
 
       <div
@@ -138,7 +144,7 @@ export function DashboardShell({
           </button>
         </header>
 
-        <CommandPalette workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites} />
+        <CommandPalette workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites} {...(allowedFeatures ? { allowedFeatures } : {})} />
         <AskDock workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites.map((x) => x.domain)} />
         <main className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-28 lg:pt-8">
           {children}

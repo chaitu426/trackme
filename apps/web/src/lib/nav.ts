@@ -1,3 +1,4 @@
+import { featureForSitePath, type Feature } from "@trackme/contracts";
 import {
   Activity,
   RotateCcw,
@@ -20,10 +21,21 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  Network,
   Globe,
   Waypoints,
   type LucideIcon,
 } from "lucide-react";
+
+/**
+ * Whether a site page is open to the person, given the features they have on the site. With no list (no restrictions, or
+ * not on a site) everything is open. The sidebar, the command palette and the page guards all use this one rule.
+ */
+export function navAllowed(path: string, allowed?: readonly Feature[]): boolean {
+  if (!allowed) return true;
+  const feature = featureForSitePath(path);
+  return feature === null || allowed.includes(feature);
+}
 
 export interface NavItem {
   /** Path under the active site (`/<workspace>/sites/<domain>/<path>`), or under the workspace when `workspace` is set. */
@@ -108,19 +120,24 @@ export interface NavTarget {
  * Every destination for the signed-in app, from NAV_SUITES plus the workspace pages. With no site yet, site pages point at the
  * page that adds one instead of a broken URL. This is the single source: the sidebar, the palette and the breadcrumb all read it.
  */
-export function navTargets(workspaceSlug: string, siteDomain: string | null): NavTarget[] {
+export function navTargets(workspaceSlug: string, siteDomain: string | null, allowed?: readonly Feature[]): NavTarget[] {
   const siteHref = (path: string) => (siteDomain ? `/${workspaceSlug}/sites/${siteDomain}/${path}` : `/${workspaceSlug}/settings/sites`);
   const out: NavTarget[] = [];
   for (const suite of NAV_SUITES) {
     for (const item of suite.items) {
+      if (!navAllowed(item.path, allowed)) continue;
       out.push({ id: `${suite.id}:${item.path}`, label: item.label, group: suite.title, href: item.workspace ? `/${workspaceSlug}/${item.path}` : siteHref(item.path), icon: item.icon });
     }
   }
   out.push(
     { id: "workspace:team", label: "Organization & Team", group: "Workspace", href: `/${workspaceSlug}/settings`, icon: Users },
-    { id: "workspace:sites", label: "Websites", group: "Workspace", href: `/${workspaceSlug}/settings/sites`, icon: Globe },
-    { id: "workspace:site-settings", label: SITE_SETTINGS_ITEM.label, group: "Workspace", href: siteHref(SITE_SETTINGS_ITEM.path), icon: SITE_SETTINGS_ITEM.icon }
+    { id: "workspace:teams", label: "Teams & access", group: "Workspace", href: `/${workspaceSlug}/settings/teams`, icon: Network },
+    { id: "workspace:billing", label: "Plan & billing", group: "Workspace", href: `/${workspaceSlug}/settings/billing`, icon: CreditCard },
+    { id: "workspace:sites", label: "Websites", group: "Workspace", href: `/${workspaceSlug}/settings/sites`, icon: Globe }
   );
+  if (navAllowed(SITE_SETTINGS_ITEM.path, allowed)) {
+    out.push({ id: "workspace:site-settings", label: SITE_SETTINGS_ITEM.label, group: "Workspace", href: siteHref(SITE_SETTINGS_ITEM.path), icon: SITE_SETTINGS_ITEM.icon });
+  }
   return out;
 }
 
@@ -128,7 +145,12 @@ export function navTargets(workspaceSlug: string, siteDomain: string | null): Na
 export function pageLabelFor(pathname: string, workspaceSlug: string): string | undefined {
   const parts = pathname.split("/").filter(Boolean);
   if (parts[0] !== workspaceSlug) return undefined;
-  if (parts[1] === "settings") return parts[2] === "sites" ? "Websites" : "Organization & Team";
+  if (parts[1] === "settings") {
+    if (parts[2] === "sites") return "Websites";
+    if (parts[2] === "teams") return "Teams & access";
+    if (parts[2] === "billing") return "Plan & billing";
+    return "Organization & Team";
+  }
   if (parts[1] === "overview") return "Overview";
   if (parts[1] !== "sites") return undefined;
   const rest = parts.slice(3).join("/");

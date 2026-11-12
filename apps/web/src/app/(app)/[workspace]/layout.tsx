@@ -1,3 +1,5 @@
+import { FEATURES, type Feature } from "@trackme/contracts";
+import { featuresFor } from "@/lib/access";
 import { UpgradeHost } from "@/components/plan/upgrade-host";
 import { canManageBilling } from "@/lib/billing";
 import { notFound } from "next/navigation";
@@ -24,6 +26,16 @@ export default async function WorkspaceLayout({
   if (!found) notFound();
   const workspace = found;
   const [siteList, canUpgrade] = await Promise.all([listWorkspaceSites(workspace.id), canManageBilling(user.id, workspace.companyId)]);
+  // What the person may open on each site. Owners and admins, and every workspace not in restricted mode, get everything
+  // without a database lookup; the sidebar only narrows when a restriction really applies.
+  const actor = { userId: user.id, role: workspace.role, workspaceId: workspace.id };
+  const siteFeatures: Record<string, Feature[]> = {};
+  await Promise.all(
+    siteList.map(async (site) => {
+      const features = await featuresFor(actor, site.id);
+      if (features.length < FEATURES.length) siteFeatures[site.domain] = features;
+    })
+  );
   const primarySite = siteList[0];
   const primarySiteDomain = primarySite?.domain ?? "";
 
@@ -37,6 +49,7 @@ export default async function WorkspaceLayout({
       workspaces={userWorkspaces}
       sites={siteList}
       primarySiteDomain={primarySiteDomain}
+      siteFeatures={siteFeatures}
       user={{
         id: user.id,
         email: user.email,
