@@ -1,3 +1,4 @@
+import { assertFeature, planOfSite } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
@@ -36,6 +37,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { siteId } = await params;
     const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    assertFeature((await planOfSite(siteId)).plan, "paymentsAnalytics");
     const parsed = PutSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) throw new AppError(400, "INVALID_INPUT", "gateway is required; secret must be 8 to 256 characters");
     const { gateway, secret, enabled } = parsed.data;

@@ -1,3 +1,4 @@
+import { withPlanLimit } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
@@ -57,10 +58,12 @@ async function handlePost(request: NextRequest, props: { params: Promise<{ siteI
     }
 
     try {
-      const [created] = await db
-        .insert(siteSegments)
-        .values({ siteId, name: parsed.data.name, definition: parsed.data.definition, createdBy: access.userId })
-        .returning({ id: siteSegments.id, name: siteSegments.name, definition: siteSegments.definition, createdAt: siteSegments.createdAt });
+      const [created] = await withPlanLimit({ resource: "segments", workspaceId: access.workspaceId }, (tx) =>
+        tx
+          .insert(siteSegments)
+          .values({ siteId, name: parsed.data.name, definition: parsed.data.definition, createdBy: access.userId })
+          .returning({ id: siteSegments.id, name: siteSegments.name, definition: siteSegments.definition, createdAt: siteSegments.createdAt })
+      );
       return NextResponse.json({ segment: created }, { status: 201 });
     } catch (error) {
       const code = (error as { code?: string; cause?: { code?: string } })?.code ?? (error as { cause?: { code?: string } })?.cause?.code;

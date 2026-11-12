@@ -1,3 +1,4 @@
+import { withPlanLimit } from "@/lib/plan";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
 import { db, askRuns, sites, and, eq, inArray } from "@trackme/db";
@@ -62,18 +63,20 @@ async function handlePost(request: NextRequest) {
       });
     }
 
-    const [run] = await db
-      .insert(askRuns)
-      .values({
-        workspaceId: ctx.workspaceId,
-        siteId: site.id,
-        createdBy: ctx.userId.startsWith("api-key:") ? null : ctx.userId,
-        question: parsed.data.question,
-        scope,
-        status: "queued",
-        model: env.ASK_MODEL,
-      })
-      .returning({ id: askRuns.id });
+    const [run] = await withPlanLimit({ resource: "askRuns", workspaceId: ctx.workspaceId }, (tx) =>
+      tx
+        .insert(askRuns)
+        .values({
+          workspaceId: ctx.workspaceId,
+          siteId: site.id,
+          createdBy: ctx.userId.startsWith("api-key:") ? null : ctx.userId,
+          question: parsed.data.question,
+          scope,
+          status: "queued",
+          model: env.ASK_MODEL,
+        })
+        .returning({ id: askRuns.id })
+    );
     if (!run) throw new AppError(500, "ASK_RUN_NOT_CREATED", "Could not record the run.");
 
     // Clear any stream left from a previous run with the same id (ids are fresh, so this is belt-and-braces).

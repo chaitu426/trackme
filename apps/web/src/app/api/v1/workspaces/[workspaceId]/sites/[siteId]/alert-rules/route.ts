@@ -3,10 +3,11 @@
  * POST /api/v1/workspaces/[workspaceId]/sites/[siteId]/alert-rules
  */
 
+import { withPlanLimit } from "@/lib/plan";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { AppError } from "@trackme/contracts";
-import { db, eq, and, alertRules, alertChannels } from "@trackme/db";
+import { db, eq, and, alertRules, alertChannels, sites } from "@trackme/db";
 import { authenticateRequest } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 
@@ -119,18 +120,30 @@ export async function POST(
       throw new AppError(404, "CHANNEL_NOT_FOUND", "Alert channel not found in this workspace");
     }
 
-    const [rule] = await db
-      .insert(alertRules)
-      .values({
-        siteId,
-        channelId: data.channelId,
-        type: data.type,
-        name: data.name,
-        config: data.config,
-        enabled: true,
-        cooldownMinutes: data.cooldownMinutes,
-      })
-      .returning();
+    // The site must be this workspace's: a rule on another workspace's site would also dodge the plan's rule count.
+    const [ownSite] = await db
+      .select({ id: sites.id })
+      .from(sites)
+      .where(and(eq(sites.id, siteId), eq(sites.workspaceId, workspaceId)))
+      .limit(1);
+    if (!ownSite) {
+      throw new AppError(404, "SITE_NOT_FOUND", "Site not found in this workspace.");
+    }
+
+    const [rule] = await withPlanLimit({ resource: "alertRules", workspaceId }, (tx) =>
+      tx
+        .insert(alertRules)
+        .values({
+          siteId,
+          channelId: data.channelId,
+          type: data.type,
+          name: data.name,
+          config: data.config,
+          enabled: true,
+          cooldownMinutes: data.cooldownMinutes,
+        })
+        .returning()
+    );
 
     return NextResponse.json({ rule }, { status: 201 });
   } catch (err) {

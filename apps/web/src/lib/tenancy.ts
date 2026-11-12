@@ -31,6 +31,7 @@ import {
   workspaceMembers,
   workspaces,
   companyMembers,
+  companies,
   or,
 } from "@trackme/db";
 import { requireApiUser } from "./auth";
@@ -618,10 +619,11 @@ export async function getWorkspaceUsage(workspaceId: string): Promise<WorkspaceU
   const [wsRows, usageRows] = await Promise.all([
     db
       .select({
-        plan: workspaces.plan,
+        plan: companies.plan,
         monthlyQuota: workspaces.monthlyEventQuota,
       })
       .from(workspaces)
+      .innerJoin(companies, eq(companies.id, workspaces.companyId))
       .where(eq(workspaces.id, workspaceId))
       .limit(1),
     db
@@ -638,7 +640,7 @@ export async function getWorkspaceUsage(workspaceId: string): Promise<WorkspaceU
   ]);
 
   const ws = wsRows[0];
-  const plan = ws?.plan ?? "starter";
+  const plan = ws?.plan ?? "free";
   const monthlyQuota = ws?.monthlyQuota ?? 100_000;
   const currentUsage = Number(usageRows[0]?.eventCount ?? 0);
   const percentageUsed =

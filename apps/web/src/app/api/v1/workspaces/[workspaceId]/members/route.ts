@@ -1,3 +1,4 @@
+import { seatFor, withPlanLimit } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
@@ -117,34 +118,43 @@ export async function POST(
       throw new AppError(409, "MEMBER_EXISTS", "This user is already a member of this workspace.");
     }
 
-    // Revoke any prior pending invite — allows re-sending fresh invites
-    await db
-      .update(workspaceInvites)
-      .set({ status: "revoked" })
-      .where(
-        and(
-          eq(workspaceInvites.workspaceId, workspaceId),
-          eq(workspaceInvites.email, email),
-          eq(workspaceInvites.status, "pending")
-        )
-      );
-
     // Only the hash is stored; the plaintext goes into the email and nowhere else (see invite-token.ts).
     const { token, tokenHash } = newInviteToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    const [created] = await db
-      .insert(workspaceInvites)
-      .values({
+    // A pending invitation holds a seat, so the plan is checked when it is sent. Re-sending revokes the earlier
+    // invitation first, inside the same transaction and before the count, so a re-send never blocks itself.
+    const [created] = await withPlanLimit(
+      {
+        resource: seatFor(role),
         workspaceId,
-        email,
-        role,
-        token: tokenHash,
-        invitedBy: ctx.userId ?? null,
-        status: "pending",
-        expiresAt,
-      })
-      .returning();
+        prepare: async (tx) => {
+          await tx
+            .update(workspaceInvites)
+            .set({ status: "revoked" })
+            .where(
+              and(
+                eq(workspaceInvites.workspaceId, workspaceId),
+                eq(workspaceInvites.email, email),
+                eq(workspaceInvites.status, "pending")
+              )
+            );
+        },
+      },
+      (tx) =>
+        tx
+          .insert(workspaceInvites)
+          .values({
+            workspaceId,
+            email,
+            role,
+            token: tokenHash,
+            invitedBy: ctx.userId ?? null,
+            status: "pending",
+            expiresAt,
+          })
+          .returning()
+    );
 
     if (!created) {
       throw new AppError(500, "INVITE_CREATE_FAILED", "Failed to create invitation.");

@@ -1,7 +1,8 @@
+import { assertRoom } from "@/lib/plan";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
-import { AppError } from "@trackme/contracts";
+import { AppError, eventQuotaFor } from "@trackme/contracts";
 import { env } from "@trackme/config";
 import { hashApiKey } from "@trackme/authz";
 import {
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
         .where(and(eq(companyMembers.userId, user.id), eq(companyMembers.role, "owner")));
 
       let companyId: string;
+      let plan = "free"; // a company created just now starts on the free plan
       if (parsed.data.companyId) {
         if (!owned.some((c) => c.companyId === parsed.data.companyId)) {
           throw new AppError(403, "FORBIDDEN", "Only a company owner can create workspaces in this company.");
@@ -95,6 +97,11 @@ export async function POST(request: NextRequest) {
         await tx.insert(companyMembers).values({ companyId: company.id, userId: user.id, role: "owner" });
         companyId = company.id;
       }
+      if (owned.some((c) => c.companyId === companyId)) {
+        // An existing company: it must have room for another workspace and for the site that comes with it.
+        plan = await assertRoom(tx, { companyId, resource: "workspaces" });
+        await assertRoom(tx, { companyId, resource: "sites" });
+      }
 
       const workspaceRows = await tx
         .insert(workspaces)
@@ -102,6 +109,8 @@ export async function POST(request: NextRequest) {
           companyId,
           name: parsed.data.name,
           slug,
+          // What the edge accepts per month comes from the plan: a hard cap on free, a margin on pro.
+          monthlyEventQuota: eventQuotaFor(plan),
         })
         .returning({
           id: workspaces.id,

@@ -92,6 +92,13 @@
       "when": 1794503219760,
       "tag": "0012_company_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794503888132,
+      "tag": "0013_company_plan",
+      "breakpoints": true
     }
   ]
 }

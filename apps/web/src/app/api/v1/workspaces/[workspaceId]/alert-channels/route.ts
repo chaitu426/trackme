@@ -3,6 +3,7 @@
  * POST /api/v1/workspaces/[workspaceId]/alert-channels
  */
 
+import { assertChannelType, planOfWorkspace, withPlanLimit } from "@/lib/plan";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { AppError } from "@trackme/contracts";
@@ -95,16 +96,21 @@ export async function POST(
     const data = parsed.data;
     const config = buildConfig(data);
 
-    const [channel] = await db
-      .insert(alertChannels)
-      .values({
-        workspaceId,
-        name: data.name,
-        type: data.type,
-        config,
-        enabled: true,
-      })
-      .returning();
+    const { plan } = await planOfWorkspace(workspaceId);
+    assertChannelType(plan, data.type);
+
+    const [channel] = await withPlanLimit({ resource: "alertChannels", workspaceId }, (tx) =>
+      tx
+        .insert(alertChannels)
+        .values({
+          workspaceId,
+          name: data.name,
+          type: data.type,
+          config,
+          enabled: true,
+        })
+        .returning()
+    );
 
     return NextResponse.json(
       { channel: { ...channel, config: sanitizeConfig(data.type, config) } },

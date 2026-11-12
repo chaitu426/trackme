@@ -1,3 +1,4 @@
+import { seatFor, withPlanLimit, type Tx } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError, WorkspaceRoleSchema, type WorkspaceRole } from "@trackme/contracts";
@@ -113,18 +114,24 @@ export async function PATCH(
       );
     }
 
-    const [updated] = await db
-      .update(workspaceMembers)
-      .set({ role: newRole })
-      .where(
-        and(
-          eq(workspaceMembers.workspaceId, workspaceId),
-          eq(workspaceMembers.userId, memberId),
-          // Guards a concurrent ownership transfer: never overwrite a role that has just become owner.
-          eq(workspaceMembers.role, targetRole)
+    const changeRole = (client: Tx | typeof db) =>
+      client
+        .update(workspaceMembers)
+        .set({ role: newRole })
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, memberId),
+            // Guards a concurrent ownership transfer: never overwrite a role that has just become owner.
+            eq(workspaceMembers.role, targetRole)
+          )
         )
-      )
-      .returning();
+        .returning();
+    // Moving between the member seats and the viewer seats takes a seat from the other pool, so the plan is checked.
+    const [updated] =
+      seatFor(targetRole) === seatFor(newRole)
+        ? await changeRole(db)
+        : await withPlanLimit({ resource: seatFor(newRole), workspaceId }, changeRole);
     if (!updated) {
       throw new AppError(409, "MEMBER_CHANGED", "This member's role changed while you were editing it. Reload and try again.");
     }

@@ -7,6 +7,16 @@ export const ProblemDetailsSchema = z.object({
   detail: z.string(),
   instance: z.string().optional(),
   code: z.string().optional(),
+  /** Present on PLAN_LIMIT errors: what was hit, so the UI can show an upgrade prompt. */
+  plan: z
+    .object({
+      plan: z.string(),
+      resource: z.string(),
+      limit: z.number().nullable(),
+      current: z.number(),
+      upgradeTo: z.string().nullable(),
+    })
+    .optional(),
   invalidParams: z
     .array(
       z.object({
@@ -23,9 +33,11 @@ export class AppError extends Error {
   public readonly status: number;
   public readonly code: string;
   public readonly detail: string;
+  public readonly plan: ProblemDetails["plan"];
 
-  constructor(status: number, code: string, detail: string) {
+  constructor(status: number, code: string, detail: string, plan?: ProblemDetails["plan"]) {
     super(detail);
+    this.plan = plan;
     this.name = "AppError";
     this.status = status;
     this.code = code;
@@ -39,6 +51,7 @@ export class AppError extends Error {
       status: this.status,
       detail: this.detail,
       code: this.code,
+      ...(this.plan ? { plan: this.plan } : {}),
       instance,
     };
   }

@@ -1,3 +1,4 @@
+import { withPlanLimit } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
@@ -82,15 +83,17 @@ export async function POST(
       order: idx + 1,
     }));
 
-    const [created] = await db
-      .insert(siteFunnels)
-      .values({
-        siteId,
-        name,
-        description: description || null,
-        steps: sortedSteps,
-      })
-      .returning();
+    const [created] = await withPlanLimit({ resource: "funnels", workspaceId: siteRow.workspaceId }, (tx) =>
+      tx
+        .insert(siteFunnels)
+        .values({
+          siteId,
+          name,
+          description: description || null,
+          steps: sortedSteps,
+        })
+        .returning()
+    );
 
     return NextResponse.json({ funnel: created }, { status: 201 });
   } catch (error) {

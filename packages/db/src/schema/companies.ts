@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, primaryKey, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, primaryKey, index, boolean } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
 /**
@@ -8,6 +8,10 @@ import { users } from "./users.js";
 export const companies = pgTable("companies", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  /** 'free' | 'pro'. Billing (a later phase) changes it; limits come from `PLANS` in contracts. */
+  plan: text("plan").notNull().default("free"),
+  /** Set for companies that existed before plans did: they keep Pro while the beta runs. */
+  grandfathered: boolean("grandfathered").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
