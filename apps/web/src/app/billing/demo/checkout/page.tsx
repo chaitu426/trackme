@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { GlyphField } from "@trackme/landing";
-import { DEMO_CARDS, assertDemoAllowed, demoSecret, priceFor, verifySession } from "@trackme/billing";
+import { DEMO_CARDS, demoAllowed, demoSecret, priceFor, verifySession } from "@trackme/billing";
 import { LogoMark } from "@/components/brand/logo-mark";
 import { Card } from "@/components/ui/card";
 import { buttonBase, buttonSizes, buttonVariants } from "@/components/ui/button";
@@ -13,15 +13,17 @@ import { DemoCheckoutForm } from "./demo-checkout-form";
 
 export const metadata: Metadata = { title: "Demo checkout", robots: { index: false, follow: false } };
 
+// Depends on the request (the signed session) and on runtime configuration, so it is never built ahead of time.
+export const dynamic = "force-dynamic";
+
 /**
  * The demo gateway's hosted checkout: what a real provider's payment page would be. It checks the signed session, shows the
  * order, and takes a test card. The notice is deliberate: nobody should mistake this for a real payment.
  */
 export default async function DemoCheckoutPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  if (!isDemoBilling()) notFound();
-  assertDemoAllowed();
-
   const { session: token } = await searchParams;
+  // A page that exists only for the demo gateway: anywhere the demo is off or not allowed (production by default), it is not found.
+  if (!isDemoBilling() || !demoAllowed()) notFound();
   const session = typeof token === "string" ? verifySession(demoSecret(), token, new Date()) : null;
 
   return (

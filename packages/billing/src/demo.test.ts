@@ -6,6 +6,7 @@ import {
   cardOutcome,
   completionEvents,
   createDemoGateway,
+  demoAllowed,
   demoSecret,
   parseEvents,
   serializeEvents,
@@ -27,6 +28,12 @@ test("the demo gateway refuses to run in production unless asked to", () => {
   assert.throws(() => assertDemoAllowed({ NODE_ENV: "production", BILLING_ALLOW_DEMO: "false" }));
   assertDemoAllowed({ NODE_ENV: "production", BILLING_ALLOW_DEMO: "true" });
   assertDemoAllowed({ NODE_ENV: "development" });
+});
+
+test("demoAllowed is the non-throwing form of the same rule", () => {
+  assert.equal(demoAllowed({ NODE_ENV: "production" }), false);
+  assert.equal(demoAllowed({ NODE_ENV: "production", BILLING_ALLOW_DEMO: "true" }), true);
+  assert.equal(demoAllowed({ NODE_ENV: "development" }), true);
 });
 
 test("in production the demo needs a real secret; elsewhere a dev default is used", () => {

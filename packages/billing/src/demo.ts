@@ -14,6 +14,11 @@ import { priceFor, type BillingEvent, type BillingInterval } from "./types.js";
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
+/** Whether the demo gateway may run here. The non-throwing form of `assertDemoAllowed`, for pages that should 404 instead. */
+export function demoAllowed(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NODE_ENV !== "production" || env.BILLING_ALLOW_DEMO === "true";
+}
+
 export function assertDemoAllowed(env: Record<string, string | undefined> = process.env): void {
   if (env.NODE_ENV === "production" && env.BILLING_ALLOW_DEMO !== "true") {
     throw new Error(
