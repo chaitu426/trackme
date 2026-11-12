@@ -1,5 +1,6 @@
 "use client";
 
+import { LockedFeature } from "@/components/plan/locked-feature";
 import type { WorkspaceRole } from "@trackme/contracts";
 import { canChangeRole, canInviteRole, canRemoveMember } from "@trackme/authz/roles";
 import { MatrixSpinner } from "@/components/ui/matrix-loader";
@@ -32,6 +33,10 @@ interface OrganizationSettingsClientProps {
   initialMembers: Member[];
   initialInvites: Invite[];
   initialAuditLogs?: AuditLogSummary[];
+  /** True when the plan does not include the audit log. */
+  auditLocked?: boolean;
+  /** Whether the viewer can change the plan, for the locked panel's wording. */
+  canUpgrade?: boolean;
   currentUserEmail: string;
 }
 
@@ -55,7 +60,7 @@ function initialsOf(name: string): string {
   return name ? name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() : "TM";
 }
 
-export function OrganizationSettingsClient({ workspace, initialMembers, initialInvites, initialAuditLogs = [], currentUserEmail }: OrganizationSettingsClientProps) {
+export function OrganizationSettingsClient({ workspace, initialMembers, initialInvites, initialAuditLogs = [], auditLocked = false, canUpgrade = false, currentUserEmail }: OrganizationSettingsClientProps) {
   const router = useRouter();
   const [members, setMembers] = React.useState<Member[]>(initialMembers);
   const [auditLogs] = React.useState<AuditLogSummary[]>(initialAuditLogs);
@@ -388,7 +393,13 @@ export function OrganizationSettingsClient({ workspace, initialMembers, initialI
             <h3 id="audit-heading" className="text-sm font-medium text-zinc-100">
               Recent activity
             </h3>
-            <AuditLogViewer logs={auditLogs} />
+            {auditLocked ? (
+              <LockedFeature title="The audit log is part of Pro" workspaceSlug={workspace.slug} art="stream" canUpgrade={canUpgrade}>
+                See who invited, removed or changed the role of whom, when each API key was made, and who transferred ownership.
+              </LockedFeature>
+            ) : (
+              <AuditLogViewer logs={auditLogs} />
+            )}
           </section>
         </div>
       </div>

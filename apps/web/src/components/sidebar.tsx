@@ -13,6 +13,7 @@ import {
   Plus,
   Settings2,
   Users,
+  CreditCard,
   Globe,
   type LucideIcon,
 } from "lucide-react";
@@ -99,6 +100,7 @@ export function Sidebar({
       items: [
         { href: `/${workspace.slug}/settings`, label: "Organization & Team", icon: Users },
         { href: `/${workspace.slug}/settings/sites`, label: `Websites (${sites.length})`, icon: Globe },
+        { href: `/${workspace.slug}/settings/billing`, label: "Plan & billing", icon: CreditCard },
         { href: siteHref(SITE_SETTINGS_ITEM.path), label: SITE_SETTINGS_ITEM.label, icon: SITE_SETTINGS_ITEM.icon, scoped: true },
         { href: "/legal/privacy", label: "Privacy Policy", icon: BookOpen },
       ],

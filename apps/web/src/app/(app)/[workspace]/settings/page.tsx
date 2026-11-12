@@ -1,3 +1,5 @@
+import { limitsFor } from "@trackme/contracts";
+import { canManageBilling } from "@/lib/billing";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { requireWorkspaceBySlug, listApiKeys, getWorkspaceUsage } from "@/lib/tenancy";
@@ -84,11 +86,13 @@ export default async function OrganizationSettingsPage(props: {
         workspace={workspace}
         initialMembers={initialMembers}
         initialInvites={initialInvites}
-        initialAuditLogs={auditLogRows}
+        initialAuditLogs={limitsFor(usage.plan).auditLog ? auditLogRows : []}
+        auditLocked={!limitsFor(usage.plan).auditLog}
+        canUpgrade={await canManageBilling(user.id, workspace.companyId)}
         currentUserEmail={user.email}
       />
       <section id="usage">
-        <UsageQuotaCard usage={usage} />
+        <UsageQuotaCard usage={usage} workspaceSlug={workspace.slug} />
       </section>
       <section id="tokens">
         <ApiKeysManager workspaceId={workspace.id} initialKeys={apiKeys} />

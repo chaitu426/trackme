@@ -1,3 +1,5 @@
+import { UpgradeHost } from "@/components/plan/upgrade-host";
+import { canManageBilling } from "@/lib/billing";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { listUserWorkspaces, listWorkspaceSites, requireWorkspaceBySlug } from "@/lib/tenancy";
@@ -21,7 +23,7 @@ export default async function WorkspaceLayout({
   ]);
   if (!found) notFound();
   const workspace = found;
-  const siteList = await listWorkspaceSites(workspace.id);
+  const [siteList, canUpgrade] = await Promise.all([listWorkspaceSites(workspace.id), canManageBilling(user.id, workspace.companyId)]);
   const primarySite = siteList[0];
   const primarySiteDomain = primarySite?.domain ?? "";
 
@@ -41,6 +43,7 @@ export default async function WorkspaceLayout({
       }}
     >
       {children}
+      <UpgradeHost workspaceSlug={workspace.slug} canUpgrade={canUpgrade} />
     </DashboardShell>
   );
 }
