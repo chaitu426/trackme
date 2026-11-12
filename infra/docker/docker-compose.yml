@@ -35,7 +35,7 @@ services:
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-growth_analytics}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse_dev_secret}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-c67d4d81f5ef154690b4c91656e47e2b887e2920030be374656fb618bd172fc1}
     ports:
       - "127.0.0.1:8123:8123" # HTTP interface
       - "127.0.0.1:9000:9000" # Native interface
