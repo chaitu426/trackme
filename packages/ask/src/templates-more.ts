@@ -12,9 +12,11 @@ import {
   getTimeSeries,
   getWebVitalsByPage,
   profileStats,
+  RAW_SCAN_MAX_DAYS,
 } from "@trackme/analytics";
 import type { MetricQueryRequest } from "@trackme/contracts";
 import type { Template, TemplateContext } from "./templates.js";
+import { clampToRawScan } from "./scope.js";
 
 /**
  * The second half of the catalog: comparisons, trends, page-level detail, payments failure analysis, releases, retention and
@@ -117,8 +119,10 @@ const pageEngagement: Template<z.infer<typeof PagesParams>> = {
   description: "Per page: views, visitors, time on page, entrances, bounce rate and exit rate. Use for 'which pages lose people', 'best/worst pages', landing pages.",
   params: PagesParams,
   async run(ctx, { limit }) {
-    const rows = await getPageEngagement(request(ctx, ctx.range), Math.min(limit, ctx.maxRows));
+    const window = clampToRawScan(ctx.range, RAW_SCAN_MAX_DAYS);
+    const rows = await getPageEngagement(request(ctx, window), Math.min(limit, ctx.maxRows));
     return {
+      ...(window.note ? { note: window.note } : {}),
       title: "Page engagement",
       table: "events_v2 (pageview, engagement)",
       query: `SELECT path, count() AS pageviews, uniq(visitor) AS visitors, avg(active_ms) AS avg_active, -- plus entrances, bounces and exits per session
@@ -139,8 +143,10 @@ const vitalsByPage: Template<z.infer<typeof PagesParams>> = {
   description: "75th-percentile Core Web Vitals per page: which pages are slow, and on which metric. Use after web_vitals shows a problem, or for 'which page is slowest'.",
   params: PagesParams,
   async run(ctx, { limit }) {
-    const rows = await getWebVitalsByPage(request(ctx, ctx.range), Math.min(limit * 5, 250));
+    const window = clampToRawScan(ctx.range, RAW_SCAN_MAX_DAYS);
+    const rows = await getWebVitalsByPage(request(ctx, window), Math.min(limit * 5, 250));
     return {
+      ...(window.note ? { note: window.note } : {}),
       title: "Web Vitals by page (75th percentile)",
       table: "events_v2 (web_vital) by path",
       query: `SELECT path, metric_name, quantile(0.75)(metric_value) AS p75, count() AS samples
