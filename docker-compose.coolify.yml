@@ -118,15 +118,15 @@ services:
 
   ask-worker:
     <<: *build
-    container_name: trackme-ask-worker
-    command: ["pnpm", "--filter", "@trackme/ask-worker", "start"]
+    command: ["sh", "-c", "if [ \"$ASK_ENABLED\" = \"true\" ]; then pnpm --filter @trackme/ask-worker start; else echo 'Ask worker disabled'; sleep infinity; fi"]
     restart: unless-stopped
     environment:
       <<: *env
       ASK_ENABLED: ${ASK_ENABLED:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      migrate:
+        condition: service_completed_successfully
     networks: [coolify]
 
 networks:
