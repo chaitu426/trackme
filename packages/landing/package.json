@@ -10,19 +10,19 @@
     "lint": "echo 'lint ok'"
   },
   "dependencies": {
-    "lucide-react": "^1.47.0"
+    "lucide-react": "^1.67.0"
   },
   "peerDependencies": {
     "next": "^15.2.1",
-    "react": "^19.0.0"
+    "react": "^19.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "next": "^15.5.29",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^5.7.3"
   }
 }
