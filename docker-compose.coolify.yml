@@ -1,6 +1,7 @@
-# Coolify: "Docker Compose" resource. Set env vars in the Coolify UI (referenced as ${VAR}).
-# Infra (postgres, redis, kafka, clickhouse) already runs on the shared network below.
-# Assign domains in Coolify: web -> :3000, docs -> :3002, ingestion -> :3001, ingest-proxy -> :3080.
+```yaml
+# Coolify Docker Compose resource.
+# Infrastructure services run separately on the shared Coolify network.
+# Public access is through Cloudflare Quick Tunnels on localhost ports.
 
 x-build: &build
   build:
@@ -46,9 +47,12 @@ services:
     command: ["pnpm", "--filter", "@trackme/web", "start"]
     restart: unless-stopped
     expose: ["3000"]
+    ports:
+      - "127.0.0.1:3000:3000"
     environment: *env
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -88,6 +92,8 @@ services:
     command: ["./ingest-proxy"]
     restart: unless-stopped
     expose: ["3080"]
+    ports:
+      - "127.0.0.1:3080:3080"
     environment:
       INGEST_URL: ${PROXY_INGEST_URL:-http://ingestion:3001}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
@@ -103,7 +109,8 @@ services:
     restart: unless-stopped
     environment: *env
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      migrate:
+        condition: service_completed_successfully
     networks: [coolify]
 
   scheduled-worker:
@@ -113,12 +120,16 @@ services:
     restart: unless-stopped
     environment: *env
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      migrate:
+        condition: service_completed_successfully
     networks: [coolify]
 
   ask-worker:
     <<: *build
-    command: ["sh", "-c", "if [ \"$ASK_ENABLED\" = \"true\" ]; then pnpm --filter @trackme/ask-worker start; else echo 'Ask worker disabled'; sleep infinity; fi"]
+    command:
+      - sh
+      - -c
+      - 'if [ "$ASK_ENABLED" = "true" ]; then pnpm --filter @trackme/ask-worker start; else echo "Ask worker disabled"; sleep infinity; fi'
     restart: unless-stopped
     environment:
       <<: *env
@@ -133,3 +144,4 @@ networks:
   coolify:
     name: orp7ujojmp9hb8in8fs3lh7r
     external: true
+```
