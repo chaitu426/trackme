@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
     const run = rows[0];
     if (!run || !run.siteId) throw new AppError(404, "NOT_FOUND", "Run not found");
 
-    await requireMetricsAccess(request, run.workspaceId, run.siteId);
+    await requireMetricsAccess(request, run.workspaceId, run.siteId, "ask");
 
     return NextResponse.json({
       runId: run.id,
@@ -49,7 +49,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     const [run] = await db.select().from(askRuns).where(eq(askRuns.id, runId)).limit(1);
     if (!run || !run.siteId) throw new AppError(404, "NOT_FOUND", "Run not found");
 
-    const ctx = await requireMetricsAccess(request, run.workspaceId, run.siteId);
+    const ctx = await requireMetricsAccess(request, run.workspaceId, run.siteId, "ask");
     if (run.createdBy && run.createdBy !== ctx.userId) throw new AppError(403, "FORBIDDEN", "Only the person who asked can stop this run.");
 
     const stopped = await db

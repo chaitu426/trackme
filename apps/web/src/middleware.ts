@@ -17,6 +17,8 @@ const PUBLIC_API_PREFIXES = [
   "/api/v1/sourcemaps",
   // Payment gateways post signed webhooks with no session; the route verifies the signature.
   "/api/v1/webhooks/payments",
+  // Subscription billing providers (including the demo gateway) post signed webhooks the same way.
+  "/api/v1/webhooks/billing",
   // Browsers post CSP violation reports without credentials.
   "/api/security/csp-report",
   // Authenticates itself with METRICS_TOKEN (404 when unset); Prometheus has no session.

@@ -20,7 +20,7 @@ async function handlePatch(
 ) {
   try {
     const { siteId, groupId } = await params;
-    const { ctx, site } = await requireSiteAccess(request, siteId, "sites:update");
+    const { ctx, site } = await requireSiteAccess(request, siteId, "sites:update", "errors");
     if (!GROUP_ID.test(groupId)) throw new AppError(400, "INVALID_INPUT", "Invalid issue id");
 
     const parsed = BodySchema.safeParse(await request.json().catch(() => null));

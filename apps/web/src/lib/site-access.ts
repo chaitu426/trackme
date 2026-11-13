@@ -1,5 +1,8 @@
+import { levelForPermission, requireFeature } from "@/lib/access";
+import type { Feature } from "@trackme/contracts";
 import type { NextRequest } from "next/server";
 import { AppError } from "@trackme/contracts";
+import type { Permission } from "@trackme/authz";
 import { db, sites, eq } from "@trackme/db";
 import { authenticateRequest } from "@/lib/tenancy";
 
@@ -10,7 +13,8 @@ import { authenticateRequest } from "@/lib/tenancy";
 export async function authorizeSite(
   request: NextRequest,
   siteId: string,
-  permission: "read:analytics" | "sites:update"
+  permission: Permission,
+  feature?: Feature
 ): Promise<{ siteId: string; workspaceId: string; userId: string | null }> {
   const [siteRow] = await db
     .select({ id: sites.id, workspaceId: sites.workspaceId })
@@ -21,5 +25,6 @@ export async function authorizeSite(
     throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
   }
   const ctx = await authenticateRequest(request, siteRow.workspaceId, permission);
+  if (feature) await requireFeature(ctx, siteId, feature, levelForPermission(permission));
   return { siteId, workspaceId: siteRow.workspaceId, userId: ctx.userId ?? null };
 }

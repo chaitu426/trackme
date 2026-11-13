@@ -1,15 +1,20 @@
+import { isReservedSlug } from "@/lib/reserved-slugs";
+import { assertRoom } from "@/lib/plan";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
-import { AppError } from "@trackme/contracts";
+import { AppError, eventQuotaFor } from "@trackme/contracts";
 import { env } from "@trackme/config";
 import { hashApiKey } from "@trackme/authz";
 import {
   db,
   workspaces,
   workspaceMembers,
+  companies,
+  companyMembers,
   sites,
   eq,
+  and,
 } from "@trackme/db";
 import { requireApiUser } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
@@ -18,6 +23,11 @@ import { resolveTrackerIntegrity, resolveTrackerScriptUrl } from "@/lib/tracker-
 
 const CreateWorkspaceSchema = z.object({
   name: z.string().trim().min(2).max(64),
+  /**
+   * The company to create the workspace under. Omit it and the caller's only company is used; a first-time
+   * caller with no company gets one created, named after the workspace.
+   */
+  companyId: z.string().uuid().optional(),
   domain: z
     .string()
     .trim()
@@ -32,7 +42,7 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
-  return slug.length >= 2 ? slug : "workspace";
+  return slug.length >= 2 && !isReservedSlug(slug) ? slug : slug.length >= 2 ? `${slug}-workspace` : "workspace";
 }
 
 async function uniqueSlug(base: string): Promise<string> {
@@ -63,11 +73,47 @@ export async function POST(request: NextRequest) {
     const publicKeyHash = hashApiKey(publicKey);
 
     const created = await db.transaction(async (tx) => {
+      // Workspaces live under a company, and only a company owner can add one.
+      const owned = await tx
+        .select({ companyId: companyMembers.companyId })
+        .from(companyMembers)
+        .where(and(eq(companyMembers.userId, user.id), eq(companyMembers.role, "owner")));
+
+      let companyId: string;
+      let quota = eventQuotaFor("free"); // a company created just now starts on the free plan
+      if (parsed.data.companyId) {
+        if (!owned.some((c) => c.companyId === parsed.data.companyId)) {
+          throw new AppError(403, "FORBIDDEN", "Only a company owner can create workspaces in this company.");
+        }
+        companyId = parsed.data.companyId;
+      } else if (owned.length === 1) {
+        companyId = owned[0]!.companyId;
+      } else if (owned.length > 1) {
+        throw new AppError(400, "COMPANY_REQUIRED", "You own more than one company. Say which one the workspace belongs to.");
+      } else {
+        const [company] = await tx.insert(companies).values({ name: parsed.data.name }).returning({ id: companies.id });
+        if (!company) {
+          throw new AppError(500, "COMPANY_CREATE_FAILED", "Unable to create company");
+        }
+        await tx.insert(companyMembers).values({ companyId: company.id, userId: user.id, role: "owner" });
+        companyId = company.id;
+      }
+      if (owned.some((c) => c.companyId === companyId)) {
+        // An existing company: it must have room for another workspace and for the site that comes with it.
+        await assertRoom(tx, { companyId, resource: "workspaces" });
+        await assertRoom(tx, { companyId, resource: "sites" });
+        const [company] = await tx.select({ quota: companies.monthlyEventQuota }).from(companies).where(eq(companies.id, companyId)).limit(1);
+        quota = company?.quota ?? quota;
+      }
+
       const workspaceRows = await tx
         .insert(workspaces)
         .values({
+          companyId,
           name: parsed.data.name,
           slug,
+          // Mirrors the company's quota (the edge counts per company): a hard cap on free, a margin on pro.
+          monthlyEventQuota: quota,
         })
         .returning({
           id: workspaces.id,

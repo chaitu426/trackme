@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { BRAND, markSvg } from "./brand";
 import { PALETTE } from "@trackme/landing/src/palette";
+import { RELEASE } from "@trackme/landing/src/version";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -15,8 +16,14 @@ test("the brand colours are the palette's, and the line is the landing page's he
   assert.equal(BRAND.ink, PALETTE.surface.ink);
   assert.equal(BRAND.page, PALETTE.surface.page);
   assert.equal(BRAND.light, PALETTE.text.strong);
-  assert.match(read("../../../../packages/landing/src/landing.tsx"), /Analytics that counts visits,/);
-  assert.equal(BRAND.tagline, "Analytics that counts visits, not people.");
+  assert.match(read("../../../../packages/landing/src/landing.tsx"), /Analytics for every team,/);
+  assert.equal(BRAND.tagline, "Analytics for every team, not just the analyst.");
+});
+
+test("the release label matches the root package version", () => {
+  const root = JSON.parse(read("../../../../package.json")) as { version: string };
+  assert.equal(`${RELEASE.version}.0`, root.version);
+  assert.equal(RELEASE.label, `Beta ${RELEASE.version}`);
 });
 
 test("the mark draws nine glyph cells and only palette colours", () => {

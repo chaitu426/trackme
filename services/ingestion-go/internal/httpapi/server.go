@@ -530,6 +530,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 		out := enrich.EnrichedEvent{
 			TrackerEvent: ev,
 			WorkspaceID:  siteRow.WorkspaceID,
+			QuotaKey:     siteRow.QuotaScopeID,
 			SiteID:       siteRow.ID,
 			ReceivedAt:   receivedAt,
 			Country:      country,
@@ -542,7 +543,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 			SampleWeight: weight,
 		}
 		enriched = append(enriched, out)
-		quotaByWorkspace[siteRow.WorkspaceID] = siteRow.MonthlyEventQuota
+		quotaByWorkspace[out.QuotaScope()] = siteRow.MonthlyEventQuota
 	}
 
 	if len(enriched) == 0 {
@@ -608,7 +609,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 		billableByWorkspace := make(map[string]int)
 		for _, event := range claimedEvents {
 			if event.BotStatus == "human" {
-				billableByWorkspace[event.WorkspaceID]++
+				billableByWorkspace[event.QuotaScope()]++
 			}
 		}
 
@@ -670,7 +671,7 @@ func (s *Server) processEvents(r *http.Request, rawBody []byte, events []enrich.
 		} else {
 			failedIDs = append(failedIDs, event.EventID)
 			if event.BotStatus == "human" {
-				failedBillable[event.WorkspaceID]++
+				failedBillable[event.QuotaScope()]++
 			}
 		}
 	}

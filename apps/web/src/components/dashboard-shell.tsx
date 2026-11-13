@@ -1,5 +1,6 @@
 "use client";
 
+import type { Feature } from "@trackme/contracts";
 import * as React from "react";
 import { Menu, ChevronRight, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -10,6 +11,8 @@ import { CommandPalette, openCommandPalette } from "@/components/command-palette
 import { AskDock } from "@/components/ask/ask-dock";
 import { Kbd } from "@/components/ui/field";
 import { pageLabelFor } from "@/lib/nav";
+import Link from "next/link";
+import { PlanBadge } from "@/components/plan/plan-badge";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -18,6 +21,11 @@ interface DashboardShellProps {
   sites: { id: string; domain: string; displayName: string }[];
   primarySiteDomain: string;
   user: { id: string; email: string };
+  /** Per site (by domain), the features the person has. Absent for a site means nothing is restricted there. */
+  siteFeatures?: Record<string, Feature[]>;
+  /** The company plan: Pro shows its mark in the header, Free offers the upgrade to whoever may buy it. */
+  plan?: "free" | "pro";
+  canUpgrade?: boolean;
 }
 
 export function DashboardShell({
@@ -27,6 +35,9 @@ export function DashboardShell({
   sites,
   primarySiteDomain,
   user,
+  siteFeatures,
+  plan = "free",
+  canUpgrade = false,
 }: DashboardShellProps) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -66,6 +77,7 @@ export function DashboardShell({
       : primarySiteDomain;
 
   const pageLabel = pageLabelFor(pathname, workspace.slug);
+  const allowedFeatures = siteFeatures?.[activeSiteDomain];
 
   return (
     <div className="dashboard-shell relative flex min-h-screen flex-col bg-background antialiased">
@@ -79,6 +91,7 @@ export function DashboardShell({
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        {...(allowedFeatures ? { allowedFeatures } : {})}
       />
 
       <div
@@ -115,6 +128,20 @@ export function DashboardShell({
             </div>
           </div>
 
+          {plan === "pro" ? (
+            <Link href={`/${workspace.slug}/settings/billing`} aria-label="Pro plan: open plan and billing" className="press ml-auto shrink-0 rounded-md">
+              <PlanBadge plan="pro" />
+            </Link>
+          ) : (
+            canUpgrade && (
+              <Link
+                href={`/${workspace.slug}/settings/billing`}
+                className="press ml-auto hidden h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-400 hover:border-white/[0.2] hover:text-zinc-100 sm:inline-flex"
+              >
+                <span aria-hidden="true">.:</span> Free · Upgrade
+              </Link>
+            )
+          )}
           <button
             type="button"
             onClick={openCommandPalette}
@@ -138,7 +165,7 @@ export function DashboardShell({
           </button>
         </header>
 
-        <CommandPalette workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites} />
+        <CommandPalette workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites} {...(allowedFeatures ? { allowedFeatures } : {})} />
         <AskDock workspaceSlug={workspace.slug} siteDomain={activeSiteDomain || null} sites={sites.map((x) => x.domain)} />
         <main className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-28 lg:pt-8">
           {children}

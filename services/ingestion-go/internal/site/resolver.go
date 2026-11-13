@@ -51,6 +51,8 @@ func DefaultSettings() Settings {
 type ResolvedSite struct {
 	ID                string
 	WorkspaceID       string
+	// QuotaScopeID is the company: the monthly quota is shared by every workspace in it.
+	QuotaScopeID string
 	Domain            string
 	Settings          Settings
 	MonthlyEventQuota int
@@ -243,17 +245,18 @@ func normalizeSettings(settings *Settings) {
 func pgLoader(pool *pgxpool.Pool) loadFunc {
 	return func(ctx context.Context, hash string) (ResolvedSite, error) {
 		var (
-			id, workspaceID, domain string
-			settingsRaw             []byte
-			quota                   int
+			id, workspaceID, companyID, domain string
+			settingsRaw                        []byte
+			quota                              int
 		)
 		err := pool.QueryRow(ctx, `
-			SELECT s.id::text, s.workspace_id::text, s.domain, s.settings, w.monthly_event_quota
+			SELECT s.id::text, s.workspace_id::text, c.id::text, s.domain, s.settings, c.monthly_event_quota
 			FROM sites s
 			JOIN workspaces w ON w.id = s.workspace_id
+			JOIN companies c ON c.id = w.company_id
 			WHERE s.public_key_hash = $1
 			LIMIT 1
-		`, hash).Scan(&id, &workspaceID, &domain, &settingsRaw, &quota)
+		`, hash).Scan(&id, &workspaceID, &companyID, &domain, &settingsRaw, &quota)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ResolvedSite{}, ErrNotFound
 		}
@@ -272,6 +275,7 @@ func pgLoader(pool *pgxpool.Pool) loadFunc {
 		return ResolvedSite{
 			ID:                id,
 			WorkspaceID:       workspaceID,
+			QuotaScopeID:      companyID,
 			Domain:            domain,
 			Settings:          settings,
 			MonthlyEventQuota: quota,

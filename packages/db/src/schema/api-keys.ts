@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
 import { workspaces } from "./workspaces.js";
+import { users } from "./users.js";
 
 export const apiKeys = pgTable(
   "api_keys",
@@ -8,6 +9,8 @@ export const apiKeys = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    /** Who created the key. Null for keys made before this was recorded, or after that person was deleted. */
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     prefix: text("prefix").notNull(), // e.g. gip_live_ab12
     keyHash: text("key_hash").notNull().unique(),

@@ -1,3 +1,4 @@
+import { withPlanLimit } from "@/lib/plan";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
@@ -26,7 +27,7 @@ export async function GET(
 ) {
   try {
     const { workspaceId } = await props.params;
-    await authenticateRequest(request, workspaceId, "read:analytics");
+    await authenticateRequest(request, workspaceId, "analytics:read");
 
     const rows = await db
       .select({
@@ -78,23 +79,25 @@ export async function POST(
     const publicKey = `site_pub_${randomBytes(18).toString("base64url")}`;
     const publicKeyHash = hashApiKey(publicKey);
 
-    const created = await db
-      .insert(sites)
-      .values({
-        workspaceId,
-        domain,
-        displayName: displayName || domain,
-        publicKey,
-        publicKeyHash,
-      })
-      .returning({
-        id: sites.id,
-        workspaceId: sites.workspaceId,
-        domain: sites.domain,
-        displayName: sites.displayName,
-        publicKey: sites.publicKey,
-        createdAt: sites.createdAt,
-      });
+    const created = await withPlanLimit({ resource: "sites", workspaceId }, (tx) =>
+      tx
+        .insert(sites)
+        .values({
+          workspaceId,
+          domain,
+          displayName: displayName || domain,
+          publicKey,
+          publicKeyHash,
+        })
+        .returning({
+          id: sites.id,
+          workspaceId: sites.workspaceId,
+          domain: sites.domain,
+          displayName: sites.displayName,
+          publicKey: sites.publicKey,
+          createdAt: sites.createdAt,
+        })
+    );
 
     const newSite = created[0];
     if (!newSite) {

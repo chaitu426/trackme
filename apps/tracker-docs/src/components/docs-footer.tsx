@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { GlyphField } from "@trackme/landing";
+import { GlyphField, RELEASE } from "@trackme/landing";
 import { DASHBOARD_URL, PRODUCT } from "@/lib/site";
 
 /** The same closing as the landing page: the name in glyphs, lit by the cursor. */
@@ -17,6 +17,7 @@ export function DocsFooter() {
       <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 pt-12 sm:flex-row sm:items-start sm:justify-between sm:px-6 lg:px-10">
         <p className="max-w-xs text-sm leading-[22px] text-zinc-400">
           Install the tracker, record events and call the API. Guides for every framework, language and platform.
+          <span className="mt-3 block font-mono text-xs text-zinc-500">{RELEASE.label}</span>
         </p>
         <ul className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
           {links.map(([label, href]) => (

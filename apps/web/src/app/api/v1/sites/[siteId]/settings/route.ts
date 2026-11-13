@@ -1,7 +1,8 @@
+import { assertFeature, planOfSite } from "@/lib/plan";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
-import { AppError, type SiteSettings } from "@trackme/contracts";
+import { AppError, limitsFor, upgradeTarget, type SiteSettings } from "@trackme/contracts";
 import { and, db, eq, goals } from "@trackme/db";
 import { requireSiteAccess, updateSiteSettings } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
@@ -34,7 +35,7 @@ export async function GET(
 ) {
   try {
     const { siteId } = await params;
-    const { site } = await requireSiteAccess(request, siteId);
+    const { site } = await requireSiteAccess(request, siteId, "analytics:read", "site_settings");
     return NextResponse.json({
       site: {
         id: site.id,
@@ -55,7 +56,7 @@ export async function PATCH(
 ) {
   try {
     const { siteId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "site_settings");
 
     const parsed = PatchSchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -68,6 +69,19 @@ export async function PATCH(
       const [goal] = await db.select({ id: goals.id }).from(goals).where(and(eq(goals.id, patch.primaryGoalId), eq(goals.siteId, siteId))).limit(1);
       if (!goal) throw new AppError(400, "INVALID_INPUT", "That goal does not belong to this site");
     }
+    if (patch.publicDashboardEnabled || patch.retentionMonths !== undefined) {
+      const { plan } = await planOfSite(siteId);
+      if (patch.publicDashboardEnabled) assertFeature(plan, "publicDashboard");
+      if (patch.retentionMonths !== undefined && patch.retentionMonths > limitsFor(plan).retentionMonths) {
+        throw new AppError(
+          402,
+          "PLAN_LIMIT",
+          `Your ${plan} plan keeps data for up to ${limitsFor(plan).retentionMonths} months.`,
+          { plan, resource: "retention", limit: limitsFor(plan).retentionMonths, current: patch.retentionMonths, upgradeTo: upgradeTarget(plan) }
+        );
+      }
+    }
+
     if (patch.publicDashboardEnabled && !site.settings.publicDashboardSlug) {
       patch.publicDashboardSlug = randomBytes(6).toString("base64url");
     }

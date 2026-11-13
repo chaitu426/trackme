@@ -1,3 +1,4 @@
+import { withPlanLimit } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError, ApiKeyScopeSchema } from "@trackme/contracts";
@@ -55,22 +56,25 @@ export async function POST(
     }
 
     const generated = generateApiKey();
-    const created = await db
-      .insert(apiKeys)
-      .values({
-        workspaceId,
-        name: parsed.data.name,
-        prefix: generated.prefix,
-        keyHash: generated.keyHash,
-        scopes: parsed.data.scopes,
-      })
-      .returning({
-        id: apiKeys.id,
-        name: apiKeys.name,
-        prefix: apiKeys.prefix,
-        scopes: apiKeys.scopes,
-        createdAt: apiKeys.createdAt,
-      });
+    const created = await withPlanLimit({ resource: "apiKeys", workspaceId }, (tx) =>
+      tx
+        .insert(apiKeys)
+        .values({
+          workspaceId,
+          createdBy: ctx.userId,
+          name: parsed.data.name,
+          prefix: generated.prefix,
+          keyHash: generated.keyHash,
+          scopes: parsed.data.scopes,
+        })
+        .returning({
+          id: apiKeys.id,
+          name: apiKeys.name,
+          prefix: apiKeys.prefix,
+          scopes: apiKeys.scopes,
+          createdAt: apiKeys.createdAt,
+        })
+    );
 
     const key = created[0];
     if (!key) {

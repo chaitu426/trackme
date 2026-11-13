@@ -4,7 +4,7 @@ import { AppError } from "@trackme/contracts";
 import { db, siteUserProfiles, sites, eq, and, sql } from "@trackme/db";
 import { listProfiles, profileStats } from "@trackme/analytics";
 import { findServerProfileIds, overlayServerProfiles } from "@/lib/profiles";
-import { authenticateRequest } from "@/lib/tenancy";
+import { authenticateSite } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 import { timedRoute } from "@/lib/metrics-registry";
 
@@ -34,7 +34,7 @@ async function handleGet(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "read:analytics");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "analytics:read", "people");
 
     const search = request.nextUrl.searchParams.get("query")?.trim() || "";
     const limit = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("limit") || 50)));
@@ -77,7 +77,7 @@ export async function POST(
 
     // This endpoint had no authorization check beyond "has a session", so any signed-in user of any workspace
     // could write profiles into any site. Require update rights on THIS site's workspace.
-    await authenticateRequest(request, siteRow.workspaceId, "sites:update");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "sites:update", "people");
 
     const body = await request.json().catch(() => ({}));
     const parsed = IdentifyRequestSchema.safeParse(body);

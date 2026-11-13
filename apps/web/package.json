@@ -17,6 +17,7 @@
     "@trackme/analytics": "workspace:*",
     "@trackme/ask": "workspace:*",
     "@trackme/authz": "workspace:*",
+    "@trackme/billing": "workspace:*",
     "@trackme/config": "workspace:*",
     "@trackme/contracts": "workspace:*",
     "@trackme/db": "workspace:*",

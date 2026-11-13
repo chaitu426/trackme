@@ -1,3 +1,4 @@
+import { withPlanLimit } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
@@ -35,7 +36,7 @@ async function handleGet(
 ) {
   try {
     const { siteId } = await params;
-    await requireSiteAccess(request, siteId);
+    await requireSiteAccess(request, siteId, "analytics:read", "funnels");
 
     const siteGoals = await db
       .select()
@@ -55,26 +56,28 @@ export async function POST(
 ) {
   try {
     const { siteId } = await params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "sites:update", "funnels");
 
     const parsed = CreateGoalSchema.safeParse(await request.json());
     if (!parsed.success) {
       throw new AppError(400, "INVALID_INPUT", parsed.error.issues[0]?.message ?? "Invalid goal payload");
     }
 
-    const createdRows = await db
-      .insert(goals)
-      .values({
-        workspaceId: site.workspaceId,
-        siteId: site.id,
-        name: parsed.data.name,
-        type: parsed.data.type,
-        pathPattern: parsed.data.pathPattern ?? null,
-        eventName: parsed.data.eventName ?? null,
-        targetValue: parsed.data.targetValue ? String(parsed.data.targetValue) : null,
-        enabled: true,
-      })
-      .returning();
+    const createdRows = await withPlanLimit({ resource: "goals", workspaceId: site.workspaceId }, (tx) =>
+      tx
+        .insert(goals)
+        .values({
+          workspaceId: site.workspaceId,
+          siteId: site.id,
+          name: parsed.data.name,
+          type: parsed.data.type,
+          pathPattern: parsed.data.pathPattern ?? null,
+          eventName: parsed.data.eventName ?? null,
+          targetValue: parsed.data.targetValue ? String(parsed.data.targetValue) : null,
+          enabled: true,
+        })
+        .returning()
+    );
 
     const created = createdRows[0];
     if (!created) {

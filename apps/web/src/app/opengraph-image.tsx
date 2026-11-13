@@ -23,10 +23,10 @@ export default function OpengraphImage() {
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", flexWrap: "wrap", fontSize: 84, lineHeight: 1.08, fontWeight: 500, letterSpacing: -2.5, color: text.strong, maxWidth: 1000 }}>
-            Analytics that counts visits,&nbsp;<span style={{ color: text.muted }}>not people.</span>
+            Analytics for every team,&nbsp;<span style={{ color: text.muted }}>not just the analyst.</span>
           </div>
           <div style={{ display: "flex", marginTop: 28, fontSize: 28, lineHeight: 1.4, color: text.body, maxWidth: 900 }}>
-            Live traffic, funnels, errors, release impact and payments. No tracking cookies.
+            One workspace for marketing, engineering and product. No tracking cookies.
           </div>
         </div>
         <div style={{ display: "flex", fontFamily: "monospace", fontSize: 34 }}>

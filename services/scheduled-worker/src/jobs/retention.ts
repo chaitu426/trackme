@@ -1,5 +1,6 @@
 import { getClickHouseClient } from "@trackme/analytics";
 import { env } from "@trackme/config";
+import { PLANS } from "@trackme/contracts";
 import { db, sites, sql } from "@trackme/db";
 
 export interface RetentionClient {
@@ -126,7 +127,16 @@ async function runSiteRetention(client: RetentionClient, dbClient: RetentionDB, 
   const rows = (await dbClient
     .select({
       id: sites.id,
-      retentionMonths: sql<number>`COALESCE((settings ->> 'retentionMonths')::int, ${env.DEFAULT_RETENTION_MONTHS})`,
+      // A site's own setting, never longer than its company's plan keeps data (free: 6 months, pro: 24).
+      // An unknown plan is treated as free.
+      retentionMonths: sql<number>`LEAST(
+        COALESCE((settings ->> 'retentionMonths')::int, ${env.DEFAULT_RETENTION_MONTHS}),
+        COALESCE((
+          SELECT CASE c.plan WHEN 'pro' THEN ${PLANS.pro.retentionMonths} ELSE ${PLANS.free.retentionMonths} END
+          FROM workspaces w INNER JOIN companies c ON c.id = w.company_id
+          WHERE w.id = ${sites.workspaceId}
+        ), ${PLANS.free.retentionMonths})
+      )`,
     })
     .from(sites)) as RetentionSiteRow[];
 

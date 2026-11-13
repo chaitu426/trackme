@@ -1,5 +1,6 @@
 "use client";
 
+import type { Feature } from "@trackme/contracts";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -29,7 +30,7 @@ export function openCommandPalette(): void {
  * every page (the same list as the sidebar), your other sites, and the actions people look for. Results are ranked by a
  * forgiving match, so "gh" finds Gateway Health. The highlighted row slides as you move, and the list scrolls the row into view.
  */
-export function CommandPalette({ workspaceSlug, siteDomain, sites }: { workspaceSlug: string; siteDomain: string | null; sites: { id: string; domain: string; displayName: string }[] }) {
+export function CommandPalette({ workspaceSlug, siteDomain, sites, allowedFeatures }: { workspaceSlug: string; siteDomain: string | null; sites: { id: string; domain: string; displayName: string }[]; allowedFeatures?: readonly Feature[] }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -39,13 +40,13 @@ export function CommandPalette({ workspaceSlug, siteDomain, sites }: { workspace
   const opener = React.useRef<HTMLElement | null>(null);
 
   const commands = React.useMemo<Command[]>(() => {
-    const pages: Command[] = navTargets(workspaceSlug, siteDomain);
+    const pages: Command[] = navTargets(workspaceSlug, siteDomain, allowedFeatures);
     const others: Command[] = sites
       .filter((s) => s.domain !== siteDomain)
       .map((s) => ({ id: `site:${s.id}`, label: `Switch to ${s.displayName || s.domain}`, group: "Sites", href: `/${workspaceSlug}/sites/${s.domain}/realtime`, icon: Globe }));
     const actions: Command[] = [{ id: "action:add-site", label: "Add a website", group: "Actions", href: `/${workspaceSlug}/settings/sites`, icon: Plus }];
     return [...pages, ...others, ...actions];
-  }, [workspaceSlug, siteDomain, sites]);
+  }, [workspaceSlug, siteDomain, sites, allowedFeatures]);
 
   const results = React.useMemo(() => fuzzyFilter(commands, query, (c) => `${c.label} ${c.group}`), [commands, query]);
 

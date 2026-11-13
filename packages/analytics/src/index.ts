@@ -20,6 +20,7 @@ export * from "./queries/funnel-insights.js";
 export * from "./queries/segment-behavior.js";
 export * from "./queries/profiles.js";
 export * from "./queries/page-insights.js";
+export { RAW_SCAN_MAX_DAYS } from "./queries/range-split.js";
 export * from "./queries/errors.js";
 export * from "./queries/retention.js";
 export * from "./stats.js";

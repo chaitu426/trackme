@@ -54,7 +54,7 @@ func (s *Server) admitWithGate(
 
 	for i, siteID := range order {
 		events := bySite[siteID]
-		workspaceID := events[0].WorkspaceID
+		workspaceID := events[0].QuotaScope() // the quota scope: the company
 		req := gate.Request{
 			SiteID:      siteID,
 			WorkspaceID: workspaceID,

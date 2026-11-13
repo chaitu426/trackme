@@ -19,7 +19,7 @@ export async function POST(
 ) {
   try {
     const { workspaceId, channelId } = await props.params;
-    await authenticateRequest(req, workspaceId, "admin:workspace");
+    await authenticateRequest(req, workspaceId, "alerts:manage");
     // A test sends a real outbound request, so it is limited like any other way of making this server call out.
     await checkRateLimit(`channel_test:${workspaceId}`, 10, 60, "Too many test notifications. Wait a minute and try again.");
 

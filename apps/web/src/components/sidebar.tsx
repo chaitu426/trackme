@@ -1,5 +1,6 @@
 "use client";
 
+import type { Feature } from "@trackme/contracts";
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -13,10 +14,12 @@ import {
   Plus,
   Settings2,
   Users,
+  CreditCard,
+  Network,
   Globe,
   type LucideIcon,
 } from "lucide-react";
-import { NAV_SUITES, SITE_SETTINGS_ITEM } from "@/lib/nav";
+import { NAV_SUITES, SITE_SETTINGS_ITEM, navAllowed } from "@/lib/nav";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PortalMenu } from "@/components/ui/menu-panel";
 import { LogoMark } from "@/components/brand/logo-mark";
@@ -32,6 +35,8 @@ interface SidebarProps {
   onMobileClose: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  /** The features the person has on the active site. Omitted when nothing is restricted. */
+  allowedFeatures?: readonly Feature[];
 }
 
 export function Sidebar({
@@ -44,6 +49,7 @@ export function Sidebar({
   onMobileClose,
   collapsed,
   onToggleCollapse,
+  allowedFeatures,
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -85,7 +91,7 @@ export function Sidebar({
     ...NAV_SUITES.map((suite) => ({
       id: suite.id,
       title: suite.title,
-      items: suite.items.map((item): NavItem => ({
+      items: suite.items.filter((item) => navAllowed(item.path, allowedFeatures)).map((item): NavItem => ({
         href: item.workspace ? `/${workspace.slug}/${item.path}` : siteHref(item.path),
         label: item.label,
         icon: item.icon,
@@ -98,12 +104,21 @@ export function Sidebar({
       title: "Workspace",
       items: [
         { href: `/${workspace.slug}/settings`, label: "Organization & Team", icon: Users },
+        { href: `/${workspace.slug}/settings/teams`, label: "Teams & access", icon: Network },
         { href: `/${workspace.slug}/settings/sites`, label: `Websites (${sites.length})`, icon: Globe },
-        { href: siteHref(SITE_SETTINGS_ITEM.path), label: SITE_SETTINGS_ITEM.label, icon: SITE_SETTINGS_ITEM.icon, scoped: true },
+        { href: `/${workspace.slug}/settings/billing`, label: "Plan & billing", icon: CreditCard },
+        ...(navAllowed(SITE_SETTINGS_ITEM.path, allowedFeatures)
+          ? [{ href: siteHref(SITE_SETTINGS_ITEM.path), label: SITE_SETTINGS_ITEM.label, icon: SITE_SETTINGS_ITEM.icon, scoped: true }]
+          : []),
         { href: "/legal/privacy", label: "Privacy Policy", icon: BookOpen },
       ],
     },
   ];
+
+  // A suite with nothing the person may open is not shown at all.
+  for (let i = navGroups.length - 1; i >= 0; i--) {
+    if (navGroups[i]!.items.length === 0) navGroups.splice(i, 1);
+  }
 
   // An item is active when the path is its href or a child of it, and no other nav item
   // matches more specifically (so /settings does not light up on /settings/sites).

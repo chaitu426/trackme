@@ -8,9 +8,9 @@ import { PALETTE } from "@trackme/landing/src/palette";
 export const BRAND = {
   name: "TrackMe",
   /** The line. It is the landing page's headline; do not write a second one. */
-  tagline: "Analytics that counts visits, not people.",
+  tagline: "Analytics for every team, not just the analyst.",
   description:
-    "Live traffic, funnels, errors, release impact and payments from a tag under 10 KB. No tracking cookies, and no IP address is ever stored.",
+    "One workspace where marketing, engineering and product see live traffic, funnels, errors, release impact and payments, each with the access they need. No tracking cookies, and no IP address is ever stored.",
   ink: PALETTE.surface.ink,
   page: PALETTE.surface.page,
   light: PALETTE.text.strong,

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@trackme/analytics": "workspace:*",
+    "@trackme/billing": "workspace:*",
     "@trackme/config": "workspace:*",
     "@trackme/contracts": "workspace:*",
     "@trackme/db": "workspace:*",

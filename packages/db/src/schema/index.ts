@@ -1,4 +1,5 @@
 export * from "./users.js";
+export * from "./companies.js";
 export * from "./workspaces.js";
 export * from "./memberships.js";
 export * from "./sites.js";
@@ -20,3 +21,5 @@ export * from "./releases.js";
 export * from "./error-status.js";
 export * from "./payment-gateways.js";
 export * from "./ask-runs.js";
+export * from "./billing.js";
+export * from "./teams.js";

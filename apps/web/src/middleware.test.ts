@@ -8,6 +8,9 @@ test("public pages remain reachable without a session", () => {
   assert.equal(isPublicPath("/login"), true);
   assert.equal(isPublicPath("/tracker.js"), true);
   assert.equal(isPublicPath("/share/abc"), true);
+  // Billing providers post signed webhooks with no session.
+  assert.equal(isPublicPath("/api/v1/webhooks/billing/demo"), true);
+  assert.equal(isPublicPath("/api/v1/companies/x/billing"), false);
   assert.equal(isPublicPath("/legal/privacy"), true);
 });
 

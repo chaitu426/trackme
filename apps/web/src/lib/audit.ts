@@ -24,15 +24,20 @@ export interface AuditLogSummary {
 /**
  * Record an administrative action into the audit trail.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function recordAuditLog(params: RecordAuditLogParams): Promise<void> {
   try {
+    // `actor_id` is a user uuid. An API key (`api-key:<id>`) is kept in the metadata instead of being dropped,
+    // so the record still says who acted.
+    const actorIsUser = typeof params.actorId === "string" && UUID.test(params.actorId);
     await db.insert(auditLogs).values({
       workspaceId: params.workspaceId,
-      actorId: params.actorId ?? null,
+      actorId: actorIsUser ? params.actorId! : null,
       action: params.action,
       targetType: params.targetType,
       targetId: params.targetId,
-      metadata: params.metadata ?? {},
+      metadata: params.actorId && !actorIsUser ? { ...(params.metadata ?? {}), actor: params.actorId } : (params.metadata ?? {}),
       ipAddress: params.ipAddress ?? null,
     });
   } catch (err) {

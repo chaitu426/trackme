@@ -1,8 +1,9 @@
+import { withPlanLimit } from "@/lib/plan";
 import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { AppError } from "@trackme/contracts";
 import { db, siteFunnels, sites, eq, desc } from "@trackme/db";
-import { authenticateRequest } from "@/lib/tenancy";
+import { authenticateSite } from "@/lib/tenancy";
 import { jsonError } from "@/lib/http";
 
 const FunnelStepSchema = z.object({
@@ -35,7 +36,7 @@ export async function GET(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "read:analytics");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "analytics:read", "funnels");
 
     const funnels = await db
       .select()
@@ -66,7 +67,7 @@ export async function POST(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "sites:update");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "sites:update", "funnels");
 
     const body = await request.json().catch(() => ({}));
     const parsed = CreateFunnelSchema.safeParse(body);
@@ -82,15 +83,17 @@ export async function POST(
       order: idx + 1,
     }));
 
-    const [created] = await db
-      .insert(siteFunnels)
-      .values({
-        siteId,
-        name,
-        description: description || null,
-        steps: sortedSteps,
-      })
-      .returning();
+    const [created] = await withPlanLimit({ resource: "funnels", workspaceId: siteRow.workspaceId }, (tx) =>
+      tx
+        .insert(siteFunnels)
+        .values({
+          siteId,
+          name,
+          description: description || null,
+          steps: sortedSteps,
+        })
+        .returning()
+    );
 
     return NextResponse.json({ funnel: created }, { status: 201 });
   } catch (error) {

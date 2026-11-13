@@ -5,7 +5,7 @@ import { env } from "@trackme/config";
 import { db, siteUserProfiles, sites, eq, and } from "@trackme/db";
 import { eraseVisitor, getProfile, getUserTimeline } from "@trackme/analytics";
 import { overlayServerProfiles } from "@/lib/profiles";
-import { authenticateRequest, requireSiteAccess } from "@/lib/tenancy";
+import { authenticateSite, requireSiteAccess } from "@/lib/tenancy";
 import { recordAuditLog } from "@/lib/audit";
 import { getClientIp } from "@/lib/client-ip";
 import { jsonError } from "@/lib/http";
@@ -28,7 +28,7 @@ async function handleGet(
       throw new AppError(404, "SITE_NOT_FOUND", "Site not found.");
     }
 
-    await authenticateRequest(request, siteRow.workspaceId, "read:analytics");
+    await authenticateSite(request, siteRow.workspaceId, siteId, "analytics:read", "people");
 
     const decodedDistinctId = decodeURIComponent(distinctId);
 
@@ -76,7 +76,7 @@ async function handleDelete(
 ) {
   try {
     const { siteId, distinctId } = await props.params;
-    const { site, ctx } = await requireSiteAccess(request, siteId, "data:erase");
+    const { site, ctx } = await requireSiteAccess(request, siteId, "data:erase", "people");
     const identifier = decodeURIComponent(distinctId);
     const execute = request.nextUrl.searchParams.get("confirm") === "true";
 

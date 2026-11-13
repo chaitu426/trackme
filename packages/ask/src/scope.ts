@@ -100,3 +100,19 @@ export function resolveRange(range: RangeId, now: Date = new Date()): ResolvedRa
 export function daysBetween(from: string, to: string): number {
   return Math.floor((Date.parse(to) - Date.parse(from)) / DAY_MS) + 1;
 }
+
+/**
+ * A range for a query that must read raw events, which the analytics layer only allows for `maxDays`. A wider question
+ * ("last 90 days") is answered from the most recent `maxDays` and says so, instead of failing and leaving the model with
+ * nothing. `note` is set only when the range was shortened, so the evidence is never silently narrower than it looks.
+ */
+export function clampToRawScan(range: ResolvedRange, maxDays: number): { fromIso: string; toIso: string; note?: string } {
+  const to = Date.parse(range.toIso);
+  const from = Date.parse(range.fromIso);
+  if ((to - from) / 86_400_000 <= maxDays) return { fromIso: range.fromIso, toIso: range.toIso };
+  return {
+    fromIso: new Date(to - maxDays * 86_400_000).toISOString(),
+    toIso: range.toIso,
+    note: `Page-level data is read from raw events, so this covers the last ${maxDays} days, not ${range.label.toLowerCase()}.`,
+  };
+}

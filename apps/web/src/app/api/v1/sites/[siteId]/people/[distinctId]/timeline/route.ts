@@ -31,7 +31,7 @@ async function handleGet(
 ) {
   try {
     const { siteId, distinctId } = await props.params;
-    const { site } = await requireSiteAccess(request, siteId, "analytics:read");
+    const { site } = await requireSiteAccess(request, siteId, "analytics:read", "people");
     const userId = decodeURIComponent(distinctId);
     const search = request.nextUrl.searchParams;
     const cursor = search.get("cursor") ?? undefined;
