@@ -48,3 +48,48 @@ export function proHighlights(plans: Record<"free" | "pro", PlanLimits> = PLANS)
     "Payments analytics, public dashboards, audit log",
   ];
 }
+
+/** What a plan card lists: the headline limits first, written from the same table the server enforces. */
+export interface PlanCardCopy {
+  id: "free" | "pro";
+  name: string;
+  tagline: string;
+  features: string[];
+}
+
+export function planCards(plans: Record<"free" | "pro", PlanLimits> = PLANS): PlanCardCopy[] {
+  const f = plans.free;
+  const p = plans.pro;
+  const sites = (n: number | null) => (n === null ? "Unlimited websites" : `${n} ${n === 1 ? "website" : "websites"}`);
+  const spaces = (n: number | null) => (n === null ? "Unlimited workspaces" : `${n} ${n === 1 ? "workspace" : "workspaces"}`);
+  return [
+    {
+      id: "free",
+      name: "Free",
+      tagline: "For one site and a small team getting started.",
+      features: [
+        `${sites(f.sites)}, ${spaces(f.workspaces)}`,
+        `${count(f.eventsPerMonth)} events a month`,
+        `${count(f.members)} members and ${count(f.viewers)} viewers`,
+        `${f.retentionMonths} months of history`,
+        `${count(f.askPerMonth)} Ask questions a month`,
+        "Email alerts",
+      ],
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      tagline: "For teams that need every view, with the right access for each person.",
+      features: [
+        `${sites(p.sites)}, ${spaces(p.workspaces)}`,
+        `${count(p.eventsPerMonth)} events a month`,
+        "Teams and per-site access",
+        `${p.retentionMonths} months of history`,
+        "Payments analytics and the money trail",
+        `${count(p.askPerMonth)} Ask questions a month`,
+        "Slack, Discord and webhook alerts",
+        "Public dashboards, audit log, full exports",
+      ],
+    },
+  ];
+}

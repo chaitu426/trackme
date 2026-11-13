@@ -7,7 +7,7 @@ import {
   demoSecret,
   type BillingGateway,
 } from "@trackme/billing";
-import { db, companyMembers, eq, and, inArray } from "@trackme/db";
+import { db, companies, companyMembers, eq, and, inArray } from "@trackme/db";
 import { requireApiUser } from "@/lib/auth";
 import { invalidateIngestSiteCache } from "@/lib/ingest-cache";
 import { appOrigin } from "@/lib/brand";
@@ -77,4 +77,10 @@ export async function purgeEdgeCache(publicKeyHashes: string[]): Promise<void> {
 /** Only same-site relative paths may be used as a return address. */
 export function safeReturnPath(value: string | undefined, fallback: string): string {
   return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") ? value : fallback;
+}
+
+/** The plan a company is on, as one cheap read, for chrome that only needs to know whether to show the Pro mark. */
+export async function companyPlan(companyId: string): Promise<"free" | "pro"> {
+  const [row] = await db.select({ plan: companies.plan }).from(companies).where(eq(companies.id, companyId)).limit(1);
+  return row?.plan === "pro" ? "pro" : "free";
 }

@@ -27,14 +27,21 @@ export function assertDemoAllowed(env: Record<string, string | undefined> = proc
   }
 }
 
-/** The secret that signs demo checkout sessions and webhooks. Required in production; a fixed dev value otherwise. */
+/**
+ * The secret that signs demo checkout sessions and webhooks.
+ * Order: an explicit BILLING_DEMO_SECRET; else, outside production, a fixed dev value; else (production with the demo
+ * switched on deliberately) a key derived from NEXTAUTH_SECRET, so `pnpm start:all` works without extra setup. The
+ * derived key is namespaced, so the session secret itself is never used to sign billing data.
+ */
 export function demoSecret(env: Record<string, string | undefined> = process.env): string {
   const secret = env.BILLING_DEMO_SECRET;
   if (secret && secret.length >= 16) return secret;
-  if (env.NODE_ENV === "production") {
-    throw new Error("BILLING_DEMO_SECRET (16+ characters) is required to run the demo gateway in production.");
+  if (env.NODE_ENV !== "production") return "dev-only-demo-billing-secret";
+  const base = env.NEXTAUTH_SECRET;
+  if (env.BILLING_ALLOW_DEMO === "true" && base && base.length >= 16) {
+    return createHmac("sha256", base).update("trackme:billing-demo:v1").digest("hex");
   }
-  return "dev-only-demo-billing-secret";
+  throw new Error("BILLING_DEMO_SECRET (16+ characters) is required to run the demo gateway in production.");
 }
 
 // ── Signing (the same scheme real providers use: a timestamp plus an HMAC of "timestamp.body") ──────────────────────

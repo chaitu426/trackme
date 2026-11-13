@@ -43,6 +43,15 @@ test("in production the demo needs a real secret; elsewhere a dev default is use
   assert.ok(demoSecret({ NODE_ENV: "development" }).length >= 16);
 });
 
+test("a production demo that was switched on derives its secret from NEXTAUTH_SECRET", () => {
+  const env = { NODE_ENV: "production", BILLING_ALLOW_DEMO: "true", NEXTAUTH_SECRET: "x".repeat(32) };
+  const derived = demoSecret(env);
+  assert.notEqual(derived, env.NEXTAUTH_SECRET);
+  assert.equal(derived, demoSecret(env));
+  assert.throws(() => demoSecret({ ...env, BILLING_ALLOW_DEMO: "false" }), /BILLING_DEMO_SECRET/);
+  assert.throws(() => demoSecret({ ...env, NEXTAUTH_SECRET: "short" }), /BILLING_DEMO_SECRET/);
+});
+
 test("a signed payload verifies; a tampered body, wrong secret or stale timestamp does not", () => {
   const body = '{"a":1}';
   const t = Math.floor(NOW.getTime() / 1000);

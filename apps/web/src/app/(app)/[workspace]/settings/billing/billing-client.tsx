@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, FlaskConical, Minus } from "lucide-react";
+import { Check, ChevronDown, FlaskConical, Minus } from "lucide-react";
+import { GlyphField } from "@trackme/landing";
 import { limitOf, type LimitedResource } from "@trackme/contracts";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,7 @@ import { PlanBadge } from "@/components/plan/plan-badge";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { describeStatus, formatDate, formatPrice, yearlySavingPercent, type SubscriptionView } from "@/lib/billing-view";
-import type { PlanRow } from "@/lib/plan-copy";
+import { planCards, type PlanRow } from "@/lib/plan-copy";
 
 type Interval = "month" | "year";
 
@@ -73,6 +74,7 @@ export function BillingClient(props: Props) {
   const status = describeStatus(plan, subscription, props.grandfathered, now);
   const saving = yearlySavingPercent(prices.month.amountMinor, prices.year.amountMinor);
   const base = `/api/v1/companies/${companyId}/billing`;
+  const cards = React.useMemo(() => planCards(), []);
 
   React.useEffect(() => {
     if (props.checkout === "success") toast.success("You are on Pro", "The payment went through and your limits have been raised.");
@@ -119,13 +121,18 @@ export function BillingClient(props: Props) {
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* ── The plan ─────────────────────────────────────────────────────────────────────────── */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className={cn("relative overflow-hidden lg:col-span-2", plan === "pro" && "border-white/[0.26]")}>
+          {plan === "pro" && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-40 opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true">
+              <GlyphField variant="gauge" cell={10} strength={0.5} className="absolute inset-0 h-full w-full" />
+            </div>
+          )}
+          <CardHeader className="relative">
             <CardTitle>Current plan</CardTitle>
             <CardDescription>{canManage ? "You can change this as a company owner." : "Only the company owner can change the plan."}</CardDescription>
           </CardHeader>
 
-          <div className="space-y-4">
+          <div className="relative space-y-4">
             <div>
               <PlanBadge plan={plan} />
               <p className="mt-3 text-lg font-medium leading-6 text-zinc-50">{status.headline}</p>
@@ -191,12 +198,14 @@ export function BillingClient(props: Props) {
         </Card>
       </div>
 
-      {/* ── Compare and upgrade ───────────────────────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="flex-row flex-wrap items-end justify-between gap-4 space-y-0">
+      {/* ── Plans ─────────────────────────────────────────────────────────────────────────────── */}
+      <section aria-labelledby="plans-heading" className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
-            <CardTitle>Free and Pro</CardTitle>
-            <CardDescription>{subscribed ? "Your plan is highlighted." : "Pro raises every limit and adds teams, payments analytics and the audit log."}</CardDescription>
+            <h2 id="plans-heading" className="text-sm font-medium text-zinc-50">
+              Plans
+            </h2>
+            <p className="text-xs text-zinc-400">{subscribed ? "Your plan is marked. Change the billing interval from the current plan card." : "Pro raises every limit and adds teams, payments analytics and the audit log."}</p>
           </div>
           {!subscribed && (
             <PillTabs
@@ -210,60 +219,104 @@ export function BillingClient(props: Props) {
               ]}
             />
           )}
-        </CardHeader>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[540px] border-separate border-spacing-0 text-left text-sm">
-            <thead>
-              <tr className="text-xs text-zinc-500">
-                <th scope="col" className="w-[44%] border-b border-border pb-3 font-normal">
-                  <span className="sr-only">Feature</span>
-                </th>
-                {(["free", "pro"] as const).map((p) => (
-                  <th key={p} scope="col" className={cn("border-b border-border pb-3 pr-4 align-bottom font-normal", plan === p && "text-zinc-100")}>
-                    <PlanBadge plan={p} />
-                    <span className="mt-2 block font-mono text-sm text-zinc-200">
-                      {p === "free" ? "$0" : `${formatPrice(prices[interval].amountMinor, prices[interval].currency)} / ${interval === "year" ? "year" : "month"}`}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.label} className="group">
-                  <th scope="row" className="border-b border-white/[0.05] py-2.5 pr-4 text-xs font-normal text-zinc-400">
-                    {row.label}
-                  </th>
-                  {(["free", "pro"] as const).map((p) => {
-                    const text = row[p];
-                    const off = text === "Not included" || text === "Email only" || text === "CSV only";
-                    return (
-                      <td key={p} className={cn("border-b border-white/[0.05] py-2.5 pr-4 text-xs", off ? "text-zinc-500" : "text-zinc-200", plan === p && "bg-white/[0.02]")}>
-                        <span className="inline-flex items-center gap-1.5">
-                          {text === "Included" ? <Check className="size-3.5 text-good" aria-hidden="true" /> : text === "Not included" ? <Minus className="size-3.5" aria-hidden="true" /> : null}
-                          {text === "Included" || text === "Not included" ? <span className="sr-only">{text}</span> : text}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
 
-        {canManage && !subscribed && (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-            <p className="text-xs text-zinc-400">
-              {formatPrice(prices[interval].amountMinor, prices[interval].currency)} {interval === "year" ? "a year, billed once" : "a month"}. Cancel any time; your data stays.
-            </p>
-            <Button loading={busy === "checkout"} onClick={upgrade}>
-              {plan === "pro" ? "Subscribe to keep Pro" : "Upgrade to Pro"}
-            </Button>
+        <div className="grid gap-4 md:grid-cols-2">
+          {cards.map((card) => {
+            const pro = card.id === "pro";
+            const mine = plan === card.id;
+            const price = pro ? prices[interval] : { amountMinor: 0, currency: prices.month.currency };
+            const perMonth = pro && interval === "year" ? Math.round(price.amountMinor / 12) : price.amountMinor;
+            return (
+              <Card key={card.id} className={cn("relative flex flex-col overflow-hidden", pro && "border-white/[0.26]", mine && "ring-1 ring-white/[0.18]")}>
+                {pro && (
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-32 opacity-70 [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true">
+                    <GlyphField variant="gauge" cell={10} strength={0.5} className="absolute inset-0 h-full w-full" />
+                  </div>
+                )}
+                <div className="relative flex items-center justify-between">
+                  <PlanBadge plan={card.id} />
+                  {mine ? (
+                    <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-good">Your plan</span>
+                  ) : (
+                    pro && <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-500">Everything unlocked</span>
+                  )}
+                </div>
+
+                <div className="relative mt-6 flex items-baseline gap-2">
+                  <span className="font-mono text-4xl leading-none tracking-[-0.03em] text-zinc-50 tabular-nums">{formatPrice(perMonth, price.currency)}</span>
+                  <span className="text-xs text-zinc-500">{pro ? "/ month" : "forever"}</span>
+                </div>
+                <p className="relative mt-1.5 h-4 text-xs text-zinc-500">
+                  {pro ? (interval === "year" ? `${formatPrice(price.amountMinor, price.currency)} billed once a year` : "Billed monthly, cancel any time") : "No card needed"}
+                </p>
+                <p className="relative mt-4 text-xs leading-5 text-zinc-400">{card.tagline}</p>
+
+                <ul className="relative mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4">
+                  {card.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2.5 text-xs leading-5 text-zinc-300">
+                      <Check className={cn("mt-0.5 size-3.5 shrink-0", pro ? "text-good" : "text-zinc-500")} aria-hidden="true" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                {pro && canManage && !subscribed && (
+                  <Button className="relative mt-5 w-full" loading={busy === "checkout"} onClick={upgrade}>
+                    {plan === "pro" ? "Subscribe to keep Pro" : "Upgrade to Pro"}
+                  </Button>
+                )}
+                {pro && !canManage && plan !== "pro" && <p className="relative mt-5 text-xs text-zinc-500">Ask the company owner to upgrade.</p>}
+                {!pro && mine && <p className="relative mt-5 text-xs text-zinc-500">This is your current plan.</p>}
+              </Card>
+            );
+          })}
+        </div>
+
+        <details className="group rounded-xl border border-border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-xs font-medium text-zinc-200 [&::-webkit-details-marker]:hidden">
+            Compare every feature
+            <ChevronDown className="size-4 text-zinc-500 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="overflow-x-auto border-t border-border px-5 pb-4 pt-2">
+            <table className="w-full min-w-[480px] border-separate border-spacing-0 text-left text-sm">
+              <thead>
+                <tr className="text-xs text-zinc-500">
+                  <th scope="col" className="w-[46%] border-b border-border py-3 font-normal">
+                    <span className="sr-only">Feature</span>
+                  </th>
+                  {(["free", "pro"] as const).map((p) => (
+                    <th key={p} scope="col" className="border-b border-border py-3 pr-4 font-normal">
+                      <PlanBadge plan={p} />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.label}>
+                    <th scope="row" className="border-b border-white/[0.05] py-2.5 pr-4 text-xs font-normal text-zinc-400">
+                      {row.label}
+                    </th>
+                    {(["free", "pro"] as const).map((p) => {
+                      const text = row[p];
+                      const off = text === "Not included" || text === "Email only" || text === "CSV only";
+                      return (
+                        <td key={p} className={cn("border-b border-white/[0.05] py-2.5 pr-4 text-xs", off ? "text-zinc-500" : "text-zinc-200", plan === p && "bg-white/[0.02]")}>
+                          <span className="inline-flex items-center gap-1.5">
+                            {text === "Included" ? <Check className="size-3.5 text-good" aria-hidden="true" /> : text === "Not included" ? <Minus className="size-3.5" aria-hidden="true" /> : null}
+                            {text === "Included" || text === "Not included" ? <span className="sr-only">{text}</span> : text}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </Card>
+        </details>
+      </section>
 
       {/* ── Invoices ──────────────────────────────────────────────────────────────────────────── */}
       {canManage && (

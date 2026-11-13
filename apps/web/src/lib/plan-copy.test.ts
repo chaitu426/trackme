@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planRows, proHighlights } from "./plan-copy";
+import { planCards, planRows, proHighlights } from "./plan-copy";
 
 const row = (label: string) => planRows().find((r) => r.label === label)!;
 
@@ -20,4 +20,13 @@ test("the upgrade highlights are drawn from the Pro plan", () => {
   assert.ok(lines.some((l) => l.includes("10 websites")));
   assert.ok(lines.some((l) => l.includes("1,000,000 events")));
   assert.ok(lines.some((l) => l.includes("24 months")));
+});
+
+test("the plan cards list the same numbers the plan table enforces", () => {
+  const [free, pro] = planCards();
+  assert.equal(free!.id, "free");
+  assert.equal(pro!.id, "pro");
+  assert.ok(free!.features.includes("1 website, 1 workspace"));
+  assert.ok(pro!.features.includes("10 websites, 3 workspaces"));
+  assert.ok(pro!.features.includes("1,000,000 events a month"));
 });

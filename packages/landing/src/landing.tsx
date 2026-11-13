@@ -15,6 +15,7 @@ import { CopySnippet } from "./copy-snippet";
 import { TryChips } from "./try-chips";
 import { CountUp, Reveal, Spot } from "./motion";
 import { RELEASE } from "./version";
+import { Pricing, type PricingProps } from "./pricing";
 
 export interface LandingLinks {
   /** Docs home. */
@@ -43,6 +44,8 @@ export interface LandingProps {
   product?: string;
   links: LandingLinks;
   viewer?: LandingViewer | undefined;
+  /** The plans and prices. Omit to leave the pricing section out (the docs site does). */
+  pricing?: PricingProps | undefined;
   /** The real tracker and ingest URLs for the install snippet. Without them the page shows placeholders. */
   snippet?: { scriptUrl: string; endpoint: string };
 }
@@ -117,7 +120,7 @@ function Mark() {
   return <LogoMark size={24} />;
 }
 
-export function Landing({ product = "TrackMe", links, viewer, snippet }: LandingProps) {
+export function Landing({ product = "TrackMe", links, viewer, pricing, snippet }: LandingProps) {
   const scriptUrl = snippet?.scriptUrl ?? "https://your-app.com/t/v1/tracker.js";
   const endpoint = snippet?.endpoint ?? "https://ingest.your-app.com/v1/batch";
   const SNIPPET = `<script defer src="${scriptUrl}" data-site="YOUR_SITE_KEY" data-endpoint="${endpoint}"></script>`;
@@ -141,7 +144,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
         @media (prefers-reduced-motion: reduce) { .hero-tag, .rise { animation: none; opacity: 1; } .rise, line.hero-tag { transform: none; } }
       `}</style>
 
-      <Navbar product={product} links={{ docs: links.docs, signIn: links.signIn, getStarted: links.getStarted }} viewer={viewer} />
+      <Navbar product={product} links={{ docs: links.docs, signIn: links.signIn, getStarted: links.getStarted }} viewer={viewer} hasPricing={!!pricing} plan={pricing?.currentPlan} />
 
       {/* ------------------------------------------------------------ Hero */}
       <section id="product" className="relative overflow-hidden" style={{ backgroundColor: INK }}>
@@ -349,12 +352,29 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
         </Container>
       </section>
 
+      {/* --------------------------------------------------------- Pricing */}
+      {pricing && (
+        <section id="pricing" className="scroll-mt-16 pt-28 sm:pt-36">
+          <Container>
+            <SectionHead
+              index="06"
+              label="Pricing"
+              title={pricing.currentPlan === "pro" ? "You are on Pro. Everything is unlocked." : "Start free. Move to Pro when the team grows."}
+              lead="One price for the whole company, shared by every workspace in it. Cancel any time; your data stays."
+            />
+            <div className="mt-12">
+              <Pricing {...pricing} />
+            </div>
+          </Container>
+        </section>
+      )}
+
       {/* ------------------------------------------------------------- FAQ */}
       <section id="faq" className="pt-28 sm:pt-36">
         <Container>
           <div className="grid gap-12 lg:grid-cols-[420px_1fr] lg:gap-16">
             <div className="lg:sticky lg:top-28 lg:self-start">
-              <SectionHead index="06" label="Questions" title="Good to know before you start." />
+              <SectionHead index={pricing ? "07" : "06"} label="Questions" title="Good to know before you start." />
               <SmartLink href={links.docs} className="mt-8 inline-flex items-center gap-1 text-sm text-zinc-300 transition-colors duration-150 hover:text-white">
                 Read the docs <ArrowUpRight className="h-4 w-4" strokeWidth={1.5} />
               </SmartLink>
@@ -387,7 +407,7 @@ export function Landing({ product = "TrackMe", links, viewer, snippet }: Landing
             </div>
             <div className="relative z-10 grid items-end gap-10 px-6 pb-56 pt-14 sm:px-12 sm:pt-20 lg:grid-cols-[1fr_1fr] lg:gap-14">
               <div>
-                <p className="font-mono text-xs text-zinc-500">07 — Start</p>
+                <p className="font-mono text-xs text-zinc-500">{pricing ? "08" : "07"} — Start</p>
                 <h2 className="mt-5 text-balance text-[36px] font-medium leading-[42px] tracking-[-0.03em] text-zinc-50 sm:text-[52px] sm:leading-[56px]">
                   Your first pageview is one tag away.
                 </h2>

@@ -47,7 +47,7 @@ const SPECS: [string, string][] = [
   ["Per request", "up to 50 events"],
 ];
 
-const SECTIONS = [
+const BASE_SECTIONS = [
   { id: "ask", label: "Ask" },
   { id: "system", label: "System" },
   { id: "privacy", label: "Privacy" },
@@ -55,7 +55,25 @@ const SECTIONS = [
   { id: "faq", label: "FAQ" },
 ];
 
-export function Navbar({ product, links, viewer }: { product: string; links: NavLinks; viewer?: LandingViewer | undefined }) {
+/** Pricing sits before Setup, so it takes the fourth slot in the bar; Setup stays in the mobile menu. */
+function sectionsFor(hasPricing: boolean) {
+  return hasPricing ? [...BASE_SECTIONS.slice(0, 3), { id: "pricing", label: "Pricing" }, ...BASE_SECTIONS.slice(3)] : BASE_SECTIONS;
+}
+
+export function Navbar({
+  product,
+  links,
+  viewer,
+  hasPricing = false,
+  plan,
+}: {
+  product: string;
+  links: NavLinks;
+  viewer?: LandingViewer | undefined;
+  hasPricing?: boolean;
+  plan?: "free" | "pro" | undefined;
+}) {
+  const SECTIONS = React.useMemo(() => sectionsFor(hasPricing), [hasPricing]);
   const [scrolled, setScrolled] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [menu, setMenu] = React.useState(false);
@@ -85,7 +103,7 @@ export function Navbar({ product, links, viewer }: { product: string; links: Nav
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, []);
+  }, [SECTIONS]);
 
   React.useEffect(() => {
     if (!menu) return;
@@ -158,6 +176,12 @@ export function Navbar({ product, links, viewer }: { product: string; links: Nav
                   Sign in
                 </SmartLink>
               )
+            )}
+            {viewer && plan === "pro" && (
+              <span className="hidden items-center gap-1.5 rounded-md border border-white/[0.28] bg-white/[0.07] px-2 py-0.5 font-mono text-[11px] uppercase leading-4 tracking-[0.14em] text-zinc-50 sm:inline-flex">
+                <span aria-hidden="true">##</span>
+                Pro
+              </span>
             )}
             <SmartLink
               href={viewer?.href ?? links.getStarted}
