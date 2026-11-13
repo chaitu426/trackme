@@ -28,7 +28,7 @@
     "@trackme/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.13.9",
+    "@types/node": "^26.6.6",
     "typescript": "^5.7.3"
   }
 }
