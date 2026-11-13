@@ -1,4 +1,4 @@
-```yaml
+
 # Coolify Docker Compose resource.
 # Infrastructure services run separately on the shared Coolify network.
 # Public access is through Cloudflare Quick Tunnels on localhost ports.
@@ -144,4 +144,3 @@ networks:
   coolify:
     name: orp7ujojmp9hb8in8fs3lh7r
     external: true
-```
