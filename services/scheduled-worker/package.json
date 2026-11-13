@@ -22,7 +22,7 @@
     "@trackme/object-store": "workspace:*",
     "@trackme/payments": "workspace:*",
     "ioredis": "^5.6.0",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.6.0",
     "prom-client": "^15"
   },
   "devDependencies": {
